@@ -5,7 +5,7 @@ from enum import IntEnum, auto
 import numpy as np
 from amaranth.back import verilog
 import math
-from amaranth_sources.drive_serial_port import drive_serial_port
+from src.drive_serial_port import drive_serial_port
 
 
 class serial_controller(Elaboratable):
