@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "create subst path",
+            "type": "shell",
+            "command": "if not exist S: subst S: ${workspaceFolder}/controller-firmware",
+            "problemMatcher": []
+        },
+        {
+            "label": "setup python venv",
+            "type": "shell",
+            "command": "if not exist venv python -m venv venv",
+            "options": {
+                "cwd": "${workspaceFolder}/controller-firmware/python/"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "install python packages",
+            "type": "shell",
+            "command": "venv\\Scripts\\activate.bat && pip install -r requirements.txt",
+            "options": {
+                "cwd": "${workspaceFolder}/controller-firmware/python/"
+            },
+            "dependsOn": ["setup python venv"],
+            "problemMatcher": []
+        },
+        {
+            "label": "create vivado project",
+            "type": "shell",
+            "command": "c:/xilinx/vivado/2023.1/settings64.bat && if not exist S:vivado/controller_firmware vivado -mode batch -source ${workspaceFolder}/controller-firmware/vivado/create_project.tcl", // TODO: make this vivado path easier to change
+            "problemMatcher": [],
+            "dependsOn": ["create subst path"],
+        },
+        {
+            "label": "save vivado project",
+            "type": "shell",
+            "command": "c:/xilinx/vivado/2023.1/settings64.bat && vivado -mode batch -source ${workspaceFolder}/controller-firmware/vivado/save_project.tcl", // TODO: make this vivado path easier to change
+            "problemMatcher": [],
+            "dependsOn": ["create subst path"]
+        },
+        {
+            "label": "setup project",
+            "dependsOn": ["create vivado project", "install python packages"],
+            "problemMatcher": []
+        }
+    ]
+}

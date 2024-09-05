@@ -23,6 +23,7 @@
 !*.py
 !*.xdc
 !*.md
+!*.xsa
 
 # ...even if they are in subdirectories
 !*/
