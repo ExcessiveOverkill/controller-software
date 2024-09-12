@@ -1,10 +1,25 @@
 {
     "version": "2.0.0",
+    "options": {
+      "env": {
+        "xilinx_path": "/home/excessive/Xilinx",
+        "xilinx_version": "2023.1"
+      }
+    },
+
     "tasks": [
         {
-            "label": "create subst path",
+            "label": "create subst path vivado",
             "type": "shell",
-            "command": "if not exist S: subst S: ${workspaceFolder}/controller-firmware",
+            "windows": { "command": "if not exist S: subst S: ${workspaceFolder}/controller-firmware"},
+            "linux": { "command": "echo ''"},
+            "problemMatcher": []
+        },
+        {
+            "label": "create subst path vitis",
+            "type": "shell",
+            "windows": { "command": "if not exist T: subst T: ${workspaceFolder}/controller-software"},
+            "linux": { "command": "echo ''"},
             "problemMatcher": []
         },
         {
@@ -29,10 +44,20 @@
         {
             "label": "create vivado project",
             "type": "shell",
-            "command": "c:/xilinx/vivado/2023.1/settings64.bat && if not exist S:vivado/controller_firmware vivado -mode batch -source ${workspaceFolder}/controller-firmware/vivado/create_project.tcl", // TODO: make this vivado path easier to change
+            "windows": { "command": "${env:xilinx_path}/vivado/${env:xilinx_version}/settings64.bat && if not exist S:vivado/controller_firmware vivado -mode batch -source ${workspaceFolder}/controller-firmware/vivado/create_project.tcl -tclargs S:Vivado"},
+            "linux": { "command": "source ${xilinx_path}/Vivado/${xilinx_version}/settings64.sh && if [ ! -d ${workspaceFolder}/controller-firmware/Vivado/controller-firmware ]; then vivado -mode batch -source ${workspaceFolder}/controller-firmware/Vivado/create_project.tcl -tclargs ${workspaceFolder}/controller-firmware/Vivado; fi"},
             "problemMatcher": [],
-            "dependsOn": ["create subst path"],
+            "dependsOn": ["create subst path vivado"],
         },
+        // TODO: add vitis project creation
+        // {
+        //     "label": "create vitis project",
+        //     "type": "shell",
+        //     "windows": { "command": "${env:xilinx_path}/vitis/${env:xilinx_version}/settings64.bat && if not exist T:vitis/controller_firmware vivado -mode batch -source ${workspaceFolder}/controller-firmware/vitis/create_project.tcl -tclargs T:Vitis"},
+        //     "linux": { "command": "source ${xilinx_path}/Vitis/${xilinx_version}/settings64.sh && if [ ! -d ${workspaceFolder}/controller-software/vitis/osrc/logs ]; then xsct ${workspaceFolder}/controller-software/vitis/create_project.tcl ${workspaceFolder}; fi"},
+        //     "problemMatcher": [],
+        //     "dependsOn": ["create subst path vitis"],
+        // },
         {
             "label": "save vivado project",
             "type": "shell",

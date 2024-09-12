@@ -15,17 +15,24 @@ Firmware for the motion controller. This project consists of multiple modules;
 - [Surfer](https://surfer-project.org/) (optional, used to view HDL sim trace files)
 
 
-### Setup (windows)
+### Setup (windows/linux)
 #### 1. Run the "setup project" task in VS Code (Terminal -> Run Task... -> setup project)
 This will:
-- Run subst to create a new drive leading to vivado files, this is needed to keep path lengths short
+- Run subst to create a new drive leading to vivado files, this is needed to keep path lengths short (windows only)
 - Create the python virtual environment
 - Install required python packages
 - Create the vivado project
+- TODO: Create the vitis project
 
 
 
 ## Commiting changes
-#### 1. Run the "save vivado project" task in VS Code (Terminal -> Run Task... -> save vivado project)
+### Vivado
+#### Run the "save vivado project" task in VS Code (Terminal -> Run Task... -> save vivado project)
 This will:
 - Save the vivado project to a .tcl file which is in the repo and can be committed
+
+### TODO: Vitis Platform (osrc)
+#### copy the contents of the modified platform.tcl script to the specified area of the create_project.tcl script (located in /vitis/)
+This will:
+- Update the script that generates the platform project

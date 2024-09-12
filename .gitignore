@@ -1,4 +1,3 @@
-/controller-software
 /controller-firmware/src/autogen_sources
 *.jou
 *.log
