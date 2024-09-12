@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="ASCII"?>
+<sdkproject:SdkProject xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sdkproject="http://www.xilinx.com/sdkproject" name="amp-echo-test" location="/home/excessive/github/controller-software/controller-software/vitis/amp-echo-test" platform="/home/excessive/github/controller-software/controller-software/vitis/osrc/export/osrc/osrc.xpfm" platformUID="xilinx:zybo::0.0(custom)" systemProject="amp-echo-test_system" sysConfig="osrc" runtime="C/C++" cpu="freertos10_xilinx_domain" cpuInstance="ps7_cortexa9_1" os="freertos10_xilinx" mssSignature="cd4383033a83482c04db07ab961b29e9">
+  <configuration name="Debug" id="xilinx.gnu.armv7.exe.debug.2039711310">
+    <configBuildOptions xsi:type="sdkproject:SdkOptions"/>
+    <lastBuildOptions xsi:type="sdkproject:SdkOptions"/>
+  </configuration>
+  <configuration name="Release" id="xilinx.gnu.armv7.exe.release.117988180" dirty="true">
+    <configBuildOptions xsi:type="sdkproject:SdkOptions"/>
+  </configuration>
+  <template appTemplateName="openamp_echo_test" hasBspSettings="true"/>
+</sdkproject:SdkProject>

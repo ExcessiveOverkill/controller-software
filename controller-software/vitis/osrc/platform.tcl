@@ -24,3 +24,12 @@ bsp reload
 catch {bsp regenerate}
 platform generate -domains freertos10_xilinx_domain 
 platform active {osrc}
+platform active {osrc}
+bsp reload
+bsp setlib -name libmetal -ver 2.5
+bsp config extra_compiler_flags "-mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard -nostartfiles -g -Wall -Wextra -fno-tree-loop-distribute-patterns -DUSE_AMP=1"
+bsp write
+bsp reload
+catch {bsp regenerate}
+bsp write
+platform generate
