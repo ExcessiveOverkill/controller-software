@@ -7,3 +7,9 @@
 /controller-software/config/venv
 /controller-software/web/node_modules/.bin
 /controller-software/web/node_modules
+
+controller-software/*
+!controller-software/config/
+!controller-software/core/
+!controller-software/vitis/
+!controller-software/web/
