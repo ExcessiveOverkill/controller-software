@@ -3,3 +3,7 @@
 *.log
 /.Xil
 /controller-firmware/Vivado/.Xil
+*.pyc
+/controller-software/config/venv
+/controller-software/web/node_modules/.bin
+/controller-software/web/node_modules

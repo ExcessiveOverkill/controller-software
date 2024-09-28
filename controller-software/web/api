@@ -1,0 +1,76 @@
+{
+    "openrpc": "1.2.6",
+    "info": {
+        "title": "Controller API",
+        "version": "1.0.0",
+        "description": "API for interfacing with the controller"
+    },
+    "methods": [
+        {
+            "name": "move",
+            "description": "Moves the robot to a specified position",
+            "params": [
+                {
+                    "name": "x",
+                    "schema": {
+                        "type": "number"
+                    },
+                    "description": "The x-coordinate"
+                },
+                {
+                    "name": "y",
+                    "schema": {
+                        "type": "number"
+                    },
+                    "description": "The y-coordinate"
+                },
+                {
+                    "name": "z",
+                    "schema": {
+                        "type": "number"
+                    },
+                    "description": "The z-coordinate"
+                }
+            ],
+            "result": {
+                "name": "success",
+                "schema": {
+                    "type": "boolean"
+                },
+                "description": "Indicates if the move was successful"
+            }
+        },
+        {
+            "name": "rotate",
+            "description": "Rotates the robot to a specified angle",
+            "params": [
+                {
+                    "name": "angle",
+                    "schema": {
+                        "type": "number"
+                    },
+                    "description": "The angle to rotate to in degrees"
+                }
+            ],
+            "result": {
+                "name": "success",
+                "schema": {
+                    "type": "boolean"
+                },
+                "description": "Indicates if the rotation was successful"
+            }
+        },
+        {
+            "name": "getStatus",
+            "description": "Gets the current status of the robot",
+            "params": [],
+            "result": {
+                "name": "status",
+                "schema": {
+                    "type": "string"
+                },
+                "description": "The current status of the robot"
+            }
+        }
+    ]
+}

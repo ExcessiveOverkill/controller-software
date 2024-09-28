@@ -32,6 +32,15 @@
             "problemMatcher": []
         },
         {
+            "label": "setup software config python venv",
+            "type": "shell",
+            "command": "if (-not (Test-Path venv)) { python -m venv venv }",
+            "options": {
+                "cwd": "${workspaceFolder}/controller-software/config/"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "install python packages",
             "type": "shell",
             "command": "venv\\Scripts\\activate.bat && pip install -r requirements.txt",

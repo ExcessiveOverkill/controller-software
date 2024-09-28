@@ -1,6 +1,6 @@
 hardware_slots:
   port_a:
-    card_type:  "serial interface card"
+    card_type:  "serial interface card" #TODO: support more than one card type per slot?
     card_options:
       port_0: [fanuc_rs422_encoder, my_encoder]   # set which internal interfaces should be connected to each serial port. If multiple are given, a Mux is generated to switch between them at runtime
       port_1: [serial_device]
