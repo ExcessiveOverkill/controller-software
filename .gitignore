@@ -14,3 +14,4 @@ controller-software/*
 !controller-software/vitis/
 !controller-software/web/
 /controller-software/web/build
+controller-software/core/api_drivers/test_controller

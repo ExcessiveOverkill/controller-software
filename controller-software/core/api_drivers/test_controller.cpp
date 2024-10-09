@@ -1,5 +1,7 @@
 #include "api_objects.h"
 #include "shared_mem.h"
+#include <chrono>
+#include <thread>
 
 // Define static member variables
 
@@ -95,7 +97,7 @@ int main() {
             }
         }
 
-        Sleep(100);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     shared_mem_obj.close_shared_mem();
