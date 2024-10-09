@@ -5,7 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
 const selfsigned = require('selfsigned');
-const litegraph = require('litegraph.js');
+const controllerAPI = require('./build/Release/controller_API');
+
+console.log('controller_API:', controllerAPI.api_call("test"));
 
 // Import the methods from openrpc-methods.js
 const methodHandlers = require('./openrpc-methods');

@@ -13,3 +13,4 @@ controller-software/*
 !controller-software/core/
 !controller-software/vitis/
 !controller-software/web/
+/controller-software/web/build
