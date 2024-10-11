@@ -89,7 +89,11 @@
 			"*.tcc": "cpp",
 			"deque": "cpp",
 			"memory_resource": "cpp",
-			"string_view": "cpp"
+			"string_view": "cpp",
+			"any": "cpp",
+			"codecvt": "cpp",
+			"filesystem": "cpp",
+			"valarray": "cpp"
 		}
 	}
 }

@@ -1,173 +1,110 @@
 #include <node.h>
-#include <string.h>
-#include <thread>
-#include <chrono>
-#include <api_helper.h>
+#include "../core/api_drivers/web_api.h"
+#include "../core/api_drivers/json.hpp"
 
 using namespace v8;
+using json = nlohmann::json;
 
+web_api api;
 
-int get_shared_addr_to_write_to(unsigned int size, unsigned int &addr, unsigned int &block) {
-  block = 0;  // section of shared memory used for this API call
-  return 1; // fails if unable to get shared memory address
-}
+void get_responses_from_controller(const FunctionCallbackInfo<Value>& args){
+  Isolate* isolate = args.GetIsolate();
+  json response;
 
-bool shared_memory_updated(unsigned int block){ // return true when the specified block has been updated by the controller
-  return true;
-}
+  unsigned int ret = api.get_completed_calls(&response);
 
-void api_call(const FunctionCallbackInfo<Value>& args) {
-    API_Helper api_helper;
-    api_helper.set_args(args);
+  if(ret != 0){
+    isolate->ThrowException(Exception::TypeError(
+    String::NewFromUtf8(isolate, "Error getting completed calls").ToLocalChecked()));
+  }
 
-    Isolate* isolate = args.GetIsolate();
-    //HandleScope scope(isolate);
+  // Convert the nlohmann::json object to a string
+    std::string jsonString = response.dump();
 
-    // Check if the first argument is an object
-    if (args.Length() < 1 || !args[0]->IsObject()) {
-        isolate->ThrowException(Exception::TypeError(
-            String::NewFromUtf8(isolate, "Expected an object").ToLocalChecked()));
+    // Use V8's JSON::Parse to convert the JSON string into a V8 object
+    Local<String> v8String = String::NewFromUtf8(isolate, jsonString.c_str()).ToLocalChecked();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> v8JsonObject;
+    if (!JSON::Parse(context, v8String).ToLocal(&v8JsonObject)) {
+        isolate->ThrowException(Exception::SyntaxError(
+            String::NewFromUtf8(isolate, "Failed to parse JSON").ToLocalChecked()));
         return;
     }
 
-    // Convert the first argument to a V8 Object
-    Local<Object> obj = args[0]->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
+    // Return the V8 JSON object to Node.js
+    args.GetReturnValue().Set(v8JsonObject);
 
-    // Get the property names (keys) from the object
-    Local<Array> propertyNames = obj->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
+  return;
+}
 
-    // Loop over the properties
-    for (uint32_t i = 0; i < propertyNames->Length(); i++) {
-        // Get the property name (key)
-        Local<Value> key = propertyNames->Get(isolate->GetCurrentContext(), i).ToLocalChecked();
-        Local<Value> value = obj->Get(isolate->GetCurrentContext(), key).ToLocalChecked();
+void send_data_to_controller(const FunctionCallbackInfo<Value>& args){
+  Isolate* isolate = args.GetIsolate();
 
-        // Convert key and value to UTF8 strings
-        String::Utf8Value keyStr(isolate, key);
-        String::Utf8Value valueStr(isolate, value);
+  unsigned int ret = api.write_web_calls_to_controller();
 
-        // Print the key-value pair
-        //std::cout << *keyStr << ": " << *valueStr << std::endl;
+  if(ret != 0){
+    isolate->ThrowException(Exception::TypeError(
+    String::NewFromUtf8(isolate, "Failed to write data to controller").ToLocalChecked()));
+    return;
+  }
+
+  return;
+}
+
+void api_call(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+
+    // Variable to hold the resulting string
+    std::string jsonString;
+
+    // Check if the first argument is a string
+    if (args[0]->IsString()) {
+        // Convert the V8 string to a C++ std::string
+        String::Utf8Value utf8(isolate, args[0]);
+        jsonString = std::string(*utf8);
+    } 
+    // Check if the first argument is an object
+    else if (args[0]->IsObject()) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> obj = args[0]->ToObject(context).ToLocalChecked();
+
+        // Use JSON::Stringify to convert the object to a JSON string
+        Local<String> jsonStr;
+        Local<Value> jsonObj = JSON::Stringify(context, obj).ToLocalChecked();
+
+        // Convert the V8 JSON string to a C++ std::string
+        String::Utf8Value utf8Json(isolate, jsonObj);
+        jsonString = std::string(*utf8Json);
+    } 
+    else {
+        // If the argument is neither a string nor an object, throw an error
+        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Argument must be a string or object").ToLocalChecked()));
+        return;
     }
+
+    json parsedJson;
+    parsedJson = json::parse(jsonString);
+
+    unsigned int ret = 0;
+    unsigned int call_number = 0;
+
+    ret = api.add_call(&parsedJson, &call_number);
+
+    if(ret != 0){
+        isolate->ThrowException(Exception::TypeError(
+        String::NewFromUtf8(isolate, "Failed to add call").ToLocalChecked()));
+        return;
+    }
+
+    args.GetReturnValue().Set(Number::New(isolate, call_number));
+
+  return;
 }
 
-
-// void api_call(const FunctionCallbackInfo<Value>& args) {
-//   Isolate* isolate = args.GetIsolate();
-//   Local<Context> context = isolate->GetCurrentContext();
-//   Local<Object> ret_obj = Object::New(isolate);
-//   ret_obj->Set(context, String::NewFromUtf8(isolate, "success").ToLocalChecked(), Boolean::New(isolate, false)).FromJust();
-//   ret_obj->Set(context, String::NewFromUtf8(isolate, "error").ToLocalChecked(), String::NewFromUtf8(isolate, "").ToLocalChecked()).FromJust();
-
-//   // Check the number of arguments passed.
-//   if (args.Length() < 1) {
-//     isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "No arguments found").ToLocalChecked()));
-//     return;
-//   }
-
-//   if (!args[0]->IsString()) {
-//     isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Could not parse API call name as string").ToLocalChecked()));
-//     return;
-//   }
-
-//     // get API call name
-//     String::Utf8Value utf8_value(isolate, args[0]);
-//     std::string api_call_name(*utf8_value);
-
-//   if (api_call_name.compare("machine_state") != 0) {
-
-//     // check arguments
-//     if (args.Length() > 2) {
-//       isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong number of arguments").ToLocalChecked()));
-//       return;
-//     }
-    
-//     call = new machine_state;
-
-//     if (args.Length() == 2) {
-
-//       if (!args[1]->IsString()) {
-//       isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong argument type for [commanded_state]").ToLocalChecked()));
-//       return;
-//       }
-
-//       String::Utf8Value utf8_value(isolate, args[1]);
-//       std::string commanded_state(*utf8_value);
-
-//       if (commanded_state.compare("") == 0) {
-//         call->command_state = machine_state::NONE;
-//       }
-//       else if (commanded_state.compare("on") == 0) {
-//         call->command_state = machine_state::ON;
-//       }
-//       else if (commanded_state.compare("off") == 0) {
-//         call->command_state = machine_state::OFF;
-//       }
-//       else {
-//         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Invalid commanded state").ToLocalChecked()));
-//         return;
-//       }
-//     }
-
-//     // get memory address we can safely write to
-//     unsigned int addr, block;
-//     if(get_shared_addr_to_write_to(sizeof(machine_state), addr, block) != 0){ // fails if unable to get shared memory address
-//       isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Unable to get shared memory address").ToLocalChecked()));
-//       return;
-//     }
-
-//     //memcpy((void*)addr, call, sizeof(machine_state), sizeof(machine_state));  // copy to shared memory
-
-//     for(int i = 0; i < 10; i++){ // wait for controller to update shared memory
-//       if(shared_memory_updated(block)){
-//         break;
-//       }
-//       std::sleep(1);
-//       if(i == 9){
-//         isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Controller did not respond in time").ToLocalChecked()));
-//         return;
-//       }
-//     }
-
-//   }
-
-//   ret_obj->Set(context, String::NewFromUtf8(isolate, "success").ToLocalChecked(), Boolean::New(isolate, true)).FromJust();
-//   args.GetReturnValue().Set(ret_obj);
-//   return;
-// }
-
-// void Add(const FunctionCallbackInfo<Value>& args) {
-//   Isolate* isolate = args.GetIsolate();
-
-//   // Check the number of arguments passed.
-//   if (args.Length() < 2) {
-//     // Throw an Error that is passed back to JavaScript
-//     isolate->ThrowException(Exception::TypeError(
-//         String::NewFromUtf8(isolate,
-//                             "Wrong number of arguments").ToLocalChecked()));
-//     return;
-//   }
-
-//   // Check the argument types
-//   if (!args[0]->IsNumber() || !args[1]->IsNumber()) {
-//     isolate->ThrowException(Exception::TypeError(
-//         String::NewFromUtf8(isolate,
-//                             "Wrong arguments").ToLocalChecked()));
-//     return;
-//   }
-
-//   // Perform the operation
-//   double value =
-//       args[0].As<Number>()->Value() + args[1].As<Number>()->Value();
-//   Local<Number> num = Number::New(isolate, value);
-
-//   // Set the return value (using the passed in
-//   // FunctionCallbackInfo<Value>&)
-//   args.GetReturnValue().Set(num);
-// }
-
-void Init(Local<Object> exports) {
+void Initialize(Local<Object> exports) {
   NODE_SET_METHOD(exports, "api_call", api_call);
+  NODE_SET_METHOD(exports, "send_data", send_data_to_controller);
+  NODE_SET_METHOD(exports, "get_responses", get_responses_from_controller);
 }
 
-NODE_MODULE(NODE_GYP_MODULE_NAME, Init)
+NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)

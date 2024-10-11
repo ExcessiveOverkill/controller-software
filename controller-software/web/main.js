@@ -7,10 +7,26 @@ const WebSocket = require('ws');
 const selfsigned = require('selfsigned');
 const controllerAPI = require('./build/Release/controller_API');
 
-console.log('controller_API:', controllerAPI.api_call("test"));
+const machine_on_call = {call_name: "machine_state", commanded_state: "on"};
+const machine_off_call = {call_name: "machine_state", commanded_state: "off"};
+
+console.log('controller_API:', controllerAPI.api_call(machine_on_call));
+console.log('controller_API:', controllerAPI.api_call(machine_off_call));
+console.log('controller_API:', controllerAPI.send_data());
+
+console.log('controller_API:', controllerAPI.api_call(machine_on_call));
+console.log('controller_API:', controllerAPI.api_call(machine_off_call));
+console.log('controller_API:', controllerAPI.send_data());
+
+var responses = controllerAPI.get_responses();
+
+console.log('Controller_API:', responses);
+
+quit();
 
 // Import the methods from openrpc-methods.js
 const methodHandlers = require('./openrpc-methods');
+const { exit } = require('process');
 
 // Generate self-signed certificate for WebSocket
 const attrs = [{ name: 'commonName', value: 'localhost' }];

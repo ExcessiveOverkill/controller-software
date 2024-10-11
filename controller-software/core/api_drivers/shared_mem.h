@@ -69,6 +69,11 @@ unsigned int shared_mem::open_shared_mem(unsigned int size, void *&mem, int &shm
         return 1;
     }
 
+    // set memory to all zero if we have write access
+    if(prot_flags & PROT_WRITE){
+        memset(mem, 0, size);
+    }
+
     return 0;
 }
 
@@ -103,14 +108,19 @@ unsigned int shared_mem::create_shared_mem(unsigned int size, void *&mem, int &s
         return 1;
     }
 
+    // set memory to all zero if we have write access
+    if(prot_flags & PROT_WRITE){
+        memset(mem, 0, size);
+    }
+
     return 0;
 }
 
 unsigned int shared_mem::controller_create_shared_mem(){   // called from the controller side
-    if(create_shared_mem(data_buffer_size, web_to_controller_data_mem, web_to_controller_data_map, "web_to_controller_data_mem", PROT_READ) != 0){
+    if(create_shared_mem(data_buffer_size, web_to_controller_data_mem, web_to_controller_data_map, "web_to_controller_data_mem", PROT_READ | PROT_WRITE) != 0){ // read and write so we can clear the buffer on startup
         return 1;
     }
-    if(create_shared_mem(control_buffer_size, web_to_controller_control_mem, web_to_controller_control_map, "web_to_controller_control_mem", PROT_READ) != 0){
+    if(create_shared_mem(control_buffer_size, web_to_controller_control_mem, web_to_controller_control_map, "web_to_controller_control_mem", PROT_READ | PROT_WRITE) != 0){ // read and write so we can clear the buffer on startup
         return 1;
     }
     if(create_shared_mem(data_buffer_size, controller_to_web_data_mem, controller_to_web_data_map, "controller_to_web_data_mem", PROT_WRITE) != 0){

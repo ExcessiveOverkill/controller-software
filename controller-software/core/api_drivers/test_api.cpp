@@ -1,58 +1,39 @@
-#include "api_objects.h"
-#include "shared_mem.h"
+#include "web_api.h"
 
-// Define static member variables
-
-uint32_t Base_API::data_buffer_size = 0;
-uint32_t Base_API::control_buffer_size = 0;
-
-
-void* Base_API::web_to_controller_data_base_address = nullptr;
-void* Base_API::controller_to_web_data_base_address = nullptr;
-
-
-void* Base_API::web_to_controller_control_base_address = nullptr;
-void* Base_API::controller_to_web_control_base_address = nullptr;
-
-
-uint32_t Base_API::web_to_controller_data_mem_index = 0;
-uint32_t Base_API::controller_to_web_data_mem_index = 0;
-
-
-uint32_t Base_API::web_to_controller_control_mem_index = 0;
-uint32_t Base_API::controller_to_web_control_mem_index = 0;
-
-
-uint32_t Base_API::web_to_controller_call_count = 0;
-uint32_t Base_API::controller_to_web_call_count = 0;
 
 int main() {
+    web_api api;
 
-    shared_mem shared_mem_obj;
-    
-    if(shared_mem_obj.web_create_shared_mem() !=0 ){
-        std::cerr << "Error creating shared memory" << std::endl;
-        return 1;
-    }
+    uint32_t api_call_number;
 
-    default_call default_call_obj;
-    default_call_obj.set_shared_memory(shared_mem_obj);
+    json call = {
+        {"call_name", "machine_state"},
+        {"commanded_state", "on"}
+    };
 
+    api.add_call(&call, &api_call_number);
+    api.add_call(&call, &api_call_number);
+    api.add_call(&call, &api_call_number);
+    api.add_call(&call, &api_call_number);
 
-    // Create a vector of Base_API pointers
-    std::vector<std::shared_ptr<Base_API>> calls;
+    // api.create_new_call_from_string("machine_state", &api_call_number);
+    // api.add_data_to_call("commanded_state", "on");
+
+    // api.create_new_call_from_string("machine_state", &api_call_number);
+    // api.add_data_to_call("commanded_state", "off");
  
-    get_new_call_object_from_string(&calls, "machine_state");
-    calls.back()->web_input_data("commanded_state", "on");
+    // api.write_web_calls_to_controller();
 
-    get_new_call_object_from_string(&calls, "machine_state");
-    calls.back()->web_input_data("commanded_state", "off");
+    // api.create_new_call_from_string("machine_state", &api_call_number);
+    // api.add_data_to_call("commanded_state", "on");
 
-    write_web_calls_to_controller(calls);
-
-
-    // Call functions
-    //callFunctions(objects);
-    shared_mem_obj.close_shared_mem();
+    // api.create_new_call_from_string("machine_state", &api_call_number);
+    // api.add_data_to_call("commanded_state", "off");
+ 
+    api.write_web_calls_to_controller();
+    json response;
+    api.get_completed_calls(&response);
+    
+    std::cout << response.dump(4) << std::endl;  // Pretty print with indentation
     return 0;
 }
