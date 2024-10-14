@@ -2,7 +2,7 @@
 #include <memory> // For smart pointers
 #include <string>
 #include "../shared_mem.h"
-#include "../json.hpp"
+#include "../../json.hpp"
 
 using json = nlohmann::json;
 

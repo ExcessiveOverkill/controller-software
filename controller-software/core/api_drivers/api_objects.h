@@ -2,7 +2,7 @@
 #include <memory> // For smart pointers
 #include <string>
 #include "shared_mem.h"
-#include "json.hpp"
+#include "../json.hpp"
 
 
 #include "calls/machine_state.h"
