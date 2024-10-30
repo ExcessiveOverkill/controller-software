@@ -5,8 +5,6 @@
 // get/set machione state
 class machine_state: public Base_API {
     private:
-        
-
         enum machine_state_t {
             NONE,
             ON,

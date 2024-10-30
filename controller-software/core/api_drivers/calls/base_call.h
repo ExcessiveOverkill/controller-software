@@ -6,9 +6,12 @@
 
 using json = nlohmann::json;
 
+#pragma once
+
 enum api_call_id_t {    // list of all possible API calls
     DEFAULT,
-    MACHINE_STATE
+    MACHINE_STATE,
+    PRINT_UINT32
 };
 
 // Base_API class
@@ -23,6 +26,8 @@ public:
 
     static void * web_to_controller_control_base_address;
     static void * controller_to_web_control_base_address;
+
+    static volatile uint32_t * persistent_web_mem;    // created by the contoller, but updated and read by the web side to keep track of the last data index (incase web side restarts)
 
     static uint32_t web_to_controller_data_mem_index;
     static uint32_t controller_to_web_data_mem_index;
@@ -74,6 +79,8 @@ public:
     uint32_t update_web_to_controller_control_buffer(api_call_id_t api_call_id, uint32_t start_index, uint32_t size) {  // web side
 
         memcpy(static_cast<uint32_t*>(web_to_controller_control_base_address) + web_to_controller_control_mem_index + 1, &api_call_id, sizeof(api_call_id)); // api call ID
+
+        start_index = start_index % data_buffer_size;
         memcpy(static_cast<uint32_t*>(web_to_controller_control_base_address) + web_to_controller_control_mem_index + 2, &start_index, sizeof(start_index)); // start index
         memcpy(static_cast<uint32_t*>(web_to_controller_control_base_address) + web_to_controller_control_mem_index + 3, &size, sizeof(size)); // size
 
@@ -83,7 +90,7 @@ public:
         
         web_to_controller_control_mem_index += 4;
 
-        if(web_to_controller_control_mem_index >= control_buffer_size){
+        if(web_to_controller_control_mem_index >= control_buffer_size/4){
             web_to_controller_control_mem_index = 0;
         }
         
@@ -94,6 +101,8 @@ public:
     uint32_t update_controller_to_web_control_buffer(api_call_id_t api_call_id, uint32_t start_index, uint32_t size) {  // controller side
 
         memcpy(static_cast<uint32_t*>(controller_to_web_control_base_address) + controller_to_web_control_mem_index + 1, &api_call_id, sizeof(api_call_id)); // api call ID
+        
+        start_index = start_index % data_buffer_size;
         memcpy(static_cast<uint32_t*>(controller_to_web_control_base_address) + controller_to_web_control_mem_index + 2, &start_index, sizeof(start_index)); // start index
         memcpy(static_cast<uint32_t*>(controller_to_web_control_base_address) + controller_to_web_control_mem_index + 3, &size, sizeof(size)); // size
 
@@ -103,7 +112,7 @@ public:
         
         controller_to_web_control_mem_index += 4;
 
-        if(controller_to_web_control_mem_index >= control_buffer_size){
+        if(controller_to_web_control_mem_index >= control_buffer_size/4){
             controller_to_web_control_mem_index = 0;
         }
         
@@ -123,7 +132,9 @@ public:
         else {
             memcpy(static_cast<char*>(web_to_controller_data_base_address) + web_to_controller_data_mem_index, data_in, size);    // copy the data to the buffer
             web_to_controller_data_mem_index += size;    // update the index
+            //web_to_controller_data_mem_index %= data_buffer_size;
         }
+        persistent_web_mem[1] = web_to_controller_data_mem_index;    // update the persistent memory
 
         return 0;
     }
@@ -157,6 +168,7 @@ public:
         else {
             memcpy(data_out, static_cast<char*>(web_to_controller_data_base_address) + web_to_controller_data_mem_index, size);    // copy the data from the buffer
             web_to_controller_data_mem_index += size;    // update the index
+            //web_to_controller_data_mem_index %= data_buffer_size;
         }
 
         return 0;
@@ -173,6 +185,7 @@ public:
             memcpy(data_out, static_cast<char*>(controller_to_web_data_base_address) + controller_to_web_data_mem_index, size);    // copy the data from the buffer
             controller_to_web_data_mem_index += size;    // update the index
         }
+        persistent_web_mem[2] = controller_to_web_data_mem_index;    // update the persistent memory
 
         return 0;
     }
@@ -188,6 +201,18 @@ public:
         web_to_controller_control_base_address = shared_mem_obj.get_web_to_controller_control_mem();
         controller_to_web_data_base_address = shared_mem_obj.get_controller_to_web_data_mem();
         controller_to_web_control_base_address = shared_mem_obj.get_controller_to_web_control_mem();
+        persistent_web_mem = static_cast<uint32_t*>(shared_mem_obj.get_persistent_web_mem());
+
+
+        // set current call count and memory indexes from persistent memory
+
+        web_to_controller_call_count = persistent_web_mem[0];
+        controller_to_web_call_count = persistent_web_mem[3];
+        web_to_controller_control_mem_index = (web_to_controller_call_count * 4) % (control_buffer_size/4);
+        controller_to_web_control_mem_index = (controller_to_web_call_count * 4) % (control_buffer_size/4);
+        web_to_controller_data_mem_index = persistent_web_mem[1];
+        controller_to_web_data_mem_index = persistent_web_mem[2];
+        
 
         return 0;
     }

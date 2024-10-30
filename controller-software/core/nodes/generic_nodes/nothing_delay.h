@@ -5,7 +5,7 @@
 class nothing_delay: public base_node {
     private:
         bool default_input_value = false;
-        bool output_value = true;
+        bool output_value = false;
 
         input* input_value = nullptr;
     public:

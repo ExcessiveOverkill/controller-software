@@ -14,6 +14,8 @@ void* Base_API::controller_to_web_data_base_address = nullptr;
 void* Base_API::web_to_controller_control_base_address = nullptr;
 void* Base_API::controller_to_web_control_base_address = nullptr;
 
+volatile uint32_t* Base_API::persistent_web_mem = nullptr;
+
 uint32_t Base_API::web_to_controller_data_mem_index = 0;
 uint32_t Base_API::controller_to_web_data_mem_index = 0;
 

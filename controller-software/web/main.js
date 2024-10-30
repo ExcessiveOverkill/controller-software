@@ -7,22 +7,6 @@ const WebSocket = require('ws');
 const selfsigned = require('selfsigned');
 const controllerAPI = require('./build/Release/controller_API');
 
-const machine_on_call = {call_name: "machine_state", commanded_state: "on"};
-const machine_off_call = {call_name: "machine_state", commanded_state: "off"};
-
-console.log('controller_API:', controllerAPI.api_call(machine_on_call));
-console.log('controller_API:', controllerAPI.api_call(machine_off_call));
-console.log('controller_API:', controllerAPI.send_data());
-
-console.log('controller_API:', controllerAPI.api_call(machine_on_call));
-console.log('controller_API:', controllerAPI.api_call(machine_off_call));
-console.log('controller_API:', controllerAPI.send_data());
-
-var responses = controllerAPI.get_responses();
-
-console.log('Controller_API:', responses);
-
-quit();
 
 // Import the methods from openrpc-methods.js
 const methodHandlers = require('./openrpc-methods');
@@ -71,9 +55,14 @@ function loadUsers() {
     }
 }
 
-// Call the function to load users initially
+// load users initially
 loadUsers();
 
+// maps to track pending calls
+const pendingCalls = new Map();
+const wsPendingCalls = new Map();
+
+// handle API calls
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
@@ -91,6 +80,7 @@ wss.on('connection', (ws) => {
         }
 
         const { method, params, id } = parsedMessage;
+        const user_call_id = id;
 
         // Handle login
         if (method === 'Login') {
@@ -105,38 +95,39 @@ wss.on('connection', (ws) => {
                 // Respond with success
                 ws.send(JSON.stringify({
                     jsonrpc: '2.0',
-                    id,
+                    id: user_call_id,
                     result: { success: true }
                 }));
             } else {
                 // Respond with login failure
                 ws.send(JSON.stringify({
                     jsonrpc: '2.0',
-                    id,
+                    id: user_call_id,
                     result: { success: false, error: 'Invalid credentials' }
                 }));
             }
             return;
         }
 
-        // Check if the WebSocket connection is authenticated
+        // Check if the connection is authenticated
         const userSession = userSessions.get(ws);
         if (!userSession) {
-            // If not authenticated, reject the request
+            // not authenticated, reject the request
             ws.send(JSON.stringify({
                 jsonrpc: '2.0',
-                id,
+                id: user_call_id,
                 error: { code: 401, message: 'Unauthorized' }
             }));
             return;
         }
 
+        // Handle logout
         if (method === 'Logout') {
             // Handle user logout
             userSessions.delete(ws);
             ws.send(JSON.stringify({
                 jsonrpc: '2.0',
-                id,
+                id: user_call_id,
                 result: { success: true, message: 'Logged out successfully' }
             }));
             ws.close();
@@ -146,27 +137,45 @@ wss.on('connection', (ws) => {
         if (methodHandlers[method] && userSession.permissions.includes(method)) {
             try {
                 const result = methodHandlers[method](params, userSession);
-                ws.send(JSON.stringify({
-                    jsonrpc: '2.0',
-                    id,
-                    result
-                }));
+                if (result.immediate == true) {  // Check if the method returned an immediate result
+                    // immediate response
+                    ws.send(JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: user_call_id,
+                        result
+                    }));
+                }
+                else {  // Method requires asynchronous processing
+                    // add call to controller (actually written to controller later)
+                    const controller_call_id = controllerAPI.api_call(result.call_data);
+
+                    // Store the pending call
+                    pendingCalls.set(controller_call_id, { ws, userSession, user_call_id });
+                    // Also store in wsPendingCalls for cleanup on disconnection
+                    let wsCalls = wsPendingCalls.get(ws);
+                    if (!wsCalls) {
+                        wsCalls = new Set();
+                        wsPendingCalls.set(ws, wsCalls);
+                    }
+                    wsCalls.add(controller_call_id);
+                }
             } catch (error) {
                 ws.send(JSON.stringify({
                     jsonrpc: '2.0',
-                    id,
+                    id: user_call_id,
                     error: { code: 500, message: `Error executing method: ${error.message}` }
                 }));
             }
         } else {
             ws.send(JSON.stringify({
                 jsonrpc: '2.0',
-                id,
+                id: user_call_id,
                 error: { code: 32601, message: 'Method not found or insufficient permissions' }
             }));
         }
     });
 
+    // handle websocket close
     ws.on('close', () => {
         // Remove user session when WebSocket is closed
         const userSession = userSessions.get(ws);
@@ -174,9 +183,57 @@ wss.on('connection', (ws) => {
             console.log(`User ${userSession.username} disconnected`);
             userSessions.delete(ws); // Remove the user session from the map
         }
+
+        // Remove any pending calls associated with this WebSocket (calls will still be processed but no response will be sent)
+        const wsCalls = wsPendingCalls.get(ws);
+        if (wsCalls) {
+            for (const id of wsCalls) {
+                pendingCalls.delete(id);
+            }
+            wsPendingCalls.delete(ws);
+        }
         console.log('Client disconnected');
     });
 });
+
+// Handle pending calls
+function processCompletedCalls() {
+    // send new calls
+    controllerAPI.send_data();
+
+    // Get completed calls
+    const completedCalls = controllerAPI.get_responses();
+    if (completedCalls == null){    // No completed calls
+        return;
+    }
+    console.log('Completed calls:', completedCalls);
+    for (const controller_call_id in completedCalls) {
+        const result = completedCalls[controller_call_id];
+        const pendingCall = pendingCalls.get(controller_call_id);
+        if (pendingCall) {
+            const { ws, user_call_id } = pendingCall;
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: user_call_id,
+                    result
+                }));
+            }
+            // Clean up
+            pendingCalls.delete(controller_call_id);
+            const wsCalls = wsPendingCalls.get(ws);
+            if (wsCalls) {
+                wsCalls.delete(controller_call_id);
+                if (wsCalls.size === 0) {
+                    wsPendingCalls.delete(ws);
+                }
+            }
+        }
+    }
+}
+setInterval(processCompletedCalls, 100);    // Interval to check for completed calls and send responses
+
+
 
 // Define the HTTPS port
 const HTTPS_PORT = process.env.HTTPS_PORT || 443;

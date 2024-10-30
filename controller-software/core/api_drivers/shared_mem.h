@@ -1,6 +1,6 @@
 #include <sys/mman.h>
-#include <sys/stat.h>        /* For mode constants */
-#include <fcntl.h>           /* For O_* constants */
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
 #include <cerrno>
@@ -12,18 +12,22 @@
 class shared_mem
 {
 private:
-        const unsigned int data_buffer_size = 512 * 4; // size of shared memory buffer for data (512 32-bit values)
-        const unsigned int control_buffer_size = 128 * 4 * 4; // size of shared memory buffer for control info (able to hold 128 API calls)
+        const unsigned int data_buffer_size = 256 * 4; // size of shared memory buffer for data (64 32-bit values)
+        const unsigned int control_buffer_size = 32 * 4 * 4; // size of shared memory buffer for control info (able to hold 32 API calls)
 
-        void* web_to_controller_data_mem;
-        void* web_to_controller_control_mem;
-        void* controller_to_web_data_mem;
-        void* controller_to_web_control_mem;
+        void* web_to_controller_data_mem = nullptr;
+        void* web_to_controller_control_mem = nullptr;
+        void* controller_to_web_data_mem = nullptr;
+        void* controller_to_web_control_mem = nullptr;
+
+        void* persistent_web_mem = nullptr;
 
         int web_to_controller_data_map;
         int web_to_controller_control_map;
         int controller_to_web_data_map;
         int controller_to_web_control_map;
+
+        int persistent_web_map;
 
         unsigned int create_shared_mem(unsigned int size, void *&mem, int &shm_fd, std::string shm_name, int prot_flags = PROT_READ | PROT_WRITE);
         unsigned int open_shared_mem(unsigned int size, void *&mem, int &shm_fd, std::string shm_name, int prot_flags = PROT_READ | PROT_WRITE);
@@ -34,6 +38,8 @@ public:
     void* get_web_to_controller_control_mem() const { return web_to_controller_control_mem; }
     void* get_controller_to_web_data_mem() const { return controller_to_web_data_mem; }
     void* get_controller_to_web_control_mem() const { return controller_to_web_control_mem; }
+
+    void* get_persistent_web_mem() const { return persistent_web_mem; }
 
     ~shared_mem();
 
@@ -47,7 +53,7 @@ public:
     void close_shared_mem();
 };
 
-unsigned int shared_mem::open_shared_mem(unsigned int size, void *&mem, int &shm_fd, std::string shm_name, int prot_flags){
+unsigned int shared_mem::open_shared_mem(unsigned int size, void *&mem, int &shm_fd, std::string shm_name, int prot_flags) {
     
     // Ensure name starts with '/'
     if (shm_name.empty() || shm_name[0] != '/') {
@@ -69,10 +75,10 @@ unsigned int shared_mem::open_shared_mem(unsigned int size, void *&mem, int &shm
         return 1;
     }
 
-    // set memory to all zero if we have write access
-    if(prot_flags & PROT_WRITE){
-        memset(mem, 0, size);
-    }
+    // // set memory to all zero if we have write access
+    // if(prot_flags & PROT_WRITE){
+    //     memset(mem, 0, size);
+    // }
 
     return 0;
 }
@@ -129,6 +135,9 @@ unsigned int shared_mem::controller_create_shared_mem(){   // called from the co
     if(create_shared_mem(control_buffer_size, controller_to_web_control_mem, controller_to_web_control_map, "controller_to_web_control_mem", PROT_WRITE) != 0){
         return 1;
     }
+    if(create_shared_mem(sizeof(uint32_t)*4, persistent_web_mem, persistent_web_map, "persistent_web_mem", PROT_READ | PROT_WRITE) != 0){   
+        return 1;
+    }
     return 0;
 }
 
@@ -145,6 +154,9 @@ unsigned int shared_mem::web_create_shared_mem(){   // called from the web side
     if(open_shared_mem(control_buffer_size, controller_to_web_control_mem, controller_to_web_control_map, "controller_to_web_control_mem", PROT_READ) != 0){
         return 1;
     }
+    if(open_shared_mem(sizeof(uint32_t)*4, persistent_web_mem, persistent_web_map, "persistent_web_mem", PROT_READ | PROT_WRITE) != 0){   
+        return 1;
+    }
     return 0;
 }
 
@@ -153,6 +165,7 @@ void shared_mem::unmap_shared_mem(){
     munmap(controller_to_web_data_mem, data_buffer_size);
     munmap(web_to_controller_control_mem, control_buffer_size);
     munmap(controller_to_web_control_mem, control_buffer_size);
+    munmap(persistent_web_mem, sizeof(uint32_t)*4);
 }
 
 void shared_mem::close_shared_mem(){
@@ -160,6 +173,7 @@ void shared_mem::close_shared_mem(){
     close(controller_to_web_data_map);
     close(web_to_controller_control_map);
     close(controller_to_web_control_map);
+    close(persistent_web_map);
 }
 
 shared_mem::~shared_mem(){

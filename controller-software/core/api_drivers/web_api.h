@@ -14,6 +14,8 @@ void* Base_API::controller_to_web_data_base_address = nullptr;
 void* Base_API::web_to_controller_control_base_address = nullptr;
 void* Base_API::controller_to_web_control_base_address = nullptr;
 
+volatile uint32_t* Base_API::persistent_web_mem = nullptr;
+
 uint32_t Base_API::web_to_controller_data_mem_index = 0;
 uint32_t Base_API::controller_to_web_data_mem_index = 0;
 
@@ -77,7 +79,7 @@ uint32_t web_api::get_completed_calls(json* data_out) {
 
     for(int i = 0; i < MAX_COMPLETED_CALL_TO_GET; i++){
         if(get_next_api_call_id_from_shared_mem() == 0){
-            std::cout << "new call received" << std::endl;
+            //std::cout << "new call received" << std::endl;
             if(get_new_call_object_from_call_id(&completed_calls, &api_call_id) == 1){
                 std::cerr << "Error creating new call object, unknown call ID" << std::endl;
                 return 1;
@@ -137,7 +139,7 @@ uint32_t web_api::add_call(json* data, uint32_t* api_call_number) {
 
     if(calls.back()->web_input_data(data) != 0){
         std::cerr << "Error adding data to call object" << std::endl;
-        calls.pop_back();   // remove failed call object
+        remove_last_call_obj_from_string(&calls, api_call_number);   // remove failed call object
         return 1;
     }
 
@@ -165,6 +167,7 @@ uint32_t web_api::get_last_controller_to_web_call() {
         }
 
         call_obj->controller_to_web_call_count++;
+        call_obj->persistent_web_mem[3] = call_obj->controller_to_web_call_count;
 
         if(call_obj->api_call_id != *(static_cast<uint32_t*>(call_obj->controller_to_web_control_base_address) + call_obj->controller_to_web_control_mem_index + 1)){
             return 2;   // error: api call ID does not match
