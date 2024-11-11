@@ -1,5 +1,10 @@
 #include "api_objects.h"
 #include "shared_mem.h"
+#include <mutex>
+#include <atomic>
+#include <thread>
+#include <condition_variable>
+#include <chrono>
 
 #pragma once
 
@@ -36,8 +41,12 @@ class controller_api {
         uint32_t get_next_api_call_id_from_shared_mem();
 
         uint32_t get_last_web_to_controller_call();
+
+        std::atomic<bool>* pause = nullptr;
         
     public:
+        static std::mutex controller_api_mtx;
+
         controller_api(){
 
             if(shared_mem_obj.controller_create_shared_mem() !=0 ){
@@ -52,6 +61,10 @@ class controller_api {
 
         uint32_t run_calls();
 
+        void set_pause_flag(std::atomic<bool>* pause_){
+            pause = pause_;
+        }
+
         ~controller_api(){
             shared_mem_obj.unmap_shared_mem();
             shared_mem_obj.close_shared_mem();
@@ -61,42 +74,52 @@ class controller_api {
 uint32_t controller_api::get_new_call() {
     // read call from shared memory and create new call object
 
+    if(pause->load()){
+        return 256; // stop update triggered
+    }
+
     if(get_next_api_call_id_from_shared_mem() == 0){
         std::cout << "new call received" << std::endl;
         if(get_new_call_object_from_call_id(&calls, &api_call_id) == 1){
             std::cerr << "Error creating new call object, unknown call ID" << std::endl;
-            return 1;
+            return 2;
         };
-        auto ret = get_last_web_to_controller_call();
+        uint32_t ret = get_last_web_to_controller_call();
 
         if (ret == 1) {
             std::cerr << "no new call to process" << std::endl;
-            return 1;
+            return 3;
         }
         else if(ret == 2){
             std::cout << "api call ID mismatch" << std::endl;
+            return 4;
         }
         else if(ret == 3){
             std::cerr << "data start index out of bounds" << std::endl;
-            return 1;
+            return 5;
         }
         else if(ret == 4){
             std::cerr << "data size is 0" << std::endl;
-            return 1;
+            return 6;
         }
         else if(ret != 0){
             std::cerr << "Error reading call from shared memory" << std::endl;
-            return 1;
+            return 7;
         }
+        return 0;
     }
-    return 0;
+    return 1;   // no new call to process
 }
 
 uint32_t controller_api::run_calls() {
     
     for (auto it = calls.begin(); it != calls.end();) {
 
-        auto ret = (*it)->run();  // Run the call
+        if(pause->load()){
+            return 256; // stop update triggered
+        }
+
+        uint32_t ret = (*it)->run();  // Run the call
         
         if (ret == 0) {     // call complete
             
@@ -113,6 +136,7 @@ uint32_t controller_api::run_calls() {
         }
 
         ++it;
+        //const std::lock_guard<std::mutex> unlock(controller_api_mtx);
     }
 
     return 0;
@@ -173,3 +197,5 @@ uint32_t controller_api::get_last_web_to_controller_call() {
 
         return 0;
     }
+
+std::mutex controller_api::controller_api_mtx;;

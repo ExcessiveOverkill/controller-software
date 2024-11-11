@@ -1,4 +1,5 @@
-#include "../base_node.h"
+#include "../node_factory.h"
+
 
 class bool_constant: public base_node {
     private:
@@ -17,3 +18,5 @@ class bool_constant: public base_node {
         }
 
 };
+
+static Node_Registrar<bool_constant> node_registrar_bool_constant("bool_constant");
