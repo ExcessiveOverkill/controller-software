@@ -40,9 +40,9 @@ private:
 
 // Template class to register a type with the factory
 template <typename T>
-class Node_Registrar {
+class Driver_Registrar {
 public:
-    Node_Registrar(const std::string& typeName) {
+    Driver_Registrar(const std::string& typeName) {
         Node_Factory::registerType(typeName, []() -> std::shared_ptr<base_node> {
             return std::make_shared<T>();
         });

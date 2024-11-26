@@ -19,4 +19,4 @@ class bool_constant: public base_node {
 
 };
 
-static Node_Registrar<bool_constant> node_registrar_bool_constant("bool_constant");
+static Driver_Registrar<bool_constant> node_registrar_bool_constant("bool_constant");

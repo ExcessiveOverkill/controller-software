@@ -2,22 +2,64 @@
 //#include "nodes/node_core.h"
 #include <iostream>
 //#include "controller.h"
-
+#include "fpga_interface.h"
+#include "fpga_module_manager.h"
 
 int main() {
     //Node_Core core;
     //Controller controller;
 
-    int a = 0;
-    int *b = &a;
+    fpga_module_manager fpga_manager;
+    Fpga_Interface fpga;
+    fpga_manager.set_fpga_interface(&fpga);
 
-    a++;
+    fpga_manager.load_config("/home/em-os/controller/config/fpga_configs/controller_config.json");
 
-    std::cout << "Hello, World!" << std::endl;
-    std::cout << "Hello, World!" << std::endl;
-    std::cout << "Hello, World!" << std::endl;
-    std::cout << "Hello, World!" << std::endl;
-    std::cout << a << std::endl;
+
+    if(fpga_manager.initialize_fpga()){
+        std::cerr << "Failed to initialize FPGA" << std::endl;
+        return 1;
+    }
+
+    fpga_manager.load_drivers();
+
+    // load node config
+
+    // drivers should somehow specify what variables are available to the controller (both to the PS and PL), and make configuration settings available to the user
+
+    // use node config to create global variables from fpga module drivers
+
+    // for now the global variables created are just hardcoded in the drivers
+    fpga_manager.create_global_variables();
+
+    fpga.set_update_frequency(1000);
+
+    uint32_t count = 0;
+    uint32_t ret = 0;
+    while(1){
+        ret = fpga.wait_for_update();
+        if(ret != 0){
+            std::cout << "FPGA update failed" << std::endl;
+            return 1;
+        }
+        fpga.cache_invalidate_all();    // make sure any cached memory gets updated
+
+        fpga_manager.run_update();  // updates low level drivers
+
+
+
+        // TODO: other realtime updates happen here
+
+
+
+        count++;
+        // if(count >= 1000){
+        //     std::cout << "FPGA update 1000x passed" << std::endl;
+        //     count = 0;
+        // }
+
+        fpga.cache_flush_all(); // write any changed data to FPGA memory
+    }
 
     //controller.run();
 

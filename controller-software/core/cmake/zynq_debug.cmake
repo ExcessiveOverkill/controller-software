@@ -9,7 +9,7 @@ set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
 
 # Specify the target architecture and NEON support
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -g -O0")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -g -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=hard -g -O0")
 
 set(CMAKE_BUILD_TYPE Debug)
 

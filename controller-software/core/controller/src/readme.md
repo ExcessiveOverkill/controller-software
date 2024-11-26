@@ -14,6 +14,9 @@ save them in the core/ssh folder
 copy ssh key to zynq:
 ssh-copy-id -i .ssh/zynq em-os@192.168.1.238
 
+(remove past configs if zynq has been re-imaged)
+rm -r /home/excessive/.ssh
+
 create ssh config:
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 
@@ -33,8 +36,12 @@ Host zynq
     IdentityFile /home/excessive/controller-software/controller-software/core/.ssh/zynq
     Port 22
 
+build project to copy files to zynq
 
+TODO: figure out a way to better handle the permissions, currently you must enter the password each time (maybe not that bad?)
 
+allow write access so we can update it later from vs code (note this is unsafe since a malicious bin could be added)
+sudo chmod u+w controller/bin/controller_core
 
 
 

@@ -60,6 +60,7 @@
             "command": "ssh",
             "args": [
                 "zynq",
+                "sudo -S",
                 "pkill",
                 "-f",
                 "/home/em-os/controller/"
@@ -77,7 +78,7 @@
             "command": "ssh",
             "args": [
                 "zynq",
-                "chmod +x /home/em-os/controller/bin/controller_core && /home/em-os/controller/bin/controller_core"
+                "chmod +x /home/em-os/controller/bin/controller_core && sudo -S /home/em-os/controller/bin/controller_core"
             ],
             "dependsOn": "Copy Files to Zynq",
             "group": {
@@ -99,7 +100,7 @@
             "command": "ssh",
             "args": [
                 "zynq",
-                "gdbserver :1234 /home/em-os/controller/bin/controller_core"
+                "sudo -S gdbserver :1234 /home/em-os/controller/bin/controller_core"
             ],
             "dependsOn": "Copy Files to Zynq",
             "group": {
