@@ -185,32 +185,35 @@ uint32_t fpga_module_manager::load_driver(json node_config){
 
     // configure driver
 
-    drivers.back()->microseconds = &microseconds;
+    drivers.back()->microseconds = &microseconds;   // used for syncronized timing
 
-    if(drivers.back()->load_config_pre(node_config) != 0){
-        std::cerr << "Failed to load driver pre config" << std::endl;
+    // if(drivers.back()->load_config_pre(node_config) != 0){
+    //     std::cerr << "Failed to load driver pre config" << std::endl;
+    //     drivers.pop_back();
+    //     return 2;
+    // }
+
+    if(set_memory_pointers(&drivers.back()->base_mem) != 0){
+        std::cerr << "Failed to set memory pointers" << std::endl;
         drivers.pop_back();
         return 2;
     }
 
+    if(drivers.back()->load_config(node_config, &fpga_instructions) != 0){
+        std::cerr << "Failed to load driver post config" << std::endl;
+        drivers.pop_back();
+        return 3;
+    }
 
     // allocate memory for the driver
     if(allocate_driver_memory(&drivers.back()->base_mem) != 0){
         std::cerr << "Failed to allocate memory for driver" << std::endl;
         drivers.pop_back();
-        return 3;
-    }
-
-
-    if(drivers.back()->load_config_post(node_config) != 0){
-        std::cerr << "Failed to load driver post config" << std::endl;
-        drivers.pop_back();
         return 4;
     }
 
     // add base instuctions from driver
-    drivers.back()->get_base_instructions(&fpga_instructions);
-
+    //drivers.back()->get_base_instructions(&fpga_instructions);
 
     return 0;
 }
@@ -227,33 +230,38 @@ bool fpga_module_manager::load_json_value(const json& config, const std::string&
     return true;
 }
 
+uint32_t fpga_module_manager::set_memory_pointers(fpga_mem* mem){
+    // set the memory pointers for the driver
 
-uint32_t fpga_module_manager::allocate_driver_memory(base_driver::fpga_mem* mem){
-    // allocate memory for the driver and set the pointers
+    mem->hardware_PS_PL_mem_offset = allocated_PS_PL_address / 4 + mem_layout.data_memory_size;  // top half is PS to PL
+    mem->hardware_PL_PS_mem_offset = allocated_PL_PS_address / 4;    // bottom half is PL to PS
 
-    if(mem->PS_PL_size % 4 != 0 || mem->PL_PS_size % 4 != 0){
+    mem->software_PS_PL_ptr = (char*)PS_PL_data_ptr + allocated_PS_PL_address;
+    mem->software_PL_PS_ptr = (char*)PL_PS_data_ptr + allocated_PL_PS_address;
+
+    return 0;
+}
+
+uint32_t fpga_module_manager::allocate_driver_memory(const fpga_mem* mem){
+    // allocate memory for the driver (this is called after the driver has been configured)
+
+    if(mem->software_PS_PL_size % 4 != 0 || mem->software_PL_PS_size % 4 != 0){
         std::cerr << "Error: Memory sizes must be in 4 byte increments" << std::endl;
         return 1;
     }
 
-    if(mem->PS_PL_size + allocated_PS_PL_address >= mem_layout.PS_to_PL_control_size){
+    if(mem->software_PS_PL_size + allocated_PS_PL_address >= mem_layout.PS_to_PL_control_size){
         std::cerr << "Error: Not enough PS->PL memory for driver" << std::endl;
         return 2;
     }
 
-    if(mem->PL_PS_size + allocated_PL_PS_address >= mem_layout.PL_to_PS_control_size){
+    if(mem->software_PL_PS_size + allocated_PL_PS_address >= mem_layout.PL_to_PS_control_size){
         std::cerr << "Error: Not enough PL->PS memory for driver" << std::endl;
         return 3;
     }
 
-    mem->PS_PL_mem_offset = allocated_PS_PL_address / 4 + mem_layout.data_memory_size;  // top half is PS to PL
-    mem->PL_PS_mem_offset = allocated_PL_PS_address / 4;    // bottom half is PL to PS
-
-    mem->PS_PL_ptr = (char*)PS_PL_data_ptr + allocated_PS_PL_address;
-    mem->PL_PS_ptr = (char*)PL_PS_data_ptr + allocated_PL_PS_address;
-
-    allocated_PS_PL_address += mem->PS_PL_size;
-    allocated_PL_PS_address += mem->PL_PS_size;
+    allocated_PS_PL_address += mem->software_PS_PL_size;
+    allocated_PL_PS_address += mem->software_PL_PS_size;
     
     return 0;
 }

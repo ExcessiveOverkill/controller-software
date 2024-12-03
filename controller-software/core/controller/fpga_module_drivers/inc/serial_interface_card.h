@@ -1,4 +1,5 @@
 #include "fpga_module_driver_factory.h"
+#include "register_helper.h"
 
 
 #pragma once
@@ -8,21 +9,29 @@ public:
     serial_interface_card();
     ~serial_interface_card();
 
-    uint32_t load_config_pre(json config) override;
-    uint32_t load_config_post(json config) override;
-    uint32_t get_base_instructions(std::vector<uint64_t>* instructions) override;
+    uint32_t load_config(json config, std::vector<uint64_t>* instructions) override;
+    //uint32_t get_base_instructions(std::vector<uint64_t>* instructions) override;
 
     uint32_t run() override;
 
 private:
-    struct registers{
-        uint32_t* port_mode_enable = nullptr;   // write
-        uint32_t* i2c_config = nullptr; // write
-        uint32_t* i2c_status = nullptr; // read
-        uint32_t* i2c_data_rx = nullptr;    // read
-        uint32_t* i2c_data_tx = nullptr;    // write
 
-    } regs;
+    // TODO: probably should make a way to free this memory apon destruction (if we allow reconfig without restarting)
+    struct registers2{
+        Register* rs485_mode_enable;
+        Register* rs422_mode_enable;
+        Register* quadrature_mode_enable;
+        Register* i2c_config_read_mode;
+        Register* i2c_config_device_address;
+        Register* i2c_config_reg_address;
+        Register* i2c_config_data_length;
+        Register* i2c_config_start;
+        Register* i2c_status_busy;
+        Register* i2c_status_error;
+        Register* i2c_data_rx;
+        Register* i2c_data_tx;
+
+    } regs2;
 
     struct i2c_transfer{
         uint8_t device_address = 0;

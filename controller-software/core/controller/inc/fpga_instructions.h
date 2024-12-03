@@ -10,6 +10,18 @@ enum instruction_type : uint8_t {
     COPY = 2
 };
 
+struct fpga_mem{    // memory allocated to the driver by the FPGA manager
+    uint32_t software_PS_PL_size = 0;    // must be in 4 byte increments
+    uint32_t hardware_PS_PL_size = 0; // in 32 bit words
+    void* software_PS_PL_ptr = nullptr;  // pointer in user space
+    uint32_t hardware_PS_PL_mem_offset = 0;  // offset in the PS->PL memory, used for instructions
+
+    uint32_t software_PL_PS_size = 0;    // must be in 4 byte increments
+    uint32_t hardware_PL_PS_size = 0; // in 32 bit words
+    void* software_PL_PS_ptr = nullptr;  // pointer in user space
+    uint32_t hardware_PL_PS_mem_offset = 0;  // offset in the PS->PL memory, used for instructions
+};
+
 static uint64_t create_instruction_END(){
     return ((uint64_t)instruction_type::END << 48);
 }

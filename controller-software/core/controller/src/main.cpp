@@ -53,10 +53,10 @@ int main() {
 
 
         count++;
-        // if(count >= 1000){
-        //     std::cout << "FPGA update 1000x passed" << std::endl;
-        //     count = 0;
-        // }
+        if(count >= 1000){
+            std::cout << "FPGA update 1000x passed" << std::endl;
+            count = 0;
+        }
 
         fpga.cache_flush_all(); // write any changed data to FPGA memory
     }

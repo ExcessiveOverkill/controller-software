@@ -32,9 +32,11 @@
             "driver_data": {},
             "address_map": {
                 "0x0": {
+                    "address": 0,
                     "name": "port_mode_enable",
                     "count": 1,
-                    "group": null,
+                    "group_name": "",
+                    "group_index": 0,
                     "dataType": "PACKED",
                     "readWrite": "WRITE",
                     "description": "Enable port modes",
@@ -44,9 +46,11 @@
                     "metadata": {},
                     "packedRegisters": [
                         {
+                            "address": 0,
                             "name": "rs485_mode_enable",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "UNSIGNED",
                             "readWrite": "WRITE",
                             "description": "Enable rs485 mode",
@@ -56,9 +60,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 0,
                             "name": "rs422_mode_enable",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "UNSIGNED",
                             "readWrite": "WRITE",
                             "description": "Enable rs422 mode",
@@ -68,9 +74,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 0,
                             "name": "quadrature_mode_enable",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "UNSIGNED",
                             "readWrite": "WRITE",
                             "description": "Enable quadrature mode",
@@ -82,9 +90,11 @@
                     ]
                 },
                 "0x1": {
+                    "address": 1,
                     "name": "i2c_config",
                     "count": 1,
-                    "group": null,
+                    "group_name": "",
+                    "group_index": 0,
                     "dataType": "PACKED",
                     "readWrite": "WRITE",
                     "description": "I2c configuration",
@@ -94,9 +104,11 @@
                     "metadata": {},
                     "packedRegisters": [
                         {
+                            "address": 1,
                             "name": "read",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "BOOL",
                             "readWrite": "WRITE",
                             "description": "read mode",
@@ -106,9 +118,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 1,
                             "name": "device_address",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "UNSIGNED",
                             "readWrite": "WRITE",
                             "description": "Device address",
@@ -118,9 +132,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 1,
                             "name": "device_register",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "UNSIGNED",
                             "readWrite": "WRITE",
                             "description": "Device register",
@@ -130,9 +146,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 1,
                             "name": "byte_count",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "UNSIGNED",
                             "readWrite": "WRITE",
                             "description": "Byte count",
@@ -142,9 +160,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 1,
                             "name": "start",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "BOOL",
                             "readWrite": "WRITE",
                             "description": "Start",
@@ -156,9 +176,11 @@
                     ]
                 },
                 "0x2": {
+                    "address": 2,
                     "name": "i2c_data_rx",
                     "count": 1,
-                    "group": null,
+                    "group_name": "",
+                    "group_index": 0,
                     "dataType": "UNSIGNED",
                     "readWrite": "READ",
                     "description": "I2c data rx",
@@ -168,9 +190,11 @@
                     "metadata": {}
                 },
                 "0x3": {
+                    "address": 3,
                     "name": "i2c_data_tx",
                     "count": 1,
-                    "group": null,
+                    "group_name": "",
+                    "group_index": 0,
                     "dataType": "UNSIGNED",
                     "readWrite": "WRITE",
                     "description": "I2c data tx",
@@ -180,9 +204,11 @@
                     "metadata": {}
                 },
                 "0x4": {
+                    "address": 4,
                     "name": "i2c_status",
                     "count": 1,
-                    "group": null,
+                    "group_name": "",
+                    "group_index": 0,
                     "dataType": "PACKED",
                     "readWrite": "READ",
                     "description": "I2c status",
@@ -192,9 +218,11 @@
                     "metadata": {},
                     "packedRegisters": [
                         {
+                            "address": 4,
                             "name": "busy",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "BOOL",
                             "readWrite": "READ",
                             "description": "Busy",
@@ -204,9 +232,11 @@
                             "metadata": {}
                         },
                         {
+                            "address": 4,
                             "name": "error",
                             "count": 1,
-                            "group": null,
+                            "group_name": "",
+                            "group_index": 0,
                             "dataType": "BOOL",
                             "readWrite": "READ",
                             "description": "Error",

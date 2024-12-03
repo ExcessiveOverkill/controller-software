@@ -62,7 +62,9 @@ private:
 
     uint32_t load_mem_layout();
 
-    uint32_t allocate_driver_memory(base_driver::fpga_mem* mem);    // allocate memory for the driver and set the pointers
+    uint32_t set_memory_pointers(fpga_mem* mem);   // set the memory pointers for the driver
+
+    uint32_t allocate_driver_memory(const fpga_mem* mem);    // allocate memory that the driver will use
 
     uint32_t write_instructions_to_fpga();  // write the instructions to the FPGA
 
