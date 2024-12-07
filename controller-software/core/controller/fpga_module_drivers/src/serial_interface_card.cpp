@@ -15,30 +15,34 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
         return 1;
     }
 
-    // configure loader to setup registers for immediate use
+    // configure registers
     Address_Map_Loader loader;
     loader.setup(&config, &base_mem, node_address, instructions);
 
-    auto port_mode_enable = loader.get_packed_register_parent("port_mode_enable");
-    auto i2c_config = loader.get_packed_register_parent("i2c_config");
+    auto port_mode_enable = loader.get_register("port_mode_enable", 0);
+    loader.sync_with_PS(port_mode_enable);
+    regs2.rs485_mode_enable = port_mode_enable->get_register("rs485_mode_enable");
+    regs2.rs422_mode_enable = port_mode_enable->get_register("rs422_mode_enable");
+    regs2.quadrature_mode_enable = port_mode_enable->get_register("rs422_mode_enable");
 
-    regs2.i2c_data_tx = loader.get_register<uint32_t>("i2c_data_tx", 0);
+    auto i2c_config = loader.get_register("i2c_config", 0);
+    loader.sync_with_PS(i2c_config);
+    regs2.i2c_config_read_mode = i2c_config->get_register("read");
+    regs2.i2c_config_device_address = i2c_config->get_register("device_address");
+    regs2.i2c_config_reg_address = i2c_config->get_register("register_address");
+    regs2.i2c_config_data_length = i2c_config->get_register("byte_count");
+    regs2.i2c_config_start = i2c_config->get_register("start");
 
-    regs2.i2c_data_rx = loader.get_register<uint32_t>("i2c_data_rx", 0);
-    auto i2c_status = loader.get_packed_register_parent("i2c_status");
+    regs2.i2c_data_tx = loader.get_register("i2c_data_tx", 0);
+    loader.sync_with_PS(regs2.i2c_data_tx);
+    regs2.i2c_data_rx = loader.get_register("i2c_data_rx", 0);
+    loader.sync_with_PS(regs2.i2c_data_rx);
 
-    regs2.rs485_mode_enable = loader.get_sub_register_from_parent<uint32_t>(port_mode_enable, "port_mode_enable", "rs485_mode_enable");
-    regs2.rs422_mode_enable = loader.get_sub_register_from_parent<uint32_t>(port_mode_enable, "port_mode_enable", "rs422_mode_enable");
-    regs2.quadrature_mode_enable = loader.get_sub_register_from_parent<uint32_t>(port_mode_enable, "port_mode_enable", "quadrature_mode_enable");
-
-    regs2.i2c_config_read_mode = loader.get_sub_register_from_parent<bool>(i2c_config, "i2c_config", "read");
-    regs2.i2c_config_device_address = loader.get_sub_register_from_parent<uint8_t>(i2c_config, "i2c_config", "device_address");
-    regs2.i2c_config_reg_address = loader.get_sub_register_from_parent<uint8_t>(i2c_config, "i2c_config", "device_register");
-    regs2.i2c_config_data_length = loader.get_sub_register_from_parent<uint8_t>(i2c_config, "i2c_config", "byte_count");
-    regs2.i2c_config_start = loader.get_sub_register_from_parent<bool>(i2c_config, "i2c_config", "start");
-
-    regs2.i2c_status_busy = loader.get_sub_register_from_parent<bool>(i2c_status, "i2c_status", "busy");
-    regs2.i2c_status_error = loader.get_sub_register_from_parent<bool>(i2c_status, "i2c_status", "error");
+    auto i2c_status = loader.get_register("i2c_status", 0);
+    loader.sync_with_PS(i2c_status);
+    regs2.i2c_status_busy = i2c_status->get_register("busy");
+    regs2.i2c_status_error = i2c_status->get_register("error");
+    
 
     
     uint32_t test = 0;

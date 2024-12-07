@@ -35,28 +35,28 @@ uint32_t fpga_module_manager::load_mem_layout(){
 
     json controller_json = config["controller"];
 
-    if (!controller_json.contains("driver_data")) {
-        std::cerr << "Error: driver_data not found in config." << std::endl;
+    if (!controller_json.contains("driver_settings")) {
+        std::cerr << "Error: driver_settings not found in config." << std::endl;
         return 1;
     }
 
-    json driver_data_json = controller_json["driver_data"];
+    json driver_settings_json = controller_json["driver_settings"];
 
     bool success = true;
 
-    success &= load_json_value(driver_data_json, "OCM_BASE_ADDR", &mem_layout.OCM_BASE_ADDR);
-    success &= load_json_value(driver_data_json, "OCM_SIZE", &mem_layout.OCM_SIZE);
-    success &= load_json_value(driver_data_json, "PS_TO_PL_CONTROL_OFFSET", &mem_layout.PS_to_PL_control_base_addr_offset);
-    success &= load_json_value(driver_data_json, "PS_TO_PL_CONTROL_SIZE", &mem_layout.PS_to_PL_control_size);
-    success &= load_json_value(driver_data_json, "PL_TO_PS_CONTROL_OFFSET", &mem_layout.PL_to_PS_control_base_addr_offset);
-    success &= load_json_value(driver_data_json, "PL_TO_PS_CONTROL_SIZE", &mem_layout.PL_to_PS_control_size);
-    success &= load_json_value(driver_data_json, "PS_TO_PL_DATA_OFFSET", &mem_layout.PS_to_PL_data_base_addr_offset);
-    success &= load_json_value(driver_data_json, "PS_TO_PL_DATA_SIZE", &mem_layout.PS_to_PL_data_size);
-    success &= load_json_value(driver_data_json, "PL_TO_PS_DATA_OFFSET", &mem_layout.PL_to_PS_data_base_addr_offset);
-    success &= load_json_value(driver_data_json, "PL_TO_PS_DATA_SIZE", &mem_layout.PL_to_PS_data_size);
-    success &= load_json_value(driver_data_json, "PS_TO_PL_DMA_INSTRUCTION_OFFSET", &mem_layout.PS_to_PL_dma_instructions_base_addr_offset);
-    success &= load_json_value(driver_data_json, "PS_TO_PL_DMA_INSTRUCTION_SIZE", &mem_layout.PS_to_PL_dma_instructions_size);
-    success &= load_json_value(driver_data_json, "DATA_MEMORY_SIZE", &mem_layout.data_memory_size);
+    success &= load_json_value(driver_settings_json, "OCM_BASE_ADDR", &mem_layout.OCM_BASE_ADDR);
+    success &= load_json_value(driver_settings_json, "OCM_SIZE", &mem_layout.OCM_SIZE);
+    success &= load_json_value(driver_settings_json, "PS_TO_PL_CONTROL_OFFSET", &mem_layout.PS_to_PL_control_base_addr_offset);
+    success &= load_json_value(driver_settings_json, "PS_TO_PL_CONTROL_SIZE", &mem_layout.PS_to_PL_control_size);
+    success &= load_json_value(driver_settings_json, "PL_TO_PS_CONTROL_OFFSET", &mem_layout.PL_to_PS_control_base_addr_offset);
+    success &= load_json_value(driver_settings_json, "PL_TO_PS_CONTROL_SIZE", &mem_layout.PL_to_PS_control_size);
+    success &= load_json_value(driver_settings_json, "PS_TO_PL_DATA_OFFSET", &mem_layout.PS_to_PL_data_base_addr_offset);
+    success &= load_json_value(driver_settings_json, "PS_TO_PL_DATA_SIZE", &mem_layout.PS_to_PL_data_size);
+    success &= load_json_value(driver_settings_json, "PL_TO_PS_DATA_OFFSET", &mem_layout.PL_to_PS_data_base_addr_offset);
+    success &= load_json_value(driver_settings_json, "PL_TO_PS_DATA_SIZE", &mem_layout.PL_to_PS_data_size);
+    success &= load_json_value(driver_settings_json, "PS_TO_PL_DMA_INSTRUCTION_OFFSET", &mem_layout.PS_to_PL_dma_instructions_base_addr_offset);
+    success &= load_json_value(driver_settings_json, "PS_TO_PL_DMA_INSTRUCTION_SIZE", &mem_layout.PS_to_PL_dma_instructions_size);
+    success &= load_json_value(driver_settings_json, "DATA_MEMORY_SIZE", &mem_layout.data_memory_size);
 
     if (!success) {
         std::cerr << "Error: Failed to load driver data from config." << std::endl;

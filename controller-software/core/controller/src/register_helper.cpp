@@ -3,7 +3,19 @@
 #include "register_helper.h"
 
 
-Register::Register(){
+Register::Register(json* json_data, const std::string register_name, uint16_t register_index, uint16_t parent_absolute_address){
+    // this json object must contain the register object
+    if (!json_data->contains(register_name)){
+        throw std::runtime_error("Register not found");
+    }
+
+    this->json_data = new json((*json_data)[register_name]);
+
+    get_register_data(register_name);
+    pl_data.index = register_index;
+    pl_data.absolute_address = parent_absolute_address + pl_data.address_offset + register_index;
+
+    pl_data.bit_mask = (1 << pl_data.width) - 1;    // mask is not shifted to the correct position, it is just the correct width
 }
 
 Register::~Register(){
@@ -20,84 +32,16 @@ void Address_Map_Loader::setup(json* node_config, fpga_mem* base_mem, uint8_t no
     this->base_mem = base_mem;
     this->node_index = node_index;
     this->instructions = instructions;
-    if(instructions != nullptr){
-        prepare_for_use = true;
-    }
-}
 
-void Register::set_software_data_ptr(uint32_t* software_data_ptr){
-    this->software_data_ptr = software_data_ptr;
-}
+    json data = (*node_config)["node"];
 
-void Register::set_hardware_data_ptr(uint16_t hardware_data_ptr){
-    this->hardware_data_ptr = hardware_data_ptr;
-}
-
-uint32_t* Register::get_software_data_ptr(){
-    return software_data_ptr;
-}
-
-uint16_t Register::get_hardware_data_ptr(){
-    return hardware_data_ptr;
-}
-
-Register::reg_type Register::get_type(){
-    return type;
-}
-
-uint16_t Register::get_count(){
-    return count;
-}
-
-//template <typename T>
-void Register::configure(register_json_data* data, uint8_t node_index, fpga_mem* mem){
-
-    bool read = 0;
-    bool write = 0;
-
-    // configure base data pointer
-    if(data->read){
-        read = true;
-        software_data_ptr = reinterpret_cast<uint32_t*>(mem->software_PL_PS_ptr) + mem->software_PL_PS_size / 4; // /4 to convert to 32 bit words
-        hardware_data_ptr = mem->hardware_PL_PS_mem_offset + mem->hardware_PL_PS_size;
-        mem->software_PL_PS_size += 4;  // increment by 4 bytes
-        mem->hardware_PL_PS_size += 1;  // increment by 1 32 bit word
-    }
-    if(data->write){
-        write = true;
-        software_data_ptr = reinterpret_cast<uint32_t*>(mem->software_PS_PL_ptr) + mem->software_PS_PL_size / 4; // /4 to convert to 32 bit words
-        hardware_data_ptr = mem->hardware_PS_PL_mem_offset + mem->hardware_PS_PL_size;
-        mem->software_PS_PL_size += 4;  // increment by 4 bytes
-        mem->hardware_PS_PL_size += 1;  // increment by 1 32 bit word
-    }
-    if(read && write){
-        throw std::runtime_error("Read and write registers are not currently supported");
-    }
-    if(!read && !write){
-        throw std::runtime_error("Register must be read or write");
-    }
-
-    configure(data, node_index);
-
-}
-
-//template <typename T>
-void Register::configure(register_json_data* data, uint8_t node_index){
-
-    // not syncing with the PS, configure only what is needed to create future instructions
-
-    width = data->width;
-    bit_offset = data->starting_bit;
-    bit_mask = (1 << width) - 1;    // mask is not shifted to the correct position, it is just the correct width
-    this->node_index = node_index;
-    node_memory_address = data->node_memory_address;
-    count = data->count;
+    base_group = new Group(&data, "base_group", 1, 0);
 
 }
 
 template <typename T>
 T* Register::get_raw_data_ptr(){
-    return (T*)software_data_ptr;
+    return (T*)ps_data.software_data_ptr;
 }
 template uint32_t* Register::get_raw_data_ptr<uint32_t>();
 template uint16_t* Register::get_raw_data_ptr<uint16_t>();
@@ -110,10 +54,140 @@ template bool* Register::get_raw_data_ptr<bool>();
 uint32_t Register::create_copy_instructions(std::vector<uint64_t>* instructions){
     // create a copy instruction to copy the register to/from the PS/PL.
 
-    std::cout << "No create_copy_instruction function override defined, no instruction will be created" << std::endl;
+    if(pl_data.read){
+        instructions->push_back(create_instruction_COPY(pl_data.node_index, pl_data.absolute_address, 0, ps_data.hardware_data_ptr));
+    }
+    else if(pl_data.write){
+        instructions->push_back(create_instruction_COPY(0, ps_data.hardware_data_ptr, pl_data.node_index, pl_data.absolute_address));
+    }
+    else{
+        throw std::runtime_error("Register must be read or write");
+    }
 
-    return 1;
+    return 0;
 }
+
+void Address_Map_Loader::sync_with_PS(Register* reg){
+    // sync the register with the PS, only needed for parent registers (not sub-registers), must be called before sub-registers are created
+
+    if(reg->is_sub_register){
+        throw std::runtime_error("Sync with PS can only be called on parent registers");
+    }
+
+    if(reg->pl_data.read){
+        reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PL_PS_ptr) + base_mem->software_PL_PS_size / 4; // /4 to convert to 32 bit words
+        reg->ps_data.hardware_data_ptr = base_mem->hardware_PL_PS_mem_offset + base_mem->hardware_PL_PS_size;
+        base_mem->software_PL_PS_size += 4;  // increment by 4 bytes
+        base_mem->hardware_PL_PS_size += 1;  // increment by 1 32 bit word
+    }
+    else if(reg->pl_data.write){
+        reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PS_PL_ptr) + base_mem->software_PS_PL_size / 4; // /4 to convert to 32 bit words
+        reg->ps_data.hardware_data_ptr = base_mem->hardware_PS_PL_mem_offset + base_mem->hardware_PS_PL_size;
+        base_mem->software_PS_PL_size += 4;  // increment by 4 bytes
+        base_mem->hardware_PS_PL_size += 1;  // increment by 1 32 bit word
+    }
+    else{
+        throw std::runtime_error("Register must be read or write");
+    }
+
+    reg->pl_data.node_index = node_index;
+    reg->create_copy_instructions(instructions);
+    
+    return;
+}
+
+void Register::get_register_data(const std::string register_name){
+    // get the data for a group
+
+    std::string register_name_get = "";
+    bool ret = true;
+        
+    pl_data.name = register_name;
+    ret &= load_json_value(*json_data, "address_offset", &pl_data.address_offset);
+    ret &= load_json_value(*json_data, "bank_size", &pl_data.bank_size);
+    ret &= load_json_value(*json_data, "width", &pl_data.width);
+    ret &= load_json_value(*json_data, "starting_bit", &pl_data.starting_bit);
+
+    std::string rw;
+    ret &= load_json_value(*json_data, "rw", &rw);
+    if(rw == "r"){
+        pl_data.read = true;
+    }
+    else if(rw == "w"){
+        pl_data.write = true;
+    }
+    else{
+        throw std::runtime_error("Invalid read/write value");
+    }
+
+    if(!ret){
+        throw std::runtime_error("Failed to load register data");
+    }
+
+    return;
+}
+
+Group::Group(json* json_data, const std::string group_name, uint16_t index, uint16_t parent_absolute_address){
+    // this json object must contain the group object
+    if (!json_data->contains(group_name)){
+        throw std::runtime_error("Group not found");
+    }
+    this->json_data = new json((*json_data)[group_name]);
+
+    get_group_data(group_name);
+    group_data.index = index;
+    group_data.absolute_address = parent_absolute_address + group_data.address_offset + (group_data.alignment * index);
+}
+
+void Group::get_group_data(const std::string group_name){
+    // get the data for a group
+
+    std::string group_name_get = "";
+    bool ret = true;
+
+    group_data.name = group_name;
+    ret &= load_json_value(*json_data, "address_offset", &group_data.address_offset);
+    ret &= load_json_value(*json_data, "alignment", &group_data.alignment);
+    ret &= load_json_value(*json_data, "count", &group_data.count);
+
+    if(!ret){
+        throw std::runtime_error("Failed to load group data");
+    }
+    return;    
+}
+
+template <typename T>
+Register* Group::get_register(std::string register_name, uint16_t index){
+    // get a register in the group
+    json data = (*json_data)["registers"];
+
+    return new Register(&data, register_name, index, group_data.absolute_address);
+}
+
+Group* Group::get_group(std::string group_name, uint16_t index){
+    // get a group of registers
+    json data = (*json_data)["groups"];
+
+    return new Group(&data, group_name, index, group_data.absolute_address);
+}
+
+template <typename T>
+Register* Register::get_register(std::string register_name){
+    // get a sub-register, no index needed
+    json data = (*json_data)["sub_registers"];
+    auto reg = new Register(&data, register_name, 0, 0);
+    reg->is_sub_register = true;
+    reg->ps_data.software_data_ptr = ps_data.software_data_ptr;
+    reg->ps_data.hardware_data_ptr = ps_data.hardware_data_ptr;
+    return reg;
+}
+template Register* Register::get_register<uint32_t>(std::string register_name);
+template Register* Register::get_register<uint16_t>(std::string register_name);
+template Register* Register::get_register<uint8_t>(std::string register_name);
+template Register* Register::get_register<int32_t>(std::string register_name);
+template Register* Register::get_register<int16_t>(std::string register_name);
+template Register* Register::get_register<int8_t>(std::string register_name);
+template Register* Register::get_register<bool>(std::string register_name);
 
 template <typename T>
 Register* Address_Map_Loader::get_register(std::string register_name, uint16_t index){
@@ -122,35 +196,7 @@ Register* Address_Map_Loader::get_register(std::string register_name, uint16_t i
     // allowed return types are automatically found by the bit width of the register and the type of the variable defined in the json file
     // specifying a larger matching type is acceptable, but specifying a smaller type will throw an error (uint8 -> uint16 is fine, uint16 -> uint8 is not)
     
-    register_json_data data;
-    
-    get_register_data_by_name(&data, register_name, "");
-    
-    verify_type_compatibility<T>(&data);
-
-    if(index >= data.count){
-        throw std::runtime_error("Index out of range");
-    }
-
-    Register* reg;
-
-    if(data.read){
-        reg = new Single_Register_Read();
-    }
-    else{
-        reg = new Single_Register_Write();
-    }
-
-    data.node_memory_address += index;  // increment the memory address by the index
-
-    if(prepare_for_use){
-        reg->configure(&data, node_index, base_mem);  // link to PS memory
-        reg->create_copy_instructions(instructions);
-    }
-    else{
-        reg->configure(&data, node_index);  // don't link to PS memory
-    }
-    
+    auto reg = base_group->get_register<T>(register_name, index);
     return reg;
 }
 template Register* Address_Map_Loader::get_register<uint8_t>(std::string register_name, uint16_t index);
@@ -161,84 +207,8 @@ template Register* Address_Map_Loader::get_register<int16_t>(std::string registe
 template Register* Address_Map_Loader::get_register<int32_t>(std::string register_name, uint16_t index);
 template Register* Address_Map_Loader::get_register<bool>(std::string register_name, uint16_t index);
 
-
-Register* Address_Map_Loader::get_packed_register_parent(std::string parent_register_name){
-    // get a packed register parent
-
-    register_json_data data;
-    
-    get_register_data_by_name(&data, parent_register_name, "");
-    
-    if(data.format != variable_format::PACKED){
-        throw std::runtime_error("Register is not a packed register");
-    }
-
-    Register* reg;
-
-    if(data.read){
-        reg = new Single_Register_Read();
-    }
-    else{
-        reg = new Single_Register_Write();
-    }
-
-    if(prepare_for_use){
-        reg->configure(&data, node_index, base_mem);  // link to PS memory
-        reg->create_copy_instructions(instructions);
-    }
-    else{
-        reg->configure(&data, node_index);  // don't link to PS memory
-    }
-    
-    return reg;
-}
-
-template <typename T>
-Register* Address_Map_Loader::get_sub_register_from_parent(Register* parent, std::string parent_register_name, std::string register_name){
-    // get part of a packed register
-    // sub registers inherit the physical memory addresses of the parent register
-
-    // return type is automatically determined by the bit width of the register and the type of the variable defined in the json file
-    // specifying a larger matching type is acceptable, but specifying a smaller type will throw an error (uint8 -> uint16 is fine, uint16 -> uint8 is not)
-    
-    register_json_data data;
-    
-    get_packed_register_data_by_name(&data, register_name, parent_register_name, "");
-    
-    verify_type_compatibility<T>(&data);
-
-    Register* reg;
-
-    // TODO: check to make sure read/write is compatible with parent register, as of now the sub-register read/write is ignored
-
-    switch (parent->get_type()){
-    case Register::reg_type::SINGLE_READ:
-        reg = new Single_Register_Read();
-        break;
-    case Register::reg_type::SINGLE_WRITE:
-        reg = new Single_Register_Write();
-        break;
-    default:
-        throw std::runtime_error("Sub-register must be a single read or write register");
-        break;
-    }
-
-    reg->configure(&data, node_index);  // no need to automatically link to PS memory, as the parent register already has (if required)
-
-    reg->set_software_data_ptr(parent->get_software_data_ptr());
-    reg->set_hardware_data_ptr(parent->get_hardware_data_ptr());
-
-    return reg;
-}
-template Register* Address_Map_Loader::get_sub_register_from_parent<uint8_t>(Register* parent, std::string parent_register_name, std::string register_name);
-template Register* Address_Map_Loader::get_sub_register_from_parent<uint16_t>(Register* parent, std::string parent_register_name, std::string register_name);
-template Register* Address_Map_Loader::get_sub_register_from_parent<uint32_t>(Register* parent, std::string parent_register_name, std::string register_name);
-template Register* Address_Map_Loader::get_sub_register_from_parent<int8_t>(Register* parent, std::string parent_register_name, std::string register_name);
-template Register* Address_Map_Loader::get_sub_register_from_parent<int16_t>(Register* parent, std::string parent_register_name, std::string register_name);
-template Register* Address_Map_Loader::get_sub_register_from_parent<int32_t>(Register* parent, std::string parent_register_name, std::string register_name);
-template Register* Address_Map_Loader::get_sub_register_from_parent<bool>(Register* parent, std::string parent_register_name, std::string register_name);
-
-
+// TODO: re-implement this
+/*
 template <typename T>
 void Address_Map_Loader::verify_type_compatibility(register_json_data* config){
     // make sure the type is compatible with the type in the json file
@@ -343,197 +313,48 @@ void Address_Map_Loader::verify_type_compatibility(register_json_data* config){
         throw std::runtime_error("Unknown type for conversion");
     }
 }
+*/
 
-uint32_t Address_Map_Loader::get_register_data_by_name(register_json_data* data, const std::string register_name, const std::string group_name){
-    // get the data for a register
+Group* Address_Map_Loader::get_group(std::string group_name, uint16_t index){
+    // get a group of registers
 
-    std::string group_name_get = "";
-    std::string register_name_get = "";
-    bool ret = true;
-
-    // loop through all registers to find a match
-    for(auto& reg : (*node_config)["node"]["address_map"]){
-        
-        if(!(load_json_value(reg, "name", &register_name_get) && register_name_get == register_name)){  // name mismatch
-            continue;
-        }
-
-        if(!(load_json_value(reg, "group_name", &group_name_get) && group_name_get == group_name)){ // group mismatch
-            continue;
-        }
-
-        ret &= load_json_value(reg, "address", &data->node_memory_address);
-        ret &= load_json_value(reg, "count", &data->count);
-        ret &= load_json_value(reg, "width", &data->width);
-        ret &= load_json_value(reg, "group_index", &data->group_index);
-        ret &= load_json_value(reg, "startingBit", &data->starting_bit);
-
-        std::string format;
-        ret &= load_json_value(reg, "dataType", &format);
-        if(format.find("BOOL") != std::string::npos){
-            data->format = variable_format::BOOL;
-        }
-        else if(format.find("PACKED") != std::string::npos){
-            data->format = variable_format::PACKED;
-        }
-        else if(format.find("UNSIGNED") != std::string::npos){  // note that this check must be before the SIGNED check, since "UNSIGNED" contains "SIGNED"
-            data->format = variable_format::UNSIGNED;
-        }
-        else if(format.find("SIGNED") != std::string::npos){
-            data->format = variable_format::SIGNED;
-        }
-        else{
-            ret = false;
-        }
-        
-        std::string read_write;
-        ret &= load_json_value(reg, "readWrite", &read_write);
-        if(read_write.find("READ") != std::string::npos){
-            data->read = true;
-        }
-        else if(read_write.find("WRITE") != std::string::npos){
-            data->write = true;
-        }
-        else{
-            ret = false;
-        }
-        if(data->read && data->write){
-            std::cerr << "Error: Register cannot be both read and write" << std::endl;
-            ret = false;
-        }
-        
-        if(!ret){
-            std::cerr << "Error: Failed to load register data" << std::endl;
-            return 1;
-        }
-
-        std::cout << "Configuring register: " << register_name << " at node memory: " << data->node_memory_address << std::endl;
-        return 0;
-    }
-
-    std::cerr << "Error: Register not found" << std::endl;
-    return 1;
-
+    return base_group->get_group(group_name, index);
 }
 
-uint32_t Address_Map_Loader::get_packed_register_data_by_name(register_json_data* data, const std::string sub_register_name, const std::string register_name, const std::string group_name){
-    // get the data for a register
+template <typename T>
+T Register::get_value() const{
+    // get the value of the register
 
-    std::string group_name_get = "";
-    std::string register_name_get = "";
-    bool ret = true;
-
-    json packed_registers;
-    bool parent_register_found = false;
-
-    // loop through all registers to find a match
-    for(auto& reg : (*node_config)["node"]["address_map"]){
-        
-        if(!(load_json_value(reg, "name", &register_name_get) && register_name_get == register_name)){  // name mismatch
-            continue;
-        }
-
-        if(!(load_json_value(reg, "group_name", &group_name_get) && group_name_get == group_name)){ // group mismatch
-            continue;
-        }
-
-        if(!(load_json_value(reg, "dataType", &register_name_get) && register_name_get.find("PACKED") != std::string::npos)){ // not a packed register
-            std::cerr << "Error: Specified register is not a packed type" << std::endl;
-            return 1;
-        }
-
-        // parent register found, now find the sub register
-        packed_registers = reg["packedRegisters"];
-        parent_register_found = true;
-        break;
-    }
-
-    if(!parent_register_found){
-        std::cerr << "Error: Parent register not found" << std::endl;
-        return 1;
-    }
-
-    // loop through all packed registers to find a match
-    for(auto& reg : packed_registers){
-        if(!(load_json_value(reg, "name", &register_name_get) && register_name_get == sub_register_name)){  // name mismatch
-            continue;
-        }
-
-        ret &= load_json_value(reg, "address", &data->node_memory_address);
-        ret &= load_json_value(reg, "count", &data->count);
-        ret &= load_json_value(reg, "width", &data->width);
-        ret &= load_json_value(reg, "group_index", &data->group_index);
-        ret &= load_json_value(reg, "startingBit", &data->starting_bit);
-
-        std::string format;
-        ret &= load_json_value(reg, "dataType", &format);
-        if(format.find("BOOL") != std::string::npos){
-            data->format = variable_format::BOOL;
-        }
-        else if(format.find("PACKED") != std::string::npos){
-            //data->format = variable_format::PACKED;
-            std::cerr << "Error: Nested packed registers not supported" << std::endl;
-            return 1;
-        }
-        // note that we must check for unsigned before signed since "unsigned" contains "signed"
-        else if(format.find("UNSIGNED") != std::string::npos){
-            data->format = variable_format::UNSIGNED;
-        }
-        else if(format.find("SIGNED") != std::string::npos){
-            data->format = variable_format::SIGNED;
-        }
-        else{
-            ret = false;
-        }
-        
-        std::string read_write;
-        ret &= load_json_value(reg, "readWrite", &read_write);
-        if(read_write.find("READ") != std::string::npos){
-            data->read = true;
-        }
-        else if(read_write.find("WRITE") != std::string::npos){
-            data->write = true;
-        }
-        else{
-            ret = false;
-        }
-        if(data->read && data->write){
-            std::cerr << "Error: Register cannot be both read and write" << std::endl;
-            ret = false;
-        }
-        
-        if(!ret){
-            std::cerr << "Error: Failed to load register data" << std::endl;
-            return 1;
-        }
-
-        std::cout << "Configured sub-register: " << sub_register_name << " at offset: " << data->node_memory_address << ":" << data->starting_bit << std::endl;
-        return 0;
-    }
-
-    std::cerr << "Error: Sub-register not found" << std::endl;
-    return 1;
-
+    return (*(ps_data.software_data_ptr) >> pl_data.starting_bit) & pl_data.bit_mask;
 }
+template uint32_t Register::get_value<uint32_t>() const;
+template uint16_t Register::get_value<uint16_t>() const;
+template uint8_t Register::get_value<uint8_t>() const;
+template int32_t Register::get_value<int32_t>() const;
+template int16_t Register::get_value<int16_t>() const;
+template int8_t Register::get_value<int8_t>() const;
+template bool Register::get_value<bool>() const;
 
+template <typename T>
+T Register::set_value(const T& value){
+    // set the value of the register
 
-//template <typename T>
-uint32_t Single_Register_Read::create_copy_instructions(std::vector<uint64_t>* instructions){
-    instructions->push_back(create_instruction_COPY(node_index, node_memory_address, 0, hardware_data_ptr));
-    return 0;
+    *(ps_data.software_data_ptr) &= ~(pl_data.bit_mask << pl_data.starting_bit);  // clear the relavent bits
+    *(ps_data.software_data_ptr) |= (value & pl_data.bit_mask) << pl_data.starting_bit;  // set the new bits
+    return value;
 }
+template uint32_t Register::set_value<uint32_t>(const uint32_t& value);
+template uint16_t Register::set_value<uint16_t>(const uint16_t& value);
+template uint8_t Register::set_value<uint8_t>(const uint8_t& value);
+template int32_t Register::set_value<int32_t>(const int32_t& value);
+template int16_t Register::set_value<int16_t>(const int16_t& value);
+template int8_t Register::set_value<int8_t>(const int8_t& value);
+template bool Register::set_value<bool>(const bool& value);
 
-//template <typename T>
-// T Single_Register_Write<T>::operator=(const T& other){
-//     // Write to the register
-//     *software_data_ptr &= ~(bit_mask << bit_offset);  // clear the relavent bits
-//     *software_data_ptr |= (other & bit_mask) << bit_offset;  // set the new bits
-//     return other;
-// }
+bool Register::set_bit(bool value, uint8_t index){
+    // set a single bit in the register
 
-
-//template <typename T>
-uint32_t Single_Register_Write::create_copy_instructions(std::vector<uint64_t>* instructions){
-    instructions->push_back(create_instruction_COPY(0, hardware_data_ptr, node_index, node_memory_address));
-    return 0;
+    *(ps_data.software_data_ptr) &= ~((pl_data.bit_mask & (1<<index)) << pl_data.starting_bit);
+    *(ps_data.software_data_ptr) |= (value << (pl_data.starting_bit + index));
+    return value;
 }
