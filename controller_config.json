@@ -1,0 +1,384 @@
+{
+    "controller": {
+        "name": "controller",
+        "compatible_drivers": [
+            "controller"
+        ],
+        "driver_settings": {
+            "OCM_BASE_ADDR": 983040,
+            "OCM_SIZE": 32768,
+            "PS_TO_PL_CONTROL_OFFSET": 0,
+            "PS_TO_PL_CONTROL_SIZE": 64,
+            "PL_TO_PS_CONTROL_OFFSET": 2048,
+            "PL_TO_PS_CONTROL_SIZE": 64,
+            "PS_TO_PL_DATA_OFFSET": 4096,
+            "PS_TO_PL_DATA_SIZE": 4096,
+            "PL_TO_PS_DATA_OFFSET": 8192,
+            "PL_TO_PS_DATA_SIZE": 4096,
+            "PS_TO_PL_DMA_INSTRUCTION_OFFSET": 12288,
+            "PS_TO_PL_DMA_INSTRUCTION_SIZE": 2048,
+            "INSTRUCTION_MEMORY_SIZE": 256,
+            "DATA_MEMORY_SIZE": 1024
+        },
+        "base_group": {
+            "name": "base_group",
+            "address_offset": 0,
+            "description": "Base group for all registers",
+            "alignment": 65536,
+            "count": 1,
+            "groups": {},
+            "registers": {}
+        }
+    },
+    "node_1_serial_card": {
+        "node_address": 1,
+        "node": {
+            "name": "serial_interface_card",
+            "compatible_drivers": [
+                "serial_interface_card"
+            ],
+            "driver_settings": {},
+            "base_group": {
+                "name": "base_group",
+                "address_offset": 0,
+                "description": "Base group for all registers",
+                "alignment": 65536,
+                "count": 1,
+                "groups": {},
+                "registers": {
+                    "port_mode_enable": {
+                        "name": "port_mode_enable",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "Select which port modes to enable",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {
+                            "rs485_mode_enable": {
+                                "name": "rs485_mode_enable",
+                                "address_offset": 0,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "",
+                                "width": 10,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "w"
+                            },
+                            "rs422_mode_enable": {
+                                "name": "rs422_mode_enable",
+                                "address_offset": 0,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "",
+                                "width": 10,
+                                "starting_bit": 10,
+                                "sub_registers": {},
+                                "rw": "w"
+                            },
+                            "quadrature_mode_enable": {
+                                "name": "quadrature_mode_enable",
+                                "address_offset": 0,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "",
+                                "width": 7,
+                                "starting_bit": 20,
+                                "sub_registers": {},
+                                "rw": "w"
+                            }
+                        },
+                        "rw": "w"
+                    },
+                    "i2c_config": {
+                        "name": "i2c_config",
+                        "address_offset": 1,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "I2C configuration",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {
+                            "read": {
+                                "name": "read",
+                                "address_offset": 1,
+                                "type": "bool",
+                                "bank_size": 1,
+                                "description": "Read mode",
+                                "width": 1,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "w"
+                            },
+                            "device_address": {
+                                "name": "device_address",
+                                "address_offset": 1,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Device address",
+                                "width": 7,
+                                "starting_bit": 1,
+                                "sub_registers": {},
+                                "rw": "w"
+                            },
+                            "register_address": {
+                                "name": "register_address",
+                                "address_offset": 1,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Device register",
+                                "width": 8,
+                                "starting_bit": 8,
+                                "sub_registers": {},
+                                "rw": "w"
+                            },
+                            "byte_count": {
+                                "name": "byte_count",
+                                "address_offset": 1,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Byte count",
+                                "width": 3,
+                                "starting_bit": 16,
+                                "sub_registers": {},
+                                "rw": "w"
+                            },
+                            "start": {
+                                "name": "start",
+                                "address_offset": 1,
+                                "type": "bool",
+                                "bank_size": 1,
+                                "description": "Start",
+                                "width": 1,
+                                "starting_bit": 19,
+                                "sub_registers": {},
+                                "rw": "w"
+                            }
+                        },
+                        "rw": "w"
+                    },
+                    "i2c_data_rx": {
+                        "name": "i2c_data_rx",
+                        "address_offset": 2,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "I2C data RX",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "i2c_data_tx": {
+                        "name": "i2c_data_tx",
+                        "address_offset": 3,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "I2C data TX",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "w"
+                    },
+                    "i2c_status": {
+                        "name": "i2c_status",
+                        "address_offset": 4,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "I2C status",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {
+                            "busy": {
+                                "name": "busy",
+                                "address_offset": 4,
+                                "type": "bool",
+                                "bank_size": 1,
+                                "description": "Busy",
+                                "width": 1,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "r"
+                            },
+                            "error": {
+                                "name": "error",
+                                "address_offset": 4,
+                                "type": "bool",
+                                "bank_size": 1,
+                                "description": "Error",
+                                "width": 1,
+                                "starting_bit": 1,
+                                "sub_registers": {},
+                                "rw": "r"
+                            }
+                        },
+                        "rw": "r"
+                    }
+                }
+            }
+        }
+    },
+    "node_2_fanuc_encoders": {
+        "node_address": 2,
+        "node": {
+            "name": "fanuc_encoders",
+            "compatible_drivers": [
+                "fanuc_encoders"
+            ],
+            "driver_settings": {},
+            "base_group": {
+                "name": "base_group",
+                "address_offset": 0,
+                "description": "Base group for all registers",
+                "alignment": 65536,
+                "count": 1,
+                "groups": {
+                    "encoder": {
+                        "name": "encoder",
+                        "address_offset": 0,
+                        "description": "Group of registers for each encoder",
+                        "alignment": 4,
+                        "count": 6,
+                        "groups": {},
+                        "registers": {
+                            "multiturn_count": {
+                                "name": "multiturn_count",
+                                "address_offset": 0,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Absolute multiturn count",
+                                "width": 32,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "r"
+                            },
+                            "singleturn_count": {
+                                "name": "singleturn_count",
+                                "address_offset": 1,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Absolute (after index) singleturn count",
+                                "width": 32,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "r"
+                            },
+                            "commutation_count": {
+                                "name": "commutation_count",
+                                "address_offset": 2,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Absolute commutation count",
+                                "width": 16,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "r"
+                            },
+                            "status": {
+                                "name": "status",
+                                "address_offset": 3,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Encoder status",
+                                "width": 32,
+                                "starting_bit": 0,
+                                "sub_registers": {
+                                    "battery_fail": {
+                                        "name": "battery_fail",
+                                        "address_offset": 3,
+                                        "type": "bool",
+                                        "bank_size": 1,
+                                        "description": "Battery fail",
+                                        "width": 1,
+                                        "starting_bit": 0,
+                                        "sub_registers": {},
+                                        "rw": "r"
+                                    },
+                                    "unindexed": {
+                                        "name": "unindexed",
+                                        "address_offset": 3,
+                                        "type": "bool",
+                                        "bank_size": 1,
+                                        "description": "Unindexed",
+                                        "width": 1,
+                                        "starting_bit": 1,
+                                        "sub_registers": {},
+                                        "rw": "r"
+                                    },
+                                    "no_response": {
+                                        "name": "no_response",
+                                        "address_offset": 3,
+                                        "type": "bool",
+                                        "bank_size": 1,
+                                        "description": "No response",
+                                        "width": 1,
+                                        "starting_bit": 2,
+                                        "sub_registers": {},
+                                        "rw": "r"
+                                    },
+                                    "crc_fail": {
+                                        "name": "crc_fail",
+                                        "address_offset": 3,
+                                        "type": "bool",
+                                        "bank_size": 1,
+                                        "description": "CRC fail",
+                                        "width": 1,
+                                        "starting_bit": 3,
+                                        "sub_registers": {},
+                                        "rw": "r"
+                                    },
+                                    "done": {
+                                        "name": "done",
+                                        "address_offset": 3,
+                                        "type": "bool",
+                                        "bank_size": 1,
+                                        "description": "Done",
+                                        "width": 1,
+                                        "starting_bit": 4,
+                                        "sub_registers": {},
+                                        "rw": "r"
+                                    }
+                                },
+                                "rw": "r"
+                            }
+                        }
+                    }
+                },
+                "registers": {}
+            }
+        }
+    },
+    "node_3_global_timers": {
+        "node_address": 3,
+        "node": {
+            "name": "global_timers",
+            "compatible_drivers": [
+                "global_timers"
+            ],
+            "driver_settings": {
+                "clock_frequency": 25000000.0
+            },
+            "base_group": {
+                "name": "base_group",
+                "address_offset": 0,
+                "description": "Base group for all registers",
+                "alignment": 65536,
+                "count": 1,
+                "groups": {},
+                "registers": {
+                    "counter": {
+                        "name": "counter",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 8,
+                        "description": "Value that the timer counts down from before triggering",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "w"
+                    }
+                }
+            }
+        }
+    }
+}
