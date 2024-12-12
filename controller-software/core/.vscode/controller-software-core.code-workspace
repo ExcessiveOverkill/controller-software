@@ -1,7 +1,7 @@
 {
 	"folders": [
 		{
-			"path": "../core/"
+			"path": "../"
 		}
 	],
 	"settings": {
@@ -93,7 +93,9 @@
 			"any": "cpp",
 			"codecvt": "cpp",
 			"filesystem": "cpp",
-			"valarray": "cpp"
+			"valarray": "cpp",
+			"hash_map": "cpp",
+			"hash_set": "cpp"
 		}
 	}
 }
