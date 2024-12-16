@@ -17,3 +17,5 @@ controller-software/*
 controller-software/core/api_drivers/test_controller
 
 .vscode/settings.json
+controller-firmware/python/pyvenv.cfg
+*.vcd
