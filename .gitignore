@@ -16,3 +16,4 @@ controller-software/*
 /controller-software/web/build
 controller-software/core/api_drivers/test_controller
 
+.vscode/settings.json
