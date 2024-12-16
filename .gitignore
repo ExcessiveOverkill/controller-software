@@ -16,3 +16,5 @@ controller-software/*
 /controller-software/web/build
 controller-software/core/api_drivers/test_controller
 
+controller-firmware/python/pyvenv.cfg
+*.vcd

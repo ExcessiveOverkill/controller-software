@@ -144,8 +144,8 @@ class em_serial_controller(Component):
 
         self.current_device_index = Signal(8)
 
-        self.tx_packet_size = Signal(range(self.max_packet_size))
-        self.rx_packet_size = Signal(range(self.max_packet_size))
+        self.tx_packet_size = Signal(range(self.max_packet_size+1))
+        self.rx_packet_size = Signal(range(self.max_packet_size+1))
         self.previous_rx_packet_size = Signal(range(self.max_packet_size+1))
 
         self.current_tx_byte_index = Signal(range(4))
@@ -307,7 +307,7 @@ class em_serial_controller(Component):
                         device_register_address.eq(self.rm.devices.cyclic_config.address_offset + self.current_cyclic_register),
                     ]
 
-                    with m.If(self.cyclic_data_enabled):
+                    with m.If(self.internalBramReadData[self.rm.devices.control.enable_cyclic_data.starting_bit]):  # cyclic data is enabled
                         m.d.sync_100 += self.rx_packet_size.eq(self.internalBramReadData[self.rm.devices.control.rx_cyclic_packet_size.starting_bit:self.rm.devices.control.rx_cyclic_packet_size.starting_bit+self.rm.devices.control.rx_cyclic_packet_size.width]),
                     with m.Else():
                         m.d.sync_100 += self.rx_packet_size.eq(3)    # minimum packet size for cyclic data
@@ -530,6 +530,7 @@ class em_serial_controller(Component):
                             m.d.sync_100 += self.current_rx_word_index.eq(self.current_rx_word_index + 1)
                             m.d.sync_100 += self.address_ToSerialPort.eq(self.serialPort.rm.rx_data.address_offset + self.current_rx_word_index + 1)
                     
+                        m.next = "get_rx_register_config_wait"
 
                     with m.Else():  # cyclic data was not entirely available from serial port memory, unpack partial data
 
