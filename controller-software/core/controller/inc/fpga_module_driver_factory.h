@@ -23,6 +23,12 @@ public:
 
     fpga_mem base_mem;  // this is what is required for MINIMUM functionality of a driver
 
+
+    // TESTING ONLY //
+    int32_t* cmd_q_current_milliamps = nullptr;    // for testing only, this should be removed
+    uint32_t* encoder_pos = nullptr;    // for testing only, this should be removed
+    uint32_t* encoder_multiturn_count = nullptr;    // for testing only, this should be removed
+
 protected:
 
     // helper function for loading values from the config file
@@ -91,5 +97,7 @@ public:
         Driver_Factory::registerType(typeName, []() -> std::shared_ptr<base_driver> {
             return std::make_shared<T>();
         });
+        
+        std::cout << "Creating driver: " << typeName << std::endl;
     }
 };

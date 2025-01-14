@@ -35,6 +35,6 @@ static uint64_t create_instruction_COPY(uint8_t src_node, uint16_t src_addr, uin
     // but only the lower half is copied to the PS, the upper half is copied from the PS to PL
     // the halfway offset is determined by DATA_MEMORY_SIZE in the config (in 32 bit words)
     // node addresses are in single increments, but contain 32 bit words
-    
+    std::cout << "src_node: " << (uint64_t)src_node << " src_addr: " << (uint64_t)src_addr << " dst_node: " << (uint64_t)dst_node << " dst_addr: " << (uint64_t)dst_addr << std::endl;
     return  ((uint64_t)src_node << 0) | ((uint64_t)dst_node << 8) | ((uint64_t)src_addr << 16) | ((uint64_t)dst_addr << 32) | ((uint64_t)instruction_type::COPY << 48);
 }

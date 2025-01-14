@@ -43,18 +43,6 @@ struct register_json_data{
     bool write = false;
 };
 
-// struct mem_offsets{
-//             // user address space (addresses directly accessible from software)
-//             void* software_PS_PL_ptr = nullptr;
-//             void* software_PL_PS_ptr = nullptr;
-//             uint32_t software_ptr_offset = 0;
-
-//             // hardware address space (node 0 memory)
-//             uint32_t hardware_PS_PL_mem_offset = 0;
-//             uint32_t hardware_PL_PS_mem_offset = 0;
-//             uint32_t hardware_mem_offset = 0;
-//         };
-
 
 
 class Register {
@@ -68,18 +56,14 @@ class Register {
         template <typename T>
         T* get_raw_data_ptr();    // get the raw data pointer
 
-        virtual uint32_t create_copy_instructions(std::vector<uint64_t>*);    // create a copy instruction to copy the register to/from the PS/PL.
+        uint32_t create_copy_instructions(std::vector<uint64_t>*);    // create a copy instruction to copy the register to/from the PS/PL.
 
-
-        // by default read/write functions throw errors unless they are overidden
 
         // Read the register
-        #define READ_ERROR_DEFAULT "Unsupported conversion or cannot read from a write-only register"
         template <typename T = uint32_t>
         T get_value() const;
 
         // Write to the register
-        #define WRITE_ERROR_DEFAULT "Unsupported conversion or cannot write to a read-only register"
         template <typename T = uint32_t>
         T set_value(const T& other);
 
@@ -132,8 +116,6 @@ class Register {
             return true;
         }
 
-
-
 };
 
 
@@ -176,6 +158,7 @@ class Group {
 };
 
 
+
 class Address_Map_Loader {
     public:
         /*
@@ -193,9 +176,9 @@ class Address_Map_Loader {
 
         void sync_with_PS(Register* reg);    // sync a register with the PS, only needed for parent registers (not sub-registers), must be called before sub-registers are created
 
+        std::vector<uint64_t>* instructions = nullptr;
 
     private:
-        std::vector<uint64_t>* instructions = nullptr;
 
         json* node_config = nullptr;
 
@@ -217,6 +200,29 @@ class Address_Map_Loader {
         template <typename T>
         bool load_json_value(const json& config, const std::string& value_name, T* dest);    // helper function for loading values from the config file
         
+};
+
+class Dynamic_Register{
+    // class to allow changing the target PL location on the fly
+    // uses only one address in the PS and PL memory, but adjusts the DMA instruction to change what node/BRAM address is being used
+
+    public:
+        Dynamic_Register(Address_Map_Loader* loader, Register* reg);
+
+        void set_register(Register* reg);    // set the register to be used, NOTE: an update cycle must be run for the data to update
+        Register* get_register();    // get the register being used (will be the one used to initialize the dynamic register, but with the instruction modified)
+    
+        void enable_sync(bool enable);    // enable/disable syncing with the PS
+
+    private:
+        std::vector<uint64_t>* instructions = nullptr;
+        uint32_t instruction_index = 0;
+        Register* reg = nullptr;
+        bool read = false;
+        bool write = false;
+        uint16_t ps_hardware_data_ptr = 0;
+        uint64_t instruction = 0;
+
 };
 
 template <typename T>

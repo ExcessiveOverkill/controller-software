@@ -109,21 +109,42 @@ uint32_t fpga_module_manager::initialize_fpga(){
 uint32_t fpga_module_manager::load_drivers(){
     // load and configure drivers based on json config file
 
+    bool missing_driver = false;
+
+    uint8_t node_count = 2;
+
     for (json::iterator it = config.begin(); it != config.end(); ++it) {
         json node_config = it.value();
 
         if(!node_config.contains("node")){    // skip if its not a node
             continue;
         }
-
+        node_count++;
         uint32_t ret = load_driver(node_config);
         if(ret != 0){
-            std::cerr << "Failed to load driver" << std::endl;
-            return 1;
+            missing_driver = true;
         }
     }
 
+    // add some NOP instructions to make sure the final send instructions are completed before the axi transfer starts
+    for(int i = 0; i < (node_count+2)*4; i++){
+        fpga_instructions.push_back(create_instruction_NOP());
+    }
+
+    if(missing_driver){
+        std::cerr << "Failed to load one or more FPGA node drivers" << std::endl;
+        return 1;
+    }
+
     return 0;
+}
+
+std::shared_ptr<base_driver> fpga_module_manager::get_driver(uint32_t index){
+    if(index >= drivers.size()){
+        return nullptr;
+    }
+    // get driver by index
+    return drivers[index];
 }
 
 uint32_t fpga_module_manager::run_update(){
@@ -137,7 +158,7 @@ uint32_t fpga_module_manager::run_update(){
     }
 
     // write the instructions to the FPGA
-    write_instructions_to_fpga();
+    write_instructions_to_fpga();   // TODO: handle the instructions being larger than the write block size, optimize order, handle read/write sequence delays, put all dynamic instructions in one block
 
     return 0;
 }
@@ -178,20 +199,12 @@ uint32_t fpga_module_manager::load_driver(json node_config){
     }
 
     if (!driver_found) {
-        std::cerr << "Error: No compatible drivers found for node: " << node_config["node"]["name"].get<std::string>() << std::endl;
+        std::cerr << "Error: No compatible drivers found for node: " << node_config["node"]["name"].get<std::string>() << ", it will not be accessible" << std::endl;
         return 1;
     }
 
-
     // configure driver
-
     drivers.back()->microseconds = &microseconds;   // used for syncronized timing
-
-    // if(drivers.back()->load_config_pre(node_config) != 0){
-    //     std::cerr << "Failed to load driver pre config" << std::endl;
-    //     drivers.pop_back();
-    //     return 2;
-    // }
 
     if(set_memory_pointers(&drivers.back()->base_mem) != 0){
         std::cerr << "Failed to set memory pointers" << std::endl;
@@ -211,9 +224,6 @@ uint32_t fpga_module_manager::load_driver(json node_config){
         drivers.pop_back();
         return 4;
     }
-
-    // add base instuctions from driver
-    //drivers.back()->get_base_instructions(&fpga_instructions);
 
     return 0;
 }

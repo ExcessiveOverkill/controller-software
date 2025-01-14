@@ -44,24 +44,10 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
     regs2.i2c_status_error = i2c_status->get_register("error");
     
 
-    
-    uint32_t test = 0;
-    //regs2.i2c_data_rx = test;
-    //test = *regs2.i2c_data_rx;
-
     // test print instructions
-    for (auto& inst : *instructions){
-        std::cout << "Instruction: " << inst << std::endl;
-    }
-
-
-    // regs.port_mode_enable = regs2.port_mode_enable->get_raw_data_ptr<uint32_t>();
-    // regs.i2c_config = regs2.i2c_config->get_raw_data_ptr<uint32_t>();
-    // regs.i2c_data_tx = regs2.i2c_data_tx->get_raw_data_ptr<uint32_t>();
-    // regs.i2c_data_rx = regs2.i2c_data_rx->get_raw_data_ptr<uint32_t>();
-    // regs.i2c_status = regs2.i2c_status->get_raw_data_ptr<uint32_t>();
-
-
+    // for (auto& inst : *instructions){
+    //     std::cout << "Instruction: " << inst << std::endl;
+    // }
 
     #define TOP_DEVICE_ADDRESS 0x20
     #define MIDDLE_DEVICE_ADDRESS 0x21
@@ -120,14 +106,9 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
     io_expander_data[1].configuration = 0x0; // all outputs
     io_expander_data[2].configuration = 0b00111000 << 8; // all outputs except for status inputs
 
-    for(int i = 0; i < 10; i++){
-        configure_port_mode(i, port_mode::RS485);
-    }
-
-    // for(int i = 0; i < 3; i++){
-    //     led_modes[i] = led_mode::BLINK_MED;
+    // for(int i = 0; i < 10; i++){
+    //     configure_port_mode(i, port_mode::RS485);
     // }
-
 
     //////////////// HARDCODED SECTION ////////////////
     led_modes[0] = led_mode::BLINK_SLOW;
@@ -144,37 +125,6 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
 
     return 0;
 }
-
-// uint32_t serial_interface_card::get_base_instructions(std::vector<uint64_t>* instructions){
-//     uint64_t instruction = 0;
-
-//     // TODO: make this more automated based on config file
-    
-//     // TODO: make sure this actually works....
-
-//     // the first address is based on the above offsets made in load_config_post
-//     // the secondary address is from the node config file
-//     // copy from PS to PL
-//     instruction = create_instruction_COPY(0, base_mem.hardware_PS_PL_mem_offset + 0x0, node_address, 0x0); // copy port_mode_enable to PL
-//     instructions->push_back(instruction);
-//     instruction = create_instruction_COPY(0, base_mem.hardware_PS_PL_mem_offset + 0x1, node_address, 0x1); // copy i2c_config to PL
-//     instructions->push_back(instruction);
-//     instruction = create_instruction_COPY(0, base_mem.hardware_PS_PL_mem_offset + 0x2, node_address, 0x3); // copy i2c_data_tx to PL
-//     instructions->push_back(instruction);
-
-//     // copy from PL to PS
-//     instruction = create_instruction_COPY(node_address, 0x0, 0, base_mem.hardware_PL_PS_mem_offset + 0x0); // copy i2c_data_rx to PS
-//     instructions->push_back(instruction);
-//     instruction = create_instruction_COPY(node_address, 0x1, 0, base_mem.hardware_PL_PS_mem_offset + 0x1); // copy i2c_status to PS
-//     instructions->push_back(instruction);
-
-
-//     // test copy
-//     //instruction = create_instruction_COPY(0, base_mem.hardware_PS_PL_mem_offset + 0x0, 0, base_mem.hardware_PL_PS_mem_offset + 0x0);
-//     //instructions->push_back(instruction);
-
-//     return 0;
-// }
 
 uint32_t serial_interface_card::run(){
     // run stuff
@@ -268,9 +218,9 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
     }
 
     // configs are in the order: 3, 1, 2, 4
-    #define RS485_CONFIG 0b1000
-    #define RS422_CONFIG 0b0111
-    #define BOTH_INPUTS_CONFIG 0b0100
+    #define RS485_CONFIG 0b0001
+    #define RS422_CONFIG 0b1110
+    #define BOTH_INPUTS_CONFIG 0b0010
 
     uint8_t config = 0;
 

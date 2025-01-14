@@ -39,10 +39,23 @@ void Address_Map_Loader::setup(json* node_config, fpga_mem* base_mem, uint8_t no
 
 }
 
+Dynamic_Register::Dynamic_Register(Address_Map_Loader* loader, Register* reg){
+    this->instructions = loader->instructions;
+    loader->sync_with_PS(reg);
+    this->reg = reg;
+    read = reg->pl_data.read;
+    write = reg->pl_data.write;
+    instruction_index = instructions->size()-1;   // save the current instruction index so we know which to modify
+    instruction = instructions->at(instruction_index);
+    enable_sync(false); // disable syncing by default
+}
+
+
 template <typename T>
 T* Register::get_raw_data_ptr(){
     return (T*)ps_data.software_data_ptr;
 }
+
 template uint32_t* Register::get_raw_data_ptr<uint32_t>();
 template uint16_t* Register::get_raw_data_ptr<uint16_t>();
 template uint8_t* Register::get_raw_data_ptr<uint8_t>();
@@ -95,6 +108,7 @@ void Address_Map_Loader::sync_with_PS(Register* reg){
     
     return;
 }
+
 
 void Register::get_register_data(const std::string register_name){
     // get the data for a group
@@ -319,6 +333,49 @@ Group* Address_Map_Loader::get_group(std::string group_name, uint16_t index){
     // get a group of registers
 
     return base_group->get_group(group_name, index);
+}
+
+void Dynamic_Register::set_register(Register* reg){
+    // set the register to be used, NOTE: an update cycle must be run for the data to update
+    if(reg->is_sub_register){
+        throw std::runtime_error("Dynamic register cannot be a sub-register");
+    }
+
+    if(reg->pl_data.read && write){
+        throw std::runtime_error("Dynamic register cannot switch between read and write");
+    }
+    if(reg->pl_data.write && read){
+        throw std::runtime_error("Dynamic register cannot switch between read and write");
+    }
+
+    // if(this->reg->pl_data.node_index != reg->pl_data.node_index){    // TODO: fix this, currently regs are assigned a node only on a sync call
+    //     throw std::runtime_error("Dynamic register cannot switch between nodes");
+    // }
+
+    // modify the instruction to use the new register
+    // TODO: might want to have dynamic instructions always be the last/first instructions in the list so we don't need to update multiple instruction blocks (if we have too many instructions)
+    if(read){
+        instruction = create_instruction_COPY(this->reg->pl_data.node_index, reg->pl_data.absolute_address, 0, this->reg->ps_data.hardware_data_ptr);
+    }
+    else{
+        instruction = create_instruction_COPY(0, this->reg->ps_data.hardware_data_ptr, this->reg->pl_data.node_index, reg->pl_data.absolute_address);
+    }
+    instructions->at(instruction_index) = instruction;
+}
+
+Register* Dynamic_Register::get_register(){
+    // get the register being used (will be the one used to initialize the dynamic register, but with the instruction modified)
+    return reg;
+}
+
+void Dynamic_Register::enable_sync(bool enable){
+    // enable/disable syncing with the PS
+    if(enable){
+        instructions->at(instruction_index) = instruction;
+    }
+    else{
+        instructions->at(instruction_index) = create_instruction_NOP();
+    }
 }
 
 template <typename T>

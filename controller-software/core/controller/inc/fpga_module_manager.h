@@ -8,7 +8,9 @@
 // include all drivers here
 
 #include "serial_interface_card.h"
-
+#include "global_timers.h"
+#include "fanuc_encoders.h"
+#include "em_serial_controller.h"
 
 
 #pragma once
@@ -31,6 +33,8 @@ public:
     uint32_t create_global_variables();
 
     uint32_t run_update();
+
+    std::shared_ptr<base_driver> get_driver(uint32_t index);
 
 private:
 
