@@ -1,0 +1,174 @@
+{
+    "0x0": {
+        "name": "control",
+        "count": 1,
+        "group": null,
+        "dataType": "PACKED",
+        "readWrite": "READ_WRITE",
+        "description": "control register",
+        "unit": "",
+        "startingBit": 0,
+        "width": 4,
+        "metadata": {},
+        "packedRegisters": [
+            {
+                "name": "start",
+                "count": 1,
+                "group": null,
+                "dataType": "BOOL",
+                "readWrite": "READ_WRITE",
+                "description": "run scope until triggered or stopped",
+                "unit": "",
+                "startingBit": 0,
+                "width": 1,
+                "metadata": {}
+            },
+            {
+                "name": "stop",
+                "count": 1,
+                "group": null,
+                "dataType": "BOOL",
+                "readWrite": "READ_WRITE",
+                "description": "stop scope",
+                "unit": "",
+                "startingBit": 1,
+                "width": 1,
+                "metadata": {}
+            },
+            {
+                "name": "single_mode",
+                "count": 1,
+                "group": null,
+                "dataType": "BOOL",
+                "readWrite": "READ_WRITE",
+                "description": "capture until triggered then stop (start bit needs cycled to start again)",
+                "unit": "",
+                "startingBit": 2,
+                "width": 1,
+                "metadata": {}
+            },
+            {
+                "name": "trigger_enable",
+                "count": 1,
+                "group": null,
+                "dataType": "BOOL",
+                "readWrite": "READ_WRITE",
+                "description": "enable trigger",
+                "unit": "",
+                "startingBit": 3,
+                "width": 1,
+                "metadata": {}
+            }
+        ]
+    },
+    "0x1": {
+        "name": "status",
+        "count": 1,
+        "group": null,
+        "dataType": "PACKED",
+        "readWrite": "READ",
+        "description": "status register",
+        "unit": "",
+        "startingBit": 0,
+        "width": 2,
+        "metadata": {},
+        "packedRegisters": [
+            {
+                "name": "running",
+                "count": 1,
+                "group": null,
+                "dataType": "BOOL",
+                "readWrite": "READ",
+                "description": "scope is running",
+                "unit": "",
+                "startingBit": 0,
+                "width": 1,
+                "metadata": {}
+            },
+            {
+                "name": "triggered",
+                "count": 1,
+                "group": null,
+                "dataType": "BOOL",
+                "readWrite": "READ",
+                "description": "scope was triggered",
+                "unit": "",
+                "startingBit": 1,
+                "width": 1,
+                "metadata": {}
+            }
+        ]
+    },
+    "0x2": {
+        "name": "mem_depth",
+        "count": 1,
+        "group": null,
+        "dataType": "UNSIGNED",
+        "readWrite": "READ",
+        "description": "size of memory in 32 bit words for capture data",
+        "unit": "",
+        "startingBit": 0,
+        "width": 32,
+        "metadata": {}
+    },
+    "0x3": {
+        "name": "sample_divider",
+        "count": 1,
+        "group": null,
+        "dataType": "UNSIGNED",
+        "readWrite": "READ_WRITE",
+        "description": "divider for generating sampkle triggers from input clock",
+        "unit": "",
+        "startingBit": 0,
+        "width": 16,
+        "metadata": {}
+    },
+    "0x4": {
+        "name": "trigger_level",
+        "count": 1,
+        "group": null,
+        "dataType": "UNSIGNED",
+        "readWrite": "READ_WRITE",
+        "description": "trigger level",
+        "unit": "",
+        "startingBit": 0,
+        "width": 32,
+        "metadata": {}
+    },
+    "0x5": {
+        "name": "trigger_time_offset",
+        "count": 1,
+        "group": null,
+        "dataType": "SIGNED",
+        "readWrite": "READ_WRITE",
+        "description": "where to start and stop the capture when triggered. 0 is 50/50 before/after, .5*mem_depth is 100/0, -.5*mem_depth is 0/100",
+        "unit": "",
+        "startingBit": 0,
+        "width": 32,
+        "metadata": {}
+    },
+    "0x6": {
+        "name": "trigger_index",
+        "count": 1,
+        "group": null,
+        "dataType": "UNSIGNED",
+        "readWrite": "READ",
+        "description": "memory index of where the trigger occured",
+        "unit": "",
+        "startingBit": 0,
+        "width": 32,
+        "metadata": {}
+    },
+    "0x7": {
+        "name": "capture_memory",
+        "count": 1024,
+        "group": null,
+        "dataType": "UNSIGNED",
+        "readWrite": "READ",
+        "description": "capture memory",
+        "unit": "",
+        "startingBit": 0,
+        "width": 32,
+        "metadata": {}
+    }
+}

@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import json
+import ssl
 
 # Global variables
 request_id = 1
@@ -78,7 +79,10 @@ async def main():
     """Main function to connect to the WebSocket and perform actions."""
     uri = 'wss://localhost:443'
     try:
-        async with websockets.connect(uri) as ws:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        async with websockets.connect(uri, ssl=ssl_context) as ws:
             print('WebSocket connection opened')
             await handle_login(ws)
             await send_print_uint32(ws, 1234)

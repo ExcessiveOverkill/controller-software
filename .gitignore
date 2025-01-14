@@ -16,6 +16,9 @@ controller-software/*
 /controller-software/web/build
 controller-software/core/api_drivers/test_controller
 
+.vscode/settings.json
+controller-firmware/python/pyvenv.cfg
+*.vcd
 controller-software/core/zynq_files/controller/config/fpga_configs/bit_files/bitfile.bit.bin
 controller-software/core/zynq_files/controller/config/fpga_configs/controller_config.json
 controller-software/core/zynq_files/controller/bin/controller_core

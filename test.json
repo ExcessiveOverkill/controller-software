@@ -1,0 +1,143 @@
+{
+    "name": "module",
+    "compatible_drivers": [
+        "driver1",
+        "driver2"
+    ],
+    "driver_settings": {
+        "setting1": 1,
+        "setting2": 2
+    },
+    "base_group": {
+        "name": "base_group",
+        "address_offset": 0,
+        "description": "Base group for all registers",
+        "alignment": 65536,
+        "count": 1,
+        "groups": {
+            "group1": {
+                "name": "group1",
+                "address_offset": 8,
+                "description": "",
+                "alignment": 8,
+                "count": 4,
+                "groups": {},
+                "registers": {
+                    "name7": {
+                        "name": "name7",
+                        "address_offset": 4,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "name6": {
+                        "name": "name6",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "name8": {
+                        "name": "name8",
+                        "address_offset": 1,
+                        "type": "unsigned",
+                        "bank_size": 2,
+                        "description": "",
+                        "width": 32,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    }
+                }
+            }
+        },
+        "registers": {
+            "name1": {
+                "name": "name1",
+                "address_offset": 0,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "description",
+                "width": 8,
+                "starting_bit": 0,
+                "sub_registers": {
+                    "sub2": {
+                        "name": "sub2",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "",
+                        "width": 4,
+                        "starting_bit": 6,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "sub1": {
+                        "name": "sub1",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "",
+                        "width": 4,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    }
+                },
+                "rw": "r"
+            },
+            "name2": {
+                "name": "name2",
+                "address_offset": 1,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "r"
+            },
+            "name3": {
+                "name": "name3",
+                "address_offset": 2,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "r"
+            },
+            "name4": {
+                "name": "name4",
+                "address_offset": 3,
+                "type": "unsigned",
+                "bank_size": 4,
+                "description": "",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "r"
+            },
+            "name5": {
+                "name": "name5",
+                "address_offset": 7,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "r"
+            }
+        }
+    }
+}
