@@ -6,7 +6,9 @@ from amaranth.lib.wiring import In, Out
 from amaranth.lib.memory import Memory
 from testing_block import test_block
 from enum import IntEnum
-import csv
+import csv, random
+import datetime
+from em_serial_controller import EM_Serial_Controller
 
 
 class shift_dma_node(wiring.Component):
@@ -209,7 +211,14 @@ class shift_dma_controller(wiring.Component):
         #self.instruction_memory_write_port = self.instruction_memory.write_port()   # write is used by the axi controller to configure the dma
         #self.current_instruction = self.instruction_memory_read_port.addr
 
-        self.current_instruction = self.instruction_memory_address
+        #self.current_instruction = self.instruction_memory_address
+        self.current_instruction = Signal(16)
+
+        with m.If(self.opening_available | (self.instruction != self.Instruction.COPY)):    # this should be true as long the current instruction is not blocked
+        #with m.If(self.opening_available):
+            m.d.comb += self.instruction_memory_address.eq(self.current_instruction)
+        with m.Else():
+            m.d.comb += self.instruction_memory_address.eq(self.current_instruction-1)
 
         # create data memory
         # divided into 2 blocks to allow for simultaneous read and write from the axi bus
@@ -338,56 +347,88 @@ class test_bench(wiring.Component):
         self.node_mem = {}
         self.nodes = {}
 
-
+        
     def elaborate(self, platform):
         m = Module()
 
         #m.domains.sync_200 = ClockDomain("sync_200", async_reset=True)
 
-        m.submodules.controller = self.controller = shift_dma_controller()
+        self.controller = shift_dma_controller()
+        self.instruction_memory = Memory(shape=unsigned(64), depth=(4096), init=[])   # about enough memory to use up an entire update period at 50% utilization (hopefully more than we'll ever need)
+        self.data_memory = Memory(shape=unsigned(32), depth=(4096), init=[])
+
+
+        m.submodules.controller = self.controller
+        m.submodules.instruction_memory = self.instruction_memory
+        m.submodules.data_memory = self.data_memory
+
+        self.serial_controller = EM_Serial_Controller(64, 16)
+        m.submodules.serial_controller = self.serial_controller
+
+        instruction_read_port = self.instruction_memory.read_port(domain="sync_100")
+        data_read_port = self.data_memory.read_port(domain="sync_100")
+        data_write_port = self.data_memory.write_port(domain="sync_100")
+
+        m.d.comb += [
+            self.controller.instruction_memory_read_data.eq(instruction_read_port.data),
+            instruction_read_port.addr.eq(self.controller.instruction_memory_address),
+
+            self.controller.data_memory_read_data.eq(data_read_port.data),
+            data_read_port.addr.eq(self.controller.data_memory_address),
+            data_write_port.addr.eq(self.controller.data_memory_address),
+            data_write_port.data.eq(self.controller.data_memory_write_data),
+            data_write_port.en.eq(self.controller.data_memory_write_enable)
+        ]
+        
         m.d.comb += self.controller.start.eq(self.start)
         m.d.comb += self.busy.eq(self.controller.busy)
 
         for node_index in range(self.node_count):
             m.submodules[f"node_{node_index+1}"] = node = shift_dma_node(node_index+1)
             self.nodes[f"node_{node_index+1}"] = node
-            m.submodules[f"node_test_block_{node_index+1}"] = test_block_ = test_block(self.clock)
+            m.submodules[f"node_test_block_{node_index+1}"] = test_block_ = test_block(0x2000)
             self.node_mem[f"node_test_block_{node_index+1}"] = test_block_
             m.d.comb += node.bram_read_data.eq(test_block_.read_data)
             m.d.comb += test_block_.write_data.eq(node.bram_write_data)
             m.d.comb += test_block_.write_enable.eq(node.bram_write_enable)
             m.d.comb += test_block_.address.eq(node.bram_address)
             if node_index == 0:
-                m.d.comb += node.read_node_address_input.eq(self.controller.read_node_address_output)
-                m.d.comb += node.write_node_address_input.eq(self.controller.write_node_address_output)
-                m.d.comb += node.read_bram_address_input.eq(self.controller.read_bram_address_output)
-                m.d.comb += node.write_bram_address_input.eq(self.controller.write_bram_address_output)
-                m.d.comb += node.data_input.eq(self.controller.data_output)
-                m.d.comb += node.read_complete_input.eq(self.controller.read_complete_output)
-                m.d.comb += node.write_complete_input.eq(self.controller.write_complete_output)
+                m.d.sync_100 += node.read_node_address_input.eq(self.controller.read_node_address_output)
+                m.d.sync_100 += node.write_node_address_input.eq(self.controller.write_node_address_output)
+                m.d.sync_100 += node.read_bram_address_input.eq(self.controller.read_bram_address_output)
+                m.d.sync_100 += node.write_bram_address_input.eq(self.controller.write_bram_address_output)
+                m.d.sync_100 += node.data_input.eq(self.controller.data_output)
+                m.d.sync_100 += node.read_complete_input.eq(self.controller.read_complete_output)
+                m.d.sync_100 += node.write_complete_input.eq(self.controller.write_complete_output)
             else:
-                m.d.comb += node.read_node_address_input.eq(m.submodules[f"node_{node_index}"].read_node_address_output)
-                m.d.comb += node.write_node_address_input.eq(m.submodules[f"node_{node_index}"].write_node_address_output)
-                m.d.comb += node.read_bram_address_input.eq(m.submodules[f"node_{node_index}"].read_bram_address_output)
-                m.d.comb += node.write_bram_address_input.eq(m.submodules[f"node_{node_index}"].write_bram_address_output)
-                m.d.comb += node.data_input.eq(m.submodules[f"node_{node_index}"].data_output)
-                m.d.comb += node.read_complete_input.eq(m.submodules[f"node_{node_index}"].read_complete_output)
-                m.d.comb += node.write_complete_input.eq(m.submodules[f"node_{node_index}"].write_complete_output)
+                m.d.sync_100 += node.read_node_address_input.eq(m.submodules[f"node_{node_index}"].read_node_address_output)
+                m.d.sync_100 += node.write_node_address_input.eq(m.submodules[f"node_{node_index}"].write_node_address_output)
+                m.d.sync_100 += node.read_bram_address_input.eq(m.submodules[f"node_{node_index}"].read_bram_address_output)
+                m.d.sync_100 += node.write_bram_address_input.eq(m.submodules[f"node_{node_index}"].write_bram_address_output)
+                m.d.sync_100 += node.data_input.eq(m.submodules[f"node_{node_index}"].data_output)
+                m.d.sync_100 += node.read_complete_input.eq(m.submodules[f"node_{node_index}"].read_complete_output)
+                m.d.sync_100 += node.write_complete_input.eq(m.submodules[f"node_{node_index}"].write_complete_output)
         node = m.submodules[f"node_{self.node_count}"]
-        m.d.comb += self.controller.read_node_address_input.eq(node.read_node_address_output)
-        m.d.comb += self.controller.write_node_address_input.eq(node.write_node_address_output)
-        m.d.comb += self.controller.read_bram_address_input.eq(node.read_bram_address_output)
-        m.d.comb += self.controller.write_bram_address_input.eq(node.write_bram_address_output)
-        m.d.comb += self.controller.data_input.eq(node.data_output)
-        m.d.comb += self.controller.read_complete_input.eq(node.read_complete_output)
-        m.d.comb += self.controller.write_complete_input.eq(node.write_complete_output)
+        m.d.sync_100 += self.controller.read_node_address_input.eq(node.read_node_address_output)
+        m.d.sync_100 += self.controller.write_node_address_input.eq(node.write_node_address_output)
+        m.d.sync_100 += self.controller.read_bram_address_input.eq(node.read_bram_address_output)
+        m.d.sync_100 += self.controller.write_bram_address_input.eq(node.write_bram_address_output)
+        m.d.sync_100 += self.controller.data_input.eq(node.data_output)
+        m.d.sync_100 += self.controller.read_complete_input.eq(node.read_complete_output)
+        m.d.sync_100 += self.controller.write_complete_input.eq(node.write_complete_output)
+
+
+        # testing for serial controller
+        m.d.comb += self.serial_controller.bram_address.eq(node.bram_address)
+        m.d.comb += self.serial_controller.bram_write_data.eq(node.bram_write_data)
+        m.d.comb += self.serial_controller.bram_write_enable.eq(node.bram_write_enable)
 
         return m
     
 node_count = 4
-clock = int(200e6) # 200 Mhz
+clock = int(100e6) # 100 Mhz
 dut = test_bench(clock, node_count)
-dut = shift_dma_controller()
+#dut = shift_dma_controller()
 sim = Simulator(dut)
 
 async def test_bench(ctx):
@@ -399,8 +440,8 @@ async def test_bench(ctx):
     #     destination_address = 0
     #     instruction = dut.controller.Instruction.COPY
     #     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    #     ctx.set(dut.controller.instruction_memory.data[index], data)
-    #     ctx.set(dut.controller.data_memory.data[index], index+1)
+    #     ctx.set(dut.instruction_memory.data[index], data)
+    #     ctx.set(dut.data_memory.data[index], index+1)
     #     print(f"set instruction {index} to {data}")
 
     # # copy values from all external nodes to internal mem
@@ -411,7 +452,7 @@ async def test_bench(ctx):
     #     destination_address = index + node_count + 1
     #     instruction = dut.controller.Instruction.COPY
     #     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    #     ctx.set(dut.controller.instruction_memory.data[index+node_count], data)
+    #     ctx.set(dut.instruction_memory.data[index+node_count], data)
     #     print(f"set instruction {index+node_count} to {data}")
 
     instruction_step = 0
@@ -424,16 +465,16 @@ async def test_bench(ctx):
         destination_address = 0
         instruction = dut.controller.Instruction.NOP
         data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-        ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+        ctx.set(dut.instruction_memory.data[instruction_step], data)
         instruction_step += 1
 
 
-    ctx.set(dut.controller.data_memory.data[1], 1)
-    # ctx.set(dut.controller.data_memory.data[2], 2)
-    # ctx.set(dut.controller.data_memory.data[3], 3)
-    # ctx.set(dut.controller.data_memory.data[4], 4)
-    # ctx.set(dut.controller.data_memory.data[5], 5)
-    # ctx.set(dut.controller.data_memory.data[6], 6)
+    ctx.set(dut.data_memory.data[1], 1)
+    # ctx.set(dut.data_memory.data[2], 2)
+    # ctx.set(dut.data_memory.data[3], 3)
+    # ctx.set(dut.data_memory.data[4], 4)
+    # ctx.set(dut.data_memory.data[5], 5)
+    # ctx.set(dut.data_memory.data[6], 6)
     #ctx.set(dut.node_mem["node_test_block_2"].memory.data[1], 8)
 
     # forward copy
@@ -444,7 +485,7 @@ async def test_bench(ctx):
     destination_address = 1
     instruction = dut.controller.Instruction.COPY
     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
     instruction_step += 1
 
     # for i in range(node_count+4):
@@ -454,7 +495,7 @@ async def test_bench(ctx):
     #     destination_address = 0
     #     instruction = dut.controller.Instruction.NOP
     #     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    #     ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    #     ctx.set(dut.instruction_memory.data[instruction_step], data)
     #     instruction_step += 1
 
     # forward copy
@@ -465,7 +506,7 @@ async def test_bench(ctx):
     destination_address = 1
     instruction = dut.controller.Instruction.COPY
     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
     instruction_step += 1
 
     # for i in range(node_count+4):
@@ -475,7 +516,7 @@ async def test_bench(ctx):
     #     destination_address = 0
     #     instruction = dut.controller.Instruction.NOP
     #     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    #     ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    #     ctx.set(dut.instruction_memory.data[instruction_step], data)
     #     instruction_step += 1
     
     # self copy
@@ -486,7 +527,7 @@ async def test_bench(ctx):
     destination_address = 2
     instruction = dut.controller.Instruction.COPY
     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
     instruction_step += 1
 
     for i in range(node_count*2+3): # nops required to allow the previous copy to complete since it loops around
@@ -496,7 +537,7 @@ async def test_bench(ctx):
         destination_address = 0
         instruction = dut.controller.Instruction.NOP
         data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-        ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+        ctx.set(dut.instruction_memory.data[instruction_step], data)
         instruction_step += 1
     
     # # reverse copy
@@ -507,7 +548,7 @@ async def test_bench(ctx):
     destination_address = 2
     instruction = dut.controller.Instruction.COPY
     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
     instruction_step += 1
 
     for i in range(node_count*2+3):
@@ -517,7 +558,7 @@ async def test_bench(ctx):
         destination_address = 0
         instruction = dut.controller.Instruction.NOP
         data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-        ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+        ctx.set(dut.instruction_memory.data[instruction_step], data)
         instruction_step += 1
 
     # # copy to controller mem
@@ -528,27 +569,66 @@ async def test_bench(ctx):
     destination_address = 2
     instruction = dut.controller.Instruction.COPY
     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
     instruction_step += 1
 
     source_node = 3
     destination_node = 0
     source_address = 2
-    destination_address = 2
-    instruction = dut.controller.Instruction.END
+    destination_address = 9
+    instruction = dut.controller.Instruction.COPY
     data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
-    ctx.set(dut.controller.instruction_memory.data[instruction_step], data)
+    for i in range(1):
+        ctx.set(dut.instruction_memory.data[instruction_step], data)
+        instruction_step += 1
+
+    source_node = 0
+    destination_node = 3
+    source_address = 2
+    destination_address = 10
+    instruction = dut.controller.Instruction.COPY
+    data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
     instruction_step += 1
 
-    #await ctx.tick().repeat(2)
+
+    source_node = 3
+    destination_node = 0
+    source_address = 2
+    destination_address = 10
+    instruction = dut.controller.Instruction.COPY
+    data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
+    instruction_step += 1
+
+
+    source_node = 0
+    destination_node = 0
+    source_address = 0
+    destination_address = 0
+    instruction = dut.controller.Instruction.NOP
+    data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
+    for i in range(4*3 +3):
+        ctx.set(dut.instruction_memory.data[instruction_step], data)
+        instruction_step += 1
+
+    instruction = dut.controller.Instruction.END
+    data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
+    ctx.set(dut.instruction_memory.data[instruction_step], data)
+    instruction_step += 1
+
+    await ctx.tick("sync_100").repeat(2)
     ctx.set(dut.start, 1)
-    await ctx.tick()
+    await ctx.tick("sync_100")
     ctx.set(dut.start, 0)
 
     results = []
 
     for n in range(100):
-        await ctx.tick()
+        await ctx.tick("sync_100")
+
+        print(f"{ctx.get(dut.data_memory.data[9])}, {ctx.get(dut.data_memory.data[10])}")
+
         data = []
         node = []
         node.append(ctx.get(dut.controller.read_node_address_output))
@@ -559,7 +639,7 @@ async def test_bench(ctx):
         node.append(ctx.get(dut.controller.read_complete_output))
         node.append(ctx.get(dut.controller.write_complete_output))
         data.append(node)
-        print(node)
+        #print(node)
 
 
         for i in range(node_count):
@@ -587,7 +667,7 @@ async def test_bench(ctx):
     if(ctx.get(dut.busy)):
         print(f"FAILED: controller did not finish in time")
 
-    if(not (ctx.get(dut.controller.data_memory.data[1]) == ctx.get(dut.node_mem["node_test_block_2"].memory.data[1]) == 1)):
+    if(not (ctx.get(dut.data_memory.data[1]) == ctx.get(dut.node_mem["node_test_block_2"].memory.data[1]) == 1)):
         print(f"FAILED: forward copy failed (0-1 to 2-1)")
     else:
         print(f"PASS: forward copy passed (0-1 to 2-1)")
@@ -607,22 +687,247 @@ async def test_bench(ctx):
     else:
         print(f"PASS: reverse copy passed (4-2 to 3-2)")
 
-    if(not (ctx.get(dut.node_mem["node_test_block_3"].memory.data[2]) == ctx.get(dut.controller.data_memory.data[2]) == 1)):
+    if(not (ctx.get(dut.node_mem["node_test_block_3"].memory.data[2]) == ctx.get(dut.data_memory.data[2]) == 1)):
         print(f"FAILED: copy to controller mem failed (3-2 to 0-2)")
     else:
         print(f"PASS: copy to controller mem passed (3-2 to 0-2)")
 
+def extract_instruction(data, print_output=True):
+    source_node = data & 0xff
+    destination_node = (data >> 8) & 0xff
+    source_address = (data >> 16) & 0xffff
+    destination_address = (data >> 32) & 0xffff
+    instruction = (data >> 48) & 0xf
+
+    if print_output:
+        print('source_node:', source_node)
+        print('destination_node:', destination_node)
+        print('source_address:', source_address)
+        print('destination_address:', destination_address)
+        print('instruction:', instruction)
+
+    return source_node, destination_node, source_address, destination_address, instruction
+
+def create_instruction(source_node, destination_node, source_address, destination_address, instruction):
+    data = source_node | (destination_node << 8) | (source_address << 16) | (destination_address << 32) | (instruction << 48)
+    return data
+
+def generate_random_instructions(count):
+    instructions = []
+    addresses = {   # limit address selection to ensure no overlaps for testing
+        0: list(range(0, 1024)),
+        1: list(range(0, 1024)),
+        2: list(range(0, 1024)),
+        3: list(range(0, 1024)),
+        4: list(range(0, 1024))
+    }
+
+
+    for i in range(count):
+        source_node = random.randint(0, 4)
+        destination_node = random.randint(0, 4)
+        source_address = addresses[source_node].pop(random.randint(0, len(addresses[source_node])-1))
+        destination_address = addresses[destination_node].pop(random.randint(0, len(addresses[destination_node])-1))
+        
+        if random.randint(0, 10) > 2:
+            instruction = dut.controller.Instruction.COPY
+            data = create_instruction(source_node, destination_node, source_address, destination_address, instruction)
+        else:
+            instruction = dut.controller.Instruction.NOP
+            data = create_instruction(0, 0, 0, 0, instruction)
+
+        instructions.append(data)
+
+    return instructions
+
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+good = [   # works
+    562950020530432,
+    562954315563264,
+    562962905563392,
+    562949953552385,
+    562954248650753,
+    562958543355906,
+    562962838388738,
+    562967133421570,
+    562971428454402,
+    562950020727808,
+    562975723290628,
+    563774654514176,
+    563778949547008,
+    563783244579840,
+    562980026580996,
+    562984321613828,
+    562988616646660,
+    281474976710656,
+    580546502067200,
+    562993171660804,
+    580542207165440
+]
+
+bad = [   # doesn't work
+    562950020530432,
+    562954315563264,
+    562962905563392,
+    562949953552385,
+    562954248650753,
+    562958543355906,
+    562962838388738,
+    562967133421570,
+    562971428454402,
+    562950020727808,
+    562975723290628,
+    563774654514176,
+    563778949547008,
+    563783244579840,
+    562980026580996,
+    562984321613828,
+    562988616646660,
+    281474976710656,
+    
+    281474976710656,    # this is the issue
+    
+    580546502067200,
+    562993171660804,
+    580542207165440
+]
+
+
+test_instructions = bad
+
+async def test_bench_2(ctx):
+    instruction_step = 0
+
+    # set all sources to a unique value
+    uid = 1000
+    for i in test_instructions:
+        source_node, destination_node, source_address, destination_address, instruction = extract_instruction(i, False)
+        if instruction != dut.controller.Instruction.COPY:
+            continue
+        if source_node == 0:
+            ctx.set(dut.data_memory.data[source_address], uid)
+        else:
+            ctx.set(dut.node_mem[f"node_test_block_{source_node}"].memory.data[source_address], uid)
+        uid += 1
+    
+    for index, i in enumerate(test_instructions):
+        print("Instruction index: ", index)
+        extract_instruction(i)
+        print("\n")
+        ctx.set(dut.instruction_memory.data[instruction_step], i)
+        instruction_step += 1
+
+    await ctx.tick("sync_100").repeat((node_count+1)*4)
+    ctx.set(dut.start, 1)
+    await ctx.tick("sync_100")
+    ctx.set(dut.start, 0)
+
+    results = []
+    completion_status = []
+    for n in range(len(test_instructions)*4):
+        await ctx.tick("sync_100")
+
+        # check which instructions have completed
+        completion_status = []
+        for index, inst in enumerate(test_instructions):
+            source_node, destination_node, source_address, destination_address, instruction = extract_instruction(inst, False)
+            if instruction != dut.controller.Instruction.COPY:
+                continue
+            src_value = 0
+            if source_node == 0:
+                src_value = ctx.get(dut.data_memory.data[source_address])
+            else:
+                src_value = ctx.get(dut.node_mem[f"node_test_block_{source_node}"].memory.data[source_address])
+            dst_value = 0
+            if destination_node == 0:
+                dst_value = ctx.get(dut.data_memory.data[destination_address])
+            else:
+                dst_value = ctx.get(dut.node_mem[f"node_test_block_{destination_node}"].memory.data[destination_address])
+
+            if src_value == dst_value:
+                completion_status.append(f"{bcolors.OKGREEN}{index}{bcolors.ENDC}")    # correct value
+            elif dst_value == 0:
+                completion_status.append(f"{bcolors.WARNING}{index}{bcolors.ENDC}")    # not yet changed
+            else:
+                completion_status.append(f"{bcolors.FAIL}{index}{bcolors.ENDC}")    # incorrect value
+
+        print("\t".join(completion_status))
+
+
+        # data = []
+        # node = []
+        # node.append(ctx.get(dut.controller.read_node_address_output))
+        # node.append(ctx.get(dut.controller.write_node_address_output))
+        # node.append(ctx.get(dut.controller.read_bram_address_output))
+        # node.append(ctx.get(dut.controller.write_bram_address_output))
+        # node.append(ctx.get(dut.controller.data_output))
+        # node.append(ctx.get(dut.controller.read_complete_output))
+        # node.append(ctx.get(dut.controller.write_complete_output))
+        # data.append(node)
+        # #print(node)
+
+
+        # for i in range(node_count):
+        #     node = []
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].read_node_address_output))
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].write_node_address_output))
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].read_bram_address_output))
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].write_bram_address_output))
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].data_output))
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].read_complete_output))
+        #     node.append(ctx.get(dut.nodes[f"node_{i+1}"].write_complete_output))
+        #     data.append(node)
+
+        # line = []
+        # for i in data:
+        #     for j in i:
+        #         line.append(j)
+        # results.append(line)
+
+    #print(results[0])
+    # with open('results.csv', 'w', newline='') as csvfile:
+    #     csvwriter = csv.writer(csvfile)
+    #     for cycle, line in enumerate(results):
+    #         csvwriter.writerow([cycle] + line)
+
+    fail = False
+    # for status in completion_status:
+    #     if status.count("DONE") == 0:
+    #         print("FAILED TEST")
+    #         fail = True
+    #         break
+
+    if fail:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        with open(f'failed_tests/instructions_{timestamp}.txt', 'w') as f:
+            for inst in test_instructions:
+                f.write(f"{inst}\n")
 
 
 
 
 if __name__ == "__main__":
 
-    sim = Simulator(dut)
-    sim.add_clock(1/clock)
-    sim.add_testbench(test_bench)
-    with sim.write_vcd("shift_dma_test.vcd"):
-        sim.run()
+    for i in range(1):
+        #test_instructions = generate_random_instructions(60)
+
+        sim = Simulator(dut)
+        sim.add_clock(1/clock, domain="sync_100")
+        sim.add_testbench(test_bench_2)
+        with sim.write_vcd("shift_dma_test.vcd"):
+            sim.run()
 
     if (False):  # export
         top = shift_dma_node(100e6, 0)

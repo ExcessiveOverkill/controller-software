@@ -7,6 +7,7 @@ from registers2 import *
 from interface_cards.serial_interface import serial_interface_card
 from fanuc_encoder import Fanuc_Encoders
 from global_timer import Global_Timers
+from em_serial_controller import EM_Serial_Controller
 
 
 
@@ -275,7 +276,7 @@ class Controller(wiring.Component):
         
         # about enough memory to use up an entire update period at 50% utilization (hopefully more than we'll ever need)
         m.submodules.instruction_memory = self.instruction_memory = Memory(shape=unsigned(64), depth=(self.INSTRUCTION_MEMORY_SIZE), init=[])
-        m.submodules.data_memory_read = self.data_memory_read = Memory(shape=unsigned(32), depth=(self.DATA_MEMORY_SIZE), init=[i for i in range(self.DATA_MEMORY_SIZE)])
+        m.submodules.data_memory_read = self.data_memory_read = Memory(shape=unsigned(32), depth=(self.DATA_MEMORY_SIZE), init=[])
         m.submodules.data_memory_write = self.data_memory_write = Memory(shape=unsigned(32), depth=(self.DATA_MEMORY_SIZE), init=[])
 
         m.submodules.shift_dma = self.shift_dma = shift_dma_controller(instruction_memory_depth=self.INSTRUCTION_MEMORY_SIZE)
@@ -375,7 +376,13 @@ class Controller(wiring.Component):
         ]
 
         self.dma_memory_half = Signal()
-        m.d.sync_100 += self.dma_memory_half.eq(self.shift_dma.data_memory_address[len(self.data_read_dma_address)])
+        self.dma_memory_half_comb = Signal()
+
+        with m.If(self.shift_dma.data_memory_address[len(self.data_read_dma_address)]):
+            m.d.sync_100 += self.dma_memory_half.eq(1)
+            m.d.comb += self.dma_memory_half_comb.eq(1)
+        with m.Else():
+            m.d.sync_100 += self.dma_memory_half.eq(0)
 
         with m.If(~self.axi_transfer_busy):   # if axi is not transfering data, link the memmory ports to the dma
             # check if the address is in the read or write memory
@@ -385,13 +392,12 @@ class Controller(wiring.Component):
                 self.data_read_dma_write_data.eq(self.shift_dma.data_memory_write_data),
                 self.data_write_dma_write_data.eq(self.shift_dma.data_memory_write_data),
             ]
-            with m.If(self.dma_memory_half == 0):  # read memory
+
+            with m.If(self.dma_memory_half == 0):  # read memory signals must be delayed by one cycle
                 m.d.comb += [
                     #self.data_read_dma_address.eq(self.shift_dma.data_memory_address[0:len(self.data_read_dma_address)]),
                     self.shift_dma.data_memory_read_data.eq(self.data_read_dma_read_data),
                     #self.data_read_dma_write_data.eq(self.shift_dma.data_memory_write_data),
-                    self.data_read_dma_write_en.eq(self.shift_dma.data_memory_write_enable),
-                    self.data_write_dma_write_en.eq(0),
                 ]
 
             with m.Else():  # write memory
@@ -399,6 +405,15 @@ class Controller(wiring.Component):
                     #self.data_write_dma_address.eq(self.shift_dma.data_memory_address[0:len(self.data_read_dma_address)]),
                     self.shift_dma.data_memory_read_data.eq(self.data_write_dma_read_data),
                     #self.data_write_dma_write_data.eq(self.shift_dma.data_memory_write_data),
+                ]
+
+            with m.If(self.dma_memory_half_comb == 0):  # write memory signals must be switched immediately
+                m.d.comb += [
+                    self.data_read_dma_write_en.eq(self.shift_dma.data_memory_write_enable),
+                    self.data_write_dma_write_en.eq(0),
+                ]
+            with m.Else():
+                m.d.comb += [
                     self.data_write_dma_write_en.eq(self.shift_dma.data_memory_write_enable),
                     self.data_read_dma_write_en.eq(0),
                 ]
@@ -892,7 +907,46 @@ class Controller(wiring.Component):
             #self.debug_pins.eq(encoders.bram_read_data),
         ]
 
-        m.d.comb += self.debug_pins.eq(m.submodules.fanuc_encoders.debug)
+        serial_controller = m.submodules["em_serial_controller"]
+        m.d.comb += [
+            serial_controller.rx.eq(card.rs422_rx[9]),
+            card.rs422_tx[9].eq(serial_controller.tx),
+
+            self.debug_pins[0].eq(serial_controller.tx),
+            self.debug_pins[1].eq(serial_controller.rx),
+        ]
+        
+        #m.d.comb += self.debug_pins[2:].eq(serial_controller.debugPins)
+
+        # with m.If((self.shift_dma.read_node_address_input == 4) & (self.shift_dma.read_bram_address_input == 0x1)): # read dev 0 status
+        #     m.d.comb += self.debug_pins[2].eq(1)
+        #     m.d.comb += self.debug_pins[3].eq(self.shift_dma.data_input[0])
+        #     m.d.comb += self.debug_pins[4].eq(self.shift_dma.data_input[1])
+        #     m.d.comb += self.debug_pins[5].eq(self.shift_dma.data_input[2])
+        #     m.d.comb += self.debug_pins[6].eq(self.shift_dma.data_input[3])
+
+        # with m.If((self.shift_dma.write_node_address_input == 0) & (self.shift_dma.write_bram_address_input == 6)):
+        #     m.d.comb += self.debug_pins[3].eq(1)
+
+        with m.If((self.shift_dma.data_memory_address == 8) & (self.shift_dma.data_memory_write_enable == 1)):
+            m.d.comb += self.debug_pins[2].eq(1)
+        m.d.comb += self.debug_pins[3].eq(self.shift_dma.data_memory_write_data[0])
+        m.d.comb += self.debug_pins[4].eq(self.shift_dma.data_memory_write_data[1])
+        m.d.comb += self.debug_pins[5].eq(self.shift_dma.data_memory_write_data[2])
+        m.d.comb += self.debug_pins[6].eq(self.shift_dma.data_memory_write_data[3])
+
+        #m.d.comb += self.debug_pins[5].eq(self.axi_transfer_busy)
+        
+
+        # m.d.comb += self.debug_pins[3].eq(serial_controller.bram_write_data[0])
+        # m.d.comb += self.debug_pins[4].eq(serial_controller.bram_write_enable)
+        # m.d.comb += self.debug_pins[3].eq(self.instruction_read_address[1])
+        # m.d.comb += self.debug_pins[4].eq(self.instruction_read_address[2])
+        # m.d.comb += self.debug_pins[5].eq(self.instruction_read_address[3])
+        # m.d.comb += self.debug_pins[6].eq(self.instruction_read_address[4])
+        # m.d.comb += self.debug_pins[7].eq(self.instruction_read_address[5])
+
+        #m.d.comb += self.debug_pins.eq(m.submodules.fanuc_encoders.debug)
 
         # connect last node back to dma controller
         m.d.sync_100 += [
@@ -922,6 +976,7 @@ nodes = {
     "serial_card" : serial_interface_card(),
     "fanuc_encoders" : Fanuc_Encoders(6),
     "global_timers" : Global_Timers(),
+    "em_serial_controller" : EM_Serial_Controller(max_packet_size=64, max_number_of_devices=16),
 }
 
 
@@ -1014,7 +1069,7 @@ async def controller_test(ctx):
 
 if __name__ == "__main__":
 
-    print(f"0x{create_instruction(0, 0, 0x1000//4, 0x0, shift_dma_controller.Instruction.COPY):016x}")
+    #print(f"0x{create_instruction(0, 0, 0x1000//4, 0x0, shift_dma_controller.Instruction.COPY):016x}")
 
     if(sim):
 

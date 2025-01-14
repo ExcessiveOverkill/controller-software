@@ -158,7 +158,7 @@ class EM_Serial_Port(Component):
         
         # handle read/write for data registers
         m.d.comb += self.address.eq(self.bram_address)
-        with m.If(~self.bram_control_mode):
+        with m.If(~self.bram_address[15]):
             m.d.comb += self.writeData.eq(self.bram_write_data)
             m.d.comb += self.bram_read_data.eq(self.readData)
             m.d.comb += self.writeEnable.eq(self.bram_write_enable)
@@ -261,6 +261,8 @@ class EM_Serial_Port(Component):
                         m.d.sync_100 += self.tx.eq(1)
                         #m.d.sync_100 += self.txen.eq(0)
                         m.d.sync_100 += self.updateStatusDataRequest.eq(1)
+
+                        m.d.sync_100 += self.tx_start.eq(0) # reset tx start bit to make sure we dont have an immediate start
                         m.next = "idle"
                     
                     with m.Else():  # start next word if not at end of packet
@@ -348,6 +350,7 @@ class EM_Serial_Port(Component):
                         with m.Else():
                             m.d.sync_100 += self.rxCRCvalid.eq(0)
 
+                        m.d.sync_100 += self.rx_start.eq(0) # reset rx start bit to make sure we dont have an immediate start
                         m.next = "idle"
                         
                         

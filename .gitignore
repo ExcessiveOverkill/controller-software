@@ -19,3 +19,9 @@ controller-software/core/api_drivers/test_controller
 .vscode/settings.json
 controller-firmware/python/pyvenv.cfg
 *.vcd
+failed_tests/instructions_20250103_133621.txt
+failed_tests/instructions_20250103_133744.txt
+failed_tests/instructions_20250103_151724.txt
+results.csv
+serial_controller.vcd
+shift_dma_test.vcd

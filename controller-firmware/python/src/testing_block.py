@@ -11,22 +11,22 @@ from amaranth.lib import wiring
 
 class test_block(wiring.Component):
 
-    def __init__(self, clock) -> None:
+    def __init__(self, size) -> None:
         super().__init__({
             "write_data": In(32),
             "write_enable": In(1),
             "address": In(16),
             "read_data": Out(32)
         })
-        self.clock = clock
+        self.size = size
     
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.memory = self.memory = Memory(shape=unsigned(32), depth=256, init=[])   # small memory for testing
+        m.submodules.memory = self.memory = Memory(shape=unsigned(32), depth=self.size, init=[])   # small memory for testing
 
-        self.externalReadPort = self.memory.read_port()
-        self.externalWritePort = self.memory.write_port()
+        self.externalReadPort = self.memory.read_port(domain="sync_100")
+        self.externalWritePort = self.memory.write_port(domain="sync_100")
 
         # connect external memory interfaces
         m.d.comb += self.externalReadPort.addr.eq(self.address)
