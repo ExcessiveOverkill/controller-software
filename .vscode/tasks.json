@@ -3,7 +3,8 @@
     "options": {
       "env": {
         "xilinx_path": "/home/excessive/Xilinx",
-        "xilinx_version": "2023.1"
+        "xilinx_version": "2023.1",
+        "petalinux_path": "/home/excessive/PetaLinux"
       }
     },
 
@@ -70,5 +71,6 @@
             "dependsOn": ["create vivado project", "install python packages"],
             "problemMatcher": []
         }
+        //TODO: add tasks for copying and installing petalinux files (.xsa file, etc.)
     ]
 }

@@ -1,0 +1,61 @@
+/include/ "system-conf.dtsi"
+/ {
+	
+	
+	
+	
+	fpga_shared_mem@000F0000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+	    compatible = "generic-uio";
+	    reg = <0x000F0000 0x00008000>;	// 32KB
+
+	    // IRQ_F2P[0] high level (memory update start)
+	    // IRQ_F2P[1] high level (memory update done)
+	    // IRQ_F2P[2] high level (DMA cycle start)
+	    // IRQ_F2P[3] high level (DMA cycle done)
+	};
+	
+	fpga_mem_update_running_irq{
+		compatible = "generic-uio";
+		interrupts = <0 29 4>;
+		interrupt-names = "mem_update_run";
+		interrupt-parent = <&intc>;
+	};
+	
+	fpga_mem_update_done_irq{
+		compatible = "generic-uio";
+		interrupts = <0 30 4>;
+		interrupt-names = "mem_update_done";
+		interrupt-parent = <&intc>;
+	};
+	
+	fpga_cycle_running_irq{
+		compatible = "generic-uio";
+		interrupts = <0 31 4>;
+		interrupt-names = "cycle_run";
+		interrupt-parent = <&intc>;
+	};
+	
+	fpga_cycle_done_irq{
+		compatible = "generic-uio";
+		interrupts = <0 32 4>;
+		interrupt-names = "cycle_done";
+		interrupt-parent = <&intc>;
+	};
+	
+	
+	chosen {
+		bootargs = "console=ttyPS0,115200 earlycon root=/dev/mmcblk0p2 rw rootwait clk_ignore_unused uio_pdrv_genirq.of_id=generic-uio";
+		stdout-path = "serial0:115200n8";
+	};
+	 
+
+};
+
+
+&sdhci0 {
+ disable-wp;
+};
