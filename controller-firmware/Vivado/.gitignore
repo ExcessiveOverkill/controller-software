@@ -24,6 +24,7 @@
 !*.xdc
 !*.md
 !*.xsa
+!*.bif
 
 # ...even if they are in subdirectories
 !*/
