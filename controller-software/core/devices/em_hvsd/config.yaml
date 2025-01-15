@@ -1,0 +1,42 @@
+gui_node_config:
+  common:
+    params:
+      serial_address:
+        name: "Serial address"
+        type: "int"
+        unit: ""
+        required: true
+        min: 0
+        max: 255
+        description: "Address of the device on the serial bus"
+
+      hard_current_limit:
+        name: "Hard current limit"
+        type: "float"
+        unit: "Amps"
+        required: true
+        min: 0
+        max: 60
+        description: "Maximum current that the device can output in percent of the maximum current"
+        auto_fill_enable: true
+        auto_fill_by: ["hard_max_current"]
+    
+    connectors:
+      #TODO: Add connectors
+
+  mode_specific:
+    pmsm_foc:
+      params:
+        commutation_offset:
+          name: "Commutation offset"
+          type: "float"
+          unit: "Radians"
+          required: false
+          min: -6.28
+          max: 6.28
+          description: "Offset of the commutation angle in radians"
+          auto_fill_enable: true
+          auto_fill_by: []
+      
+      connectors:
+        #TODO: Add connectors

@@ -319,419 +319,419 @@ class serial_controller(Elaboratable):
 
 
 
-        with m.If(self.state == self.states.IDLE):
-            m.d.sync += self.txData.eq(0)
-            m.d.sync += self.currentCyclicRegister.eq(0)
-            m.d.sync += self.rxInvalidCRCFault.eq(0)
-            m.d.sync += self.rxNotFinishedFault.eq(0)
-            m.d.sync += self.rxResponseFault.eq(0)
-            m.d.sync += self.currentTxWord.eq(0)
-            m.d.sync += self.internalWritePort.en.eq(0)
+        # with m.If(self.state == self.states.IDLE):
+        #     m.d.sync += self.txData.eq(0)
+        #     m.d.sync += self.currentCyclicRegister.eq(0)
+        #     m.d.sync += self.rxInvalidCRCFault.eq(0)
+        #     m.d.sync += self.rxNotFinishedFault.eq(0)
+        #     m.d.sync += self.rxResponseFault.eq(0)
+        #     m.d.sync += self.currentTxWord.eq(0)
+        #     m.d.sync += self.internalWritePort.en.eq(0)
 
 
-        with m.If(self.state == self.states.UPDATE_STATUS_START_WAIT):
-            m.d.sync += self.writeEnable_ToSerialPort.eq(0)
-            m.d.sync += self.internalWritePort.en.eq(0)
-            # read from device config register
-            m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.deviceControlAddrOffset)
-            m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG_WAIT)
+        # with m.If(self.state == self.states.UPDATE_STATUS_START_WAIT):
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     m.d.sync += self.internalWritePort.en.eq(0)
+        #     # read from device config register
+        #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.deviceControlAddrOffset)
+        #     m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG_WAIT)
 
 
-        with m.If(self.state == self.states.GET_TX_DEVICE_CONFIG_WAIT):
-            m.d.sync += self.writeEnable_ToSerialPort.eq(0)
-            m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG)
+        # with m.If(self.state == self.states.GET_TX_DEVICE_CONFIG_WAIT):
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG)
 
 
-        with m.If(self.state == self.states.GET_TX_DEVICE_CONFIG):
-            with m.If(self.internalReadPort.data.bit_select(0, 1)):     # check if device is enabled
-                m.d.sync += self.cylicDataEnabled.eq(self.internalReadPort.data.bit_select(1, 1))
+        # with m.If(self.state == self.states.GET_TX_DEVICE_CONFIG):
+        #     with m.If(self.internalReadPort.data.bit_select(0, 1)):     # check if device is enabled
+        #         m.d.sync += self.cylicDataEnabled.eq(self.internalReadPort.data.bit_select(1, 1))
 
-                # read from rx packet size register
-                m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.deviceRXsizeAddrOffset)
+        #         # read from rx packet size register
+        #         m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.deviceRXsizeAddrOffset)
 
-                m.d.sync += self.state.eq(self.states.START_UNPACK_RX_PACKET_WAIT)
+        #         m.d.sync += self.state.eq(self.states.START_UNPACK_RX_PACKET_WAIT)
 
-            with m.Elif(self.currentDeviceIndex < self.maxNumDevices-1):    # skip next device if the current one is disabled and we still have devices left to try
-                m.d.sync += self.currentDeviceIndex.eq(self.currentDeviceIndex+1)
-                m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex+1)*self.deviceRegisterCount + self.deviceControlAddrOffset)
-                m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG_WAIT)
+            # with m.Elif(self.currentDeviceIndex < self.maxNumDevices-1):    # skip next device if the current one is disabled and we still have devices left to try
+            #     m.d.sync += self.currentDeviceIndex.eq(self.currentDeviceIndex+1)
+            #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex+1)*self.deviceRegisterCount + self.deviceControlAddrOffset)
+            #     m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG_WAIT)
 
-            with m.Else():  # no more devices to send packets for, receive the last RX packet
-                m.d.sync += self.timer.eq(self.rxPacketSize+self.deviceRXdelay)
-                m.d.sync += self.preTimer.eq(self.wordTime)
-                m.d.sync += self.state.eq(self.states.WAIT_FOR_FINAL_RX_PACKET)
-
-
-        with m.If(self.state == self.states.START_UNPACK_RX_PACKET_WAIT):
-            m.d.sync += self.state.eq(self.states.GET_RX_DEVICE_PACKET_SIZE)
+            # with m.Else():  # no more devices to send packets for, receive the last RX packet
+            #     m.d.sync += self.timer.eq(self.rxPacketSize+self.deviceRXdelay)
+            #     m.d.sync += self.preTimer.eq(self.wordTime)
+            #     m.d.sync += self.state.eq(self.states.WAIT_FOR_FINAL_RX_PACKET)
 
 
-        with m.If(self.state == self.states.GET_RX_DEVICE_PACKET_SIZE):
+        # with m.If(self.state == self.states.START_UNPACK_RX_PACKET_WAIT):
+        #     m.d.sync += self.state.eq(self.states.GET_RX_DEVICE_PACKET_SIZE)
+
+
+        # with m.If(self.state == self.states.GET_RX_DEVICE_PACKET_SIZE):
             
-            with m.If(self.cylicDataEnabled):   # only use the rx size register if cyclic mode is enabled, otherwise the side should always be 3
-                m.d.sync += self.rxPacketSize.eq(self.internalReadPort.data.bit_select(0, 8))
-            with m.Else():
-                m.d.sync += self.rxPacketSize.eq(3)
+        #     # with m.If(self.cylicDataEnabled):   # only use the rx size register if cyclic mode is enabled, otherwise the side should always be 3
+        #     #     m.d.sync += self.rxPacketSize.eq(self.internalReadPort.data.bit_select(0, 8))
+        #     # with m.Else():
+        #     #     m.d.sync += self.rxPacketSize.eq(3)
             
-            m.d.sync += self.previousRxPacketSize.eq(self.rxPacketSize)
+        #     # m.d.sync += self.previousRxPacketSize.eq(self.rxPacketSize)
             
-            # read from cylic config register
-            m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.currentCyclicRegister + self.deviceCyclicConfigAddrOffset)
+        #     # read from cylic config register
+        #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.currentCyclicRegister + self.deviceCyclicConfigAddrOffset)
 
-            m.d.sync += self.state.eq(self.states.GET_TX_REGISTER_CONFIG)
+        #     m.d.sync += self.state.eq(self.states.GET_TX_REGISTER_CONFIG)
 
 
-        with m.If(self.state == self.states.GET_TX_REGISTER_CONFIG):
-            m.d.sync += self.writeEnable_ToSerialPort.eq(0)
-            m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.txDataBaseAddr + self.currentTxWord)
+        # with m.If(self.state == self.states.GET_TX_REGISTER_CONFIG):
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.txDataBaseAddr + self.currentTxWord)
 
-            # read from cylic data register
-            m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.currentCyclicRegister + self.deviceCyclicWriteDataAddrOffset)
+        #     # read from cylic data register
+        #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.currentCyclicRegister + self.deviceCyclicWriteDataAddrOffset)
 
-            m.d.sync += self.state.eq(self.states.GET_TX_REGISTER_DATA)
+        #     m.d.sync += self.state.eq(self.states.GET_TX_REGISTER_DATA)
             
 
-        with m.If(self.state == self.states.GET_TX_REGISTER_DATA):
+        # with m.If(self.state == self.states.GET_TX_REGISTER_DATA):
 
-            with m.If((self.internalReadPort.data.bit_select(12, 3) != 0) & ((self.currentCyclicRegister < 3) | (self.cylicDataEnabled))):
-                # save config data
-                m.d.sync += self.cyclicRegisterSize.eq(self.internalReadPort.data.bit_select(12, 3))
-                m.d.sync += self.cyclicRegisterStartingByte.eq(self.internalReadPort.data.bit_select(16, 3))
+        #     with m.If((self.internalReadPort.data.bit_select(12, 3) != 0) & ((self.currentCyclicRegister < 3) | (self.cylicDataEnabled))):
+        #         # save config data
+        #         m.d.sync += self.cyclicRegisterSize.eq(self.internalReadPort.data.bit_select(12, 3))
+        #         m.d.sync += self.cyclicRegisterStartingByte.eq(self.internalReadPort.data.bit_select(16, 3))
 
-                m.d.sync += self.state.eq(self.states.COMBINE_TX_REGISTER_DATA)
+        #         m.d.sync += self.state.eq(self.states.COMBINE_TX_REGISTER_DATA)
 
-            with m.Else():  # invalid config means we reached an unconfigured register, packet is done
-                # send to serial port if there is partial data left
-                with m.If(self.currentTxByte != 0):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData)
-                    m.d.sync += self.writeEnable_ToSerialPort.eq(1)
-                    m.d.sync += self.currentTxWord.eq(self.currentTxWord+1)
-                m.d.sync += self.state.eq(self.states.WRITE_TX_PACKET_SIZE)
+        #     with m.Else():  # invalid config means we reached an unconfigured register, packet is done
+        #         # send to serial port if there is partial data left
+        #         with m.If(self.currentTxByte != 0):
+        #             m.d.sync += self.writeData_ToSerialPort.eq(self.txData)
+        #             m.d.sync += self.writeEnable_ToSerialPort.eq(1)
+        #             m.d.sync += self.currentTxWord.eq(self.currentTxWord+1)
+        #         m.d.sync += self.state.eq(self.states.WRITE_TX_PACKET_SIZE)
         
 
-        with m.If(self.state == self.states.COMBINE_TX_REGISTER_DATA):
+        # with m.If(self.state == self.states.COMBINE_TX_REGISTER_DATA):
             
-            with m.If(self.currentTxByte + self.cyclicRegisterSize > 4):    # 32bit word is full, sent it to the serial port
+            # with m.If(self.currentTxByte + self.cyclicRegisterSize > 4):    # 32bit word is full, sent it to the serial port
                 
-                with m.If(self.cyclicRegisterSize == 1):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 8)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 8)>>(abs(3-self.currentTxByte)*8))
-                with m.Elif(self.cyclicRegisterSize == 2):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 16)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 16)>>(abs(3-self.currentTxByte)*8))
-                with m.Elif(self.cyclicRegisterSize == 3):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 24)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 24)>>(abs(3-self.currentTxByte)*8))
-                with m.Elif(self.cyclicRegisterSize == 4):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 32)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 32)>>(abs(3-self.currentTxByte)*8))
+            #     with m.If(self.cyclicRegisterSize == 1):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 8)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 8)>>(abs(3-self.currentTxByte)*8))
+            #     with m.Elif(self.cyclicRegisterSize == 2):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 16)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 16)>>(abs(3-self.currentTxByte)*8))
+            #     with m.Elif(self.cyclicRegisterSize == 3):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 24)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 24)>>(abs(3-self.currentTxByte)*8))
+            #     with m.Elif(self.cyclicRegisterSize == 4):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 32)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 32)>>(abs(3-self.currentTxByte)*8))
                 
-                m.d.sync += self.currentTxWord.eq(self.currentTxWord + 1)
-                m.d.sync += self.writeEnable_ToSerialPort.eq(1)
-                m.d.sync += self.currentTxByte.eq(self.cyclicRegisterSize - (4-self.currentTxByte))
+            #     m.d.sync += self.currentTxWord.eq(self.currentTxWord + 1)
+            #     m.d.sync += self.writeEnable_ToSerialPort.eq(1)
+            #     m.d.sync += self.currentTxByte.eq(self.cyclicRegisterSize - (4-self.currentTxByte))
             
-            with m.Elif(self.currentTxByte + self.cyclicRegisterSize == 4):    # 32bit word is full, sent it to the serial port
+            # with m.Elif(self.currentTxByte + self.cyclicRegisterSize == 4):    # 32bit word is full, sent it to the serial port
                 
-                with m.If(self.cyclicRegisterSize == 1):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 8)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 8)>>(abs(4-self.currentTxByte)*8))
-                with m.Elif(self.cyclicRegisterSize == 2):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 16)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 16)>>(abs(4-self.currentTxByte)*8))
-                with m.Elif(self.cyclicRegisterSize == 3):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 24)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 24)>>(abs(4-self.currentTxByte)*8))
-                with m.Elif(self.cyclicRegisterSize == 4):
-                    m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 32)<<(self.currentTxByte*8))
-                    m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 32)>>(abs(4-self.currentTxByte)*8))
+            #     with m.If(self.cyclicRegisterSize == 1):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 8)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 8)>>(abs(4-self.currentTxByte)*8))
+            #     with m.Elif(self.cyclicRegisterSize == 2):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 16)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 16)>>(abs(4-self.currentTxByte)*8))
+            #     with m.Elif(self.cyclicRegisterSize == 3):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 24)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 24)>>(abs(4-self.currentTxByte)*8))
+            #     with m.Elif(self.cyclicRegisterSize == 4):
+            #         m.d.sync += self.writeData_ToSerialPort.eq(self.txData | self.internalReadPort.data.bit_select(0, 32)<<(self.currentTxByte*8))
+            #         m.d.sync += self.txData.eq(self.internalReadPort.data.bit_select(self.cyclicRegisterStartingByte*8, 32)>>(abs(4-self.currentTxByte)*8))
                 
-                m.d.sync += self.currentTxWord.eq(self.currentTxWord + 1)
-                m.d.sync += self.writeEnable_ToSerialPort.eq(1)
-                m.d.sync += self.currentTxByte.eq(self.cyclicRegisterSize - (4-self.currentTxByte))
+            #     m.d.sync += self.currentTxWord.eq(self.currentTxWord + 1)
+            #     m.d.sync += self.writeEnable_ToSerialPort.eq(1)
+            #     m.d.sync += self.currentTxByte.eq(self.cyclicRegisterSize - (4-self.currentTxByte))
 
             
-            with m.Else():  # word not full yet, get next register
+            # with m.Else():  # word not full yet, get next register
 
-                with m.If(self.cyclicRegisterSize == 1):
-                    m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 8)<<(self.currentTxByte*8))
-                with m.Elif(self.cyclicRegisterSize == 2):
-                    m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 16)<<(self.currentTxByte*8))
-                with m.Elif(self.cyclicRegisterSize == 3):
-                    m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 24)<<(self.currentTxByte*8))
-                with m.Elif(self.cyclicRegisterSize == 4):
-                    m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 32)<<(self.currentTxByte*8))
+            #     with m.If(self.cyclicRegisterSize == 1):
+            #         m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 8)<<(self.currentTxByte*8))
+            #     with m.Elif(self.cyclicRegisterSize == 2):
+            #         m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 16)<<(self.currentTxByte*8))
+            #     with m.Elif(self.cyclicRegisterSize == 3):
+            #         m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 24)<<(self.currentTxByte*8))
+            #     with m.Elif(self.cyclicRegisterSize == 4):
+            #         m.d.sync += self.txData.eq(self.txData | self.internalReadPort.data.bit_select(0, 32)<<(self.currentTxByte*8))
 
-                m.d.sync += self.currentTxByte.eq(self.currentTxByte + self.cyclicRegisterSize)
+            #     m.d.sync += self.currentTxByte.eq(self.currentTxByte + self.cyclicRegisterSize)
                 
-            with m.If((self.currentCyclicRegister < 3) | (self.cylicDataEnabled)):  # get next register
-                # read from cylic config register
-                m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.currentCyclicRegister+1 + self.deviceCyclicConfigAddrOffset)
-                m.d.sync += self.currentCyclicRegister.eq(self.currentCyclicRegister+1)
-                m.d.sync += self.state.eq(self.states.GET_TX_REGISTER_CONFIG)
+            # with m.If((self.currentCyclicRegister < 3) | (self.cylicDataEnabled)):  # get next register
+            #     # read from cylic config register
+            #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + self.currentDeviceIndex*self.deviceRegisterCount + self.currentCyclicRegister+1 + self.deviceCyclicConfigAddrOffset)
+            #     m.d.sync += self.currentCyclicRegister.eq(self.currentCyclicRegister+1)
+            #     m.d.sync += self.state.eq(self.states.GET_TX_REGISTER_CONFIG)
 
-            with m.Else():
-                m.d.sync += self.state.eq(self.states.WRITE_TX_PACKET_SIZE)
+            # with m.Else():
+            #     m.d.sync += self.state.eq(self.states.WRITE_TX_PACKET_SIZE)
 
 
-        with m.If(self.state == self.states.WRITE_TX_PACKET_SIZE):
-            m.d.sync += self.address_ToSerialPort.eq(0x00)
-            m.d.sync += self.writeData_ToSerialPort.eq(self.currentTxWord.shift_left(16))
-            m.d.sync += self.writeEnable_ToSerialPort.eq(1)
+        # with m.If(self.state == self.states.WRITE_TX_PACKET_SIZE):
+        #     m.d.sync += self.address_ToSerialPort.eq(0x00)
+        #     m.d.sync += self.writeData_ToSerialPort.eq(self.currentTxWord.shift_left(16))
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(1)
 
-            with m.If(self.currentDeviceIndex != 0):
-                with m.If(self.previousRxPacketSize >= self.currentTxWord):
-                    m.d.sync += self.timer.eq(self.previousRxPacketSize-self.currentTxWord + self.deviceRXdelay)
-                with m.Else():
-                    m.d.sync += self.timer.eq(self.deviceRXdelay)
+        #     with m.If(self.currentDeviceIndex != 0):
+        #         with m.If(self.previousRxPacketSize >= self.currentTxWord):
+        #             m.d.sync += self.timer.eq(self.previousRxPacketSize-self.currentTxWord + self.deviceRXdelay)
+        #         with m.Else():
+        #             m.d.sync += self.timer.eq(self.deviceRXdelay)
 
-                m.d.sync += self.preTimer.eq(self.wordTime)
+        #         m.d.sync += self.preTimer.eq(self.wordTime)
 
-            m.d.sync += self.state.eq(self.states.WAIT_TX_DELAY)
+        #     m.d.sync += self.state.eq(self.states.WAIT_TX_DELAY)
             
 
-        with m.If(self.state == self.states.WAIT_TX_DELAY):
-            with m.If(self.timer == 0):
-                # write
-                m.d.sync += self.address_ToSerialPort.eq(0x00)
-                m.d.sync += self.writeData_ToSerialPort.eq(0b1)     # trigger TX start
-                m.d.sync += self.writeEnable_ToSerialPort.eq(1)
-                m.d.sync += self.state.eq(self.states.WAIT_TX_START_READ_STATUS)
+        # with m.If(self.state == self.states.WAIT_TX_DELAY):
+        #     with m.If(self.timer == 0):
+        #         # write
+        #         m.d.sync += self.address_ToSerialPort.eq(0x00)
+        #         m.d.sync += self.writeData_ToSerialPort.eq(0b1)     # trigger TX start
+        #         m.d.sync += self.writeEnable_ToSerialPort.eq(1)
+        #         m.d.sync += self.state.eq(self.states.WAIT_TX_START_READ_STATUS)
                 
-            with m.Else():
-                with m.If(self.preTimer == 0):
-                    m.d.sync += self.timer.eq(self.timer - 1)
-                    m.d.sync += self.preTimer.eq(self.wordTime)
-                with m.Else():
-                    m.d.sync += self.preTimer.eq(self.preTimer - 1)
-                m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     with m.Else():
+        #         with m.If(self.preTimer == 0):
+        #             m.d.sync += self.timer.eq(self.timer - 1)
+        #             m.d.sync += self.preTimer.eq(self.wordTime)
+        #         with m.Else():
+        #             m.d.sync += self.preTimer.eq(self.preTimer - 1)
+        #         m.d.sync += self.writeEnable_ToSerialPort.eq(0)
 
 
-        with m.If(self.state == self.states.WAIT_TX_START_READ_STATUS):
-            m.d.sync += self.writeEnable_ToSerialPort.eq(0)
-            # read
-            m.d.sync += self.address_ToSerialPort.eq(0x02)  # serial port status register
-            with m.If(self.address_ToSerialPort == 0x02):
-                m.d.sync += self.state.eq(self.states.WAIT_TX_START)
+        # with m.If(self.state == self.states.WAIT_TX_START_READ_STATUS):
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     # read
+        #     m.d.sync += self.address_ToSerialPort.eq(0x02)  # serial port status register
+        #     with m.If(self.address_ToSerialPort == 0x02):
+        #         m.d.sync += self.state.eq(self.states.WAIT_TX_START)
 
 
-        with m.If(self.state == self.states.WAIT_TX_START):
-            m.d.sync += self.writeEnable_ToSerialPort.eq(0)
-            with m.If(self.readData_ToSerialPort.bit_select(1, 1)):     # wait for TX transfer to start before checking to see if it has ended
-                m.d.sync += self.state.eq(self.states.WAIT_TX_PACKET_FINISH)
+        # with m.If(self.state == self.states.WAIT_TX_START):
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     with m.If(self.readData_ToSerialPort.bit_select(1, 1)):     # wait for TX transfer to start before checking to see if it has ended
+        #         m.d.sync += self.state.eq(self.states.WAIT_TX_PACKET_FINISH)
 
 
-        with m.If(self.state == self.states.WAIT_TX_PACKET_FINISH):
-            with m.If(self.readData_ToSerialPort.bit_select(0, 1)):     # TX send is done, this means the previous RX packet should also be done
+        # with m.If(self.state == self.states.WAIT_TX_PACKET_FINISH):
+        #     with m.If(self.readData_ToSerialPort.bit_select(0, 1)):     # TX send is done, this means the previous RX packet should also be done
 
-                with m.If(self.currentDeviceIndex != 0):  # dont unpack RX packet on device 0 index as there is no previous RX packet yet
+        #         with m.If(self.currentDeviceIndex != 0):  # dont unpack RX packet on device 0 index as there is no previous RX packet yet
 
-                    with m.If(self.readData_ToSerialPort.bit_select(2, 1) & self.readData_ToSerialPort.bit_select(4, 1)):   # RX done and CRC valid
-                        # prepare to unpack RX packet
+        #             with m.If(self.readData_ToSerialPort.bit_select(2, 1) & self.readData_ToSerialPort.bit_select(4, 1)):   # RX done and CRC valid
+        #                 # prepare to unpack RX packet
                         
-                        m.d.sync += self.currentCyclicRegister.eq(0)
+        #                 m.d.sync += self.currentCyclicRegister.eq(0)
 
-                        # read from serial port rx register
-                        m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.rxDataBaseAddr + 0)
+        #                 # read from serial port rx register
+        #                 m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.rxDataBaseAddr + 0)
 
-                        m.d.sync += self.currentRxWord.eq(0)
+        #                 m.d.sync += self.currentRxWord.eq(0)
 
-                        # read from cylic config register
-                        # read
-                        m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicConfigAddrOffset)
-                        m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG)
+        #                 # read from cylic config register
+        #                 # read
+        #                 m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicConfigAddrOffset)
+        #                 m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG)
 
-                    with m.Else():
-                        with m.If((self.readData_ToSerialPort.bit_select(4, 1) == 0) & self.readData_ToSerialPort.bit_select(3, 1)):   # done but invalid CRC
-                            m.d.sync += self.rxInvalidCRCFault.eq(1)    # packet was at least as large as expected but has bit error(s)
+        #             with m.Else():
+        #                 with m.If((self.readData_ToSerialPort.bit_select(4, 1) == 0) & self.readData_ToSerialPort.bit_select(3, 1)):   # done but invalid CRC
+        #                     m.d.sync += self.rxInvalidCRCFault.eq(1)    # packet was at least as large as expected but has bit error(s)
 
-                        with m.If(self.readData_ToSerialPort.bit_select(3, 1) & (self.readData_ToSerialPort.bit_select(2, 1) == 0)):   # not done but busy
-                            m.d.sync += self.rxNotFinishedFault.eq(1)   # packet was smaller than expected
+        #                 with m.If(self.readData_ToSerialPort.bit_select(3, 1) & (self.readData_ToSerialPort.bit_select(2, 1) == 0)):   # not done but busy
+        #                     m.d.sync += self.rxNotFinishedFault.eq(1)   # packet was smaller than expected
 
-                        with m.If((self.readData_ToSerialPort.bit_select(2, 1) == 0) & (self.readData_ToSerialPort.bit_select(3, 1) == 0)):   # not done and not busy
-                            m.d.sync += self.rxResponseFault.eq(1)      # no packet was detected at all
+        #                 with m.If((self.readData_ToSerialPort.bit_select(2, 1) == 0) & (self.readData_ToSerialPort.bit_select(3, 1) == 0)):   # not done and not busy
+        #                     m.d.sync += self.rxResponseFault.eq(1)      # no packet was detected at all
 
-                        # a packet error has occured, update global error bit and skip interpreting packet
-                        m.d.sync += self.updateError.eq(1)
+        #                 # a packet error has occured, update global error bit and skip interpreting packet
+        #                 m.d.sync += self.updateError.eq(1)
 
-                        # receive next device packet
-                        with m.If(self.currentDeviceIndex < self.maxNumDevices-1):
-                            m.d.sync += self.state.eq(self.states.START_RX)
+        #                 # receive next device packet
+        #                 with m.If(self.currentDeviceIndex < self.maxNumDevices-1):
+        #                     m.d.sync += self.state.eq(self.states.START_RX)
                         
-                        with m.Else():  # update complete
+        #                 with m.Else():  # update complete
 
-                            m.d.sync += self.updateBusy.eq(0)
-                            m.d.sync += self.updateDone.eq(1)
+        #                     m.d.sync += self.updateBusy.eq(0)
+        #                     m.d.sync += self.updateDone.eq(1)
 
-                            # update status register
-                            m.d.sync += self.internalReadWriteAddress.eq(0x02)
-                            m.d.sync += self.internalWritePort.data.eq(0b10 | self.updateError.shift_left(2))
-                            m.d.sync += self.internalWritePort.en.eq(1)
+        #                     # update status register
+        #                     m.d.sync += self.internalReadWriteAddress.eq(0x02)
+        #                     m.d.sync += self.internalWritePort.data.eq(0b10 | self.updateError.shift_left(2))
+        #                     m.d.sync += self.internalWritePort.en.eq(1)
 
-                            m.d.sync += self.state.eq(self.states.IDLE)
+        #                     m.d.sync += self.state.eq(self.states.IDLE)
 
-                with m.Else():
-                    m.d.sync += self.state.eq(self.states.START_RX)
+        #         with m.Else():
+        #             m.d.sync += self.state.eq(self.states.START_RX)
 
-            with m.Else():
-                m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     with m.Else():
+        #         m.d.sync += self.writeEnable_ToSerialPort.eq(0)
 
 
-        with m.If(self.state == self.states.WAIT_FOR_FINAL_RX_PACKET):
-            with m.If(self.timer == 0):
-                m.d.sync += self.state.eq(self.states.WAIT_FOR_FINAL_RX_PACKET_WAIT)
+        # with m.If(self.state == self.states.WAIT_FOR_FINAL_RX_PACKET):
+        #     with m.If(self.timer == 0):
+        #         m.d.sync += self.state.eq(self.states.WAIT_FOR_FINAL_RX_PACKET_WAIT)
 
-            with m.Else():
-                with m.If(self.preTimer == 0):
-                    m.d.sync += self.timer.eq(self.timer - 1)
-                    m.d.sync += self.preTimer.eq(self.wordTime)
-                with m.Else():
-                    m.d.sync += self.preTimer.eq(self.preTimer - 1)
+        #     with m.Else():
+        #         with m.If(self.preTimer == 0):
+        #             m.d.sync += self.timer.eq(self.timer - 1)
+        #             m.d.sync += self.preTimer.eq(self.wordTime)
+        #         with m.Else():
+        #             m.d.sync += self.preTimer.eq(self.preTimer - 1)
 
         
-        with m.If(self.state == self.states.WAIT_FOR_FINAL_RX_PACKET_WAIT):
-            m.d.sync += self.writeEnable_ToSerialPort.eq(0)
-            # read
-            m.d.sync += self.address_ToSerialPort.eq(0x02)  # serial port status register
-            with m.If(self.address_ToSerialPort == 0x02):
-                m.d.sync += self.state.eq(self.states.WAIT_TX_PACKET_FINISH)
+        # with m.If(self.state == self.states.WAIT_FOR_FINAL_RX_PACKET_WAIT):
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(0)
+        #     # read
+        #     m.d.sync += self.address_ToSerialPort.eq(0x02)  # serial port status register
+        #     with m.If(self.address_ToSerialPort == 0x02):
+        #         m.d.sync += self.state.eq(self.states.WAIT_TX_PACKET_FINISH)
 
 
-        with m.If(self.state == self.states.GET_RX_REGISTER_CONFIG_WAIT):
-            m.d.sync += self.internalWritePort.en.eq(0)
+        # with m.If(self.state == self.states.GET_RX_REGISTER_CONFIG_WAIT):
+        #     m.d.sync += self.internalWritePort.en.eq(0)
 
-            # move to next cyclic register
-            m.d.sync += self.currentCyclicRegister.eq(self.currentCyclicRegister + 1)
-            # read address
-            m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicConfigAddrOffset + self.currentCyclicRegister + 1)
-            m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG)
+        #     # move to next cyclic register
+        #     m.d.sync += self.currentCyclicRegister.eq(self.currentCyclicRegister + 1)
+        #     # read address
+        #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicConfigAddrOffset + self.currentCyclicRegister + 1)
+        #     m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG)
 
 
-        with m.If(self.state == self.states.GET_RX_REGISTER_CONFIG):
-            m.d.sync += self.state.eq(self.states.SLICE_RX_REGISTER_DATA)
+        # with m.If(self.state == self.states.GET_RX_REGISTER_CONFIG):
+        #     m.d.sync += self.state.eq(self.states.SLICE_RX_REGISTER_DATA)
             
 
-        with m.If(self.state == self.states.SLICE_RX_REGISTER_DATA):
+        # with m.If(self.state == self.states.SLICE_RX_REGISTER_DATA):
 
-            with m.If((self.internalReadPort.data.bit_select(0, 3) != 0) & ((self.currentCyclicRegister < 3) | (self.cylicDataEnabled))):
-                # save config data
-                m.d.sync += self.cyclicRegisterSize.eq(self.internalReadPort.data.bit_select(0, 3))
-                m.d.sync += self.cyclicRegisterStartingByte.eq(self.internalReadPort.data.bit_select(4, 3))
+        #     with m.If((self.internalReadPort.data.bit_select(0, 3) != 0) & ((self.currentCyclicRegister < 3) | (self.cylicDataEnabled))):
+        #         # save config data
+        #         m.d.sync += self.cyclicRegisterSize.eq(self.internalReadPort.data.bit_select(0, 3))
+        #         m.d.sync += self.cyclicRegisterStartingByte.eq(self.internalReadPort.data.bit_select(4, 3))
 
-                with m.If(self.internalReadPort.data.bit_select(4, 3) + self.internalReadPort.data.bit_select(0, 3) <= 4):   # entire cyclic register value is available from memory
+        #         with m.If(self.internalReadPort.data.bit_select(4, 3) + self.internalReadPort.data.bit_select(0, 3) <= 4):   # entire cyclic register value is available from memory
                     
-                    # slice data and write to memory
+        #             # slice data and write to memory
                     
-                    m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicReadDataAddrOffset + self.currentCyclicRegister)
-                    # write address
-                    m.d.sync += self.internalWritePort.data.eq((self.readData_ToSerialPort >> (self.internalReadPort.data.bit_select(4, 3)*8)) & (0xFFFFFFFF >> (abs(4 - self.internalReadPort.data.bit_select(0, 3)) * 8)))
-                    m.d.sync += self.internalWritePort.en.eq(1)
+        #             m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicReadDataAddrOffset + self.currentCyclicRegister)
+        #             # write address
+        #             m.d.sync += self.internalWritePort.data.eq((self.readData_ToSerialPort >> (self.internalReadPort.data.bit_select(4, 3)*8)) & (0xFFFFFFFF >> (abs(4 - self.internalReadPort.data.bit_select(0, 3)) * 8)))
+        #             m.d.sync += self.internalWritePort.en.eq(1)
 
-                    m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG_WAIT)
+        #             m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG_WAIT)
 
 
-                    with m.If(self.internalReadPort.data.bit_select(4, 3) + self.internalReadPort.data.bit_select(0, 3) == 4):
+        #             with m.If(self.internalReadPort.data.bit_select(4, 3) + self.internalReadPort.data.bit_select(0, 3) == 4):
 
-                        # entire register was read, increment to next
-                        m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.rxDataBaseAddr + self.currentRxWord + 1)
-                        m.d.sync += self.currentRxWord.eq(self.currentRxWord + 1)
+        #                 # entire register was read, increment to next
+        #                 m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.rxDataBaseAddr + self.currentRxWord + 1)
+        #                 m.d.sync += self.currentRxWord.eq(self.currentRxWord + 1)
 
                 
-                with m.Else():  # cyclic data was not entirely available from serial port memory, unpack partial data
+        #         with m.Else():  # cyclic data was not entirely available from serial port memory, unpack partial data
 
-                    # save partial data
-                    m.d.sync += self.rxData.eq((self.readData_ToSerialPort >> (self.internalReadPort.data.bit_select(4, 3)*8)) & (0xFFFFFFFF >> (abs(4 - self.internalReadPort.data.bit_select(0, 3)) * 8)))
+        #             # save partial data
+        #             m.d.sync += self.rxData.eq((self.readData_ToSerialPort >> (self.internalReadPort.data.bit_select(4, 3)*8)) & (0xFFFFFFFF >> (abs(4 - self.internalReadPort.data.bit_select(0, 3)) * 8)))
 
-                    # read from next serial port rx register
-                    m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.rxDataBaseAddr + self.currentRxWord + 1)
-                    m.d.sync += self.currentRxWord.eq(self.currentRxWord + 1)
+        #             # read from next serial port rx register
+        #             m.d.sync += self.address_ToSerialPort.eq(self.serialPort.registers.rxDataBaseAddr + self.currentRxWord + 1)
+        #             m.d.sync += self.currentRxWord.eq(self.currentRxWord + 1)
 
-                    # wait a clock cycle for data to become available
-                    m.d.sync += self.state.eq(self.states.PARTIAL_SLICE_RX_REGISTER_DATA_WAIT)
+        #             # wait a clock cycle for data to become available
+        #             m.d.sync += self.state.eq(self.states.PARTIAL_SLICE_RX_REGISTER_DATA_WAIT)
 
-            # invalid config means we reached an unconfigured register, packet is done
-            with m.Elif(self.currentDeviceIndex < self.maxNumDevices-1):
-                m.d.sync += self.state.eq(self.states.START_RX)
+        #     # invalid config means we reached an unconfigured register, packet is done
+        #     with m.Elif(self.currentDeviceIndex < self.maxNumDevices-1):
+        #         m.d.sync += self.state.eq(self.states.START_RX)
 
-            with m.Else():
-                m.d.sync += self.updateBusy.eq(0)
-                m.d.sync += self.updateDone.eq(1)
+        #     with m.Else():
+        #         m.d.sync += self.updateBusy.eq(0)
+        #         m.d.sync += self.updateDone.eq(1)
 
-                # update status register
-                m.d.sync += self.internalReadWriteAddress.eq(0x02)
-                m.d.sync += self.internalWritePort.data.eq(0b10 | self.updateError.shift_left(2))
-                m.d.sync += self.internalWritePort.en.eq(1)
+        #         # update status register
+        #         m.d.sync += self.internalReadWriteAddress.eq(0x02)
+        #         m.d.sync += self.internalWritePort.data.eq(0b10 | self.updateError.shift_left(2))
+        #         m.d.sync += self.internalWritePort.en.eq(1)
 
-                m.d.sync += self.state.eq(self.states.IDLE)
-
-
-        with m.If(self.state == self.states.PARTIAL_SLICE_RX_REGISTER_DATA_WAIT):
-            m.d.sync += self.state.eq(self.states.PARTIAL_SLICE_RX_REGISTER_DATA)
+        #         m.d.sync += self.state.eq(self.states.IDLE)
 
 
-        with m.If(self.state == self.states.PARTIAL_SLICE_RX_REGISTER_DATA):
+        # with m.If(self.state == self.states.PARTIAL_SLICE_RX_REGISTER_DATA_WAIT):
+        #     m.d.sync += self.state.eq(self.states.PARTIAL_SLICE_RX_REGISTER_DATA)
+
+
+        # with m.If(self.state == self.states.PARTIAL_SLICE_RX_REGISTER_DATA):
             
-            # finish saving partial data
+        #     # finish saving partial data
 
-            # slice/combine data and write to memory
-            # write
-            m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicReadDataAddrOffset + self.currentCyclicRegister)
-            m.d.sync += self.internalWritePort.data.eq(self.rxData |
-                                                        (self.readData_ToSerialPort & 
-                                                         (0xFFFFFFFF >> (abs(4 - (self.cyclicRegisterStartingByte + self.cyclicRegisterSize)) * 8))) <<
-                                                         (abs(self.cyclicRegisterSize - self.cyclicRegisterStartingByte) * 8)
-                                                        )
-            m.d.sync += self.internalWritePort.en.eq(1)
+        #     # slice/combine data and write to memory
+        #     # write
+        #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceCyclicReadDataAddrOffset + self.currentCyclicRegister)
+        #     m.d.sync += self.internalWritePort.data.eq(self.rxData |
+        #                                                 (self.readData_ToSerialPort & 
+        #                                                  (0xFFFFFFFF >> (abs(4 - (self.cyclicRegisterStartingByte + self.cyclicRegisterSize)) * 8))) <<
+        #                                                  (abs(self.cyclicRegisterSize - self.cyclicRegisterStartingByte) * 8)
+        #                                                 )
+        #     m.d.sync += self.internalWritePort.en.eq(1)
 
-            m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG_WAIT)
+        #     m.d.sync += self.state.eq(self.states.GET_RX_REGISTER_CONFIG_WAIT)
 
 
-        with m.If(self.state == self.states.START_UNPACK_RX_PACKET):
+        # with m.If(self.state == self.states.START_UNPACK_RX_PACKET):
             
-            with m.If(self.currentDeviceIndex != 0):
-                # update device status bits
-                m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceStatusAddrOffset)
-                m.d.sync += self.internalWritePort.data.eq(self.rxResponseFault | self.rxNotFinishedFault.shift_left(1) | self.rxInvalidCRCFault.shift_left(2))
-                m.d.sync += self.internalWritePort.en.eq(1)
+        #     with m.If(self.currentDeviceIndex != 0):
+        #         # update device status bits
+        #         m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex-1)*self.deviceRegisterCount + self.deviceStatusAddrOffset)
+        #         m.d.sync += self.internalWritePort.data.eq(self.rxResponseFault | self.rxNotFinishedFault.shift_left(1) | self.rxInvalidCRCFault.shift_left(2))
+        #         m.d.sync += self.internalWritePort.en.eq(1)
             
-            with m.If(self.currentDeviceIndex < self.maxNumDevices-1):
-                m.d.sync += self.state.eq(self.states.START_RX)
+        #     with m.If(self.currentDeviceIndex < self.maxNumDevices-1):
+        #         m.d.sync += self.state.eq(self.states.START_RX)
             
-            with m.Else():  # update complete
+        #     with m.Else():  # update complete
 
-                m.d.sync += self.updateBusy.eq(0)
-                m.d.sync += self.updateDone.eq(1)
+        #         m.d.sync += self.updateBusy.eq(0)
+        #         m.d.sync += self.updateDone.eq(1)
 
-                # update status register
-                m.d.sync += self.internalReadWriteAddress.eq(0x02)
-                m.d.sync += self.internalWritePort.data.eq(self.updateBusy | self.updateDone.shift_left(1) | self.updateError.shift_left(2))
-                m.d.sync += self.internalWritePort.en.eq(1)
+        #         # update status register
+        #         m.d.sync += self.internalReadWriteAddress.eq(0x02)
+        #         m.d.sync += self.internalWritePort.data.eq(self.updateBusy | self.updateDone.shift_left(1) | self.updateError.shift_left(2))
+        #         m.d.sync += self.internalWritePort.en.eq(1)
 
-                m.d.sync += self.state.eq(self.states.IDLE)
+        #         m.d.sync += self.state.eq(self.states.IDLE)
 
 
-        with m.If(self.state == self.states.START_RX):
+        # with m.If(self.state == self.states.START_RX):
 
-            m.d.sync += self.address_ToSerialPort.eq(0x00)
-            m.d.sync += self.writeData_ToSerialPort.eq(0b10 | self.rxPacketSize.shift_left(24))     # trigger RX start and set rx size
-            m.d.sync += self.writeEnable_ToSerialPort.eq(1)
+        #     m.d.sync += self.address_ToSerialPort.eq(0x00)
+        #     m.d.sync += self.writeData_ToSerialPort.eq(0b10 | self.rxPacketSize.shift_left(24))     # trigger RX start and set rx size
+        #     m.d.sync += self.writeEnable_ToSerialPort.eq(1)
 
-            # reset device signals
-            m.d.sync += self.currentTxWord.eq(0)
-            m.d.sync += self.currentTxByte.eq(0)
-            m.d.sync += self.txData.eq(0)
-            m.d.sync += self.cylicDataEnabled.eq(0)
-            m.d.sync += self.currentCyclicRegister.eq(0)
-            m.d.sync += self.cyclicRegisterSize.eq(0)
-            m.d.sync += self.cyclicRegisterStartingByte.eq(0)
-            m.d.sync += self.rxResponseFault.eq(0)
-            m.d.sync += self.rxNotFinishedFault.eq(0)
-            m.d.sync += self.rxInvalidCRCFault.eq(0)
+        #     # reset device signals
+        #     m.d.sync += self.currentTxWord.eq(0)
+        #     m.d.sync += self.currentTxByte.eq(0)
+        #     m.d.sync += self.txData.eq(0)
+        #     m.d.sync += self.cylicDataEnabled.eq(0)
+        #     m.d.sync += self.currentCyclicRegister.eq(0)
+        #     m.d.sync += self.cyclicRegisterSize.eq(0)
+        #     m.d.sync += self.cyclicRegisterStartingByte.eq(0)
+        #     m.d.sync += self.rxResponseFault.eq(0)
+        #     m.d.sync += self.rxNotFinishedFault.eq(0)
+        #     m.d.sync += self.rxInvalidCRCFault.eq(0)
 
-            m.d.sync += self.currentDeviceIndex.eq(self.currentDeviceIndex+1)   # increment to next device
+        #     m.d.sync += self.currentDeviceIndex.eq(self.currentDeviceIndex+1)   # increment to next device
             
-            m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG_WAIT)
-            # read from device config register
-            m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex+1)*self.deviceRegisterCount + self.deviceControlAddrOffset)
+        #     m.d.sync += self.state.eq(self.states.GET_TX_DEVICE_CONFIG_WAIT)
+        #     # read from device config register
+        #     m.d.sync += self.internalReadWriteAddress.eq(self.devicesBaseAddr + (self.currentDeviceIndex+1)*self.deviceRegisterCount + self.deviceControlAddrOffset)
 
             
         

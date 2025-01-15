@@ -9,7 +9,6 @@ jschon==0.11.1
 kiwisolver==1.4.7
 MarkupSafe==2.1.5
 matplotlib==3.9.2
-numpy==2.1.1
 packaging==24.1
 pillow==10.4.0
 pyparsing==3.1.4

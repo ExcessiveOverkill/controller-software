@@ -1,15 +1,18 @@
 hardware_slots:
-  port_a:
-    card_type:  "serial interface card"
+  slot_a:
+    #TODO: support more than one card type per slot?
+    card_type:  "serial interface card" 
     card_options:
-      port_0: [fanuc_rs422_encoder, my_encoder]   # set which internal interfaces should be connected to each serial port. If multiple are given, a Mux is generated to switch between them at runtime
+      # set which internal interfaces should be connected to each serial port.
+      # TODO: support more than one internal interface per serial port?
+      port_0: [fanuc_rs422_encoder]
       port_1: [serial_device]
 
-  port_b:
+  slot_b:
 
-  port_c:
+  slot_c:
 
-  port_d:
+  slot_d:
 
 fpga_blocks:  # extra internal functions
   cascaded_PI_controller:
