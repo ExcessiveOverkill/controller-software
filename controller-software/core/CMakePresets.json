@@ -1,0 +1,31 @@
+{
+    "version": 3,
+    "configurePresets": [
+      {
+        "name": "default",
+        "hidden": true,
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {}
+      },
+      {
+        "name": "ZYNQ-Debug",
+        "description": "Cross compile for ARM Cortex-A9 with NEON support",
+        "inherits": "default",
+        "toolchainFile": "${sourceDir}/cmake/zynq_debug.cmake",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug"
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "ZYNQ-Debug",
+        "configurePreset": "ZYNQ-Debug",
+        "description": "Build debug version for ZYNQ",
+        "jobs": 4
+      }
+    ],
+    "testPresets": []
+  }
+  

@@ -1,0 +1,21 @@
+hardware_slots:
+  slot_a:
+    #TODO: support more than one card type per slot?
+    card_type:  "serial interface card" 
+    card_options:
+      # set which internal interfaces should be connected to each serial port.
+      # TODO: support more than one internal interface per serial port?
+      port_0: [fanuc_rs422_encoder]
+      port_1: [serial_device]
+
+  slot_b:
+
+  slot_c:
+
+  slot_d:
+
+fpga_blocks:  # extra internal functions
+  cascaded_PI_controller:
+    count: 1
+    parameters: # build parameters for the block when instantiating it
+      instances: 1

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket SPA</title>
+    <style>
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="loginPage" class="page active">
+        <h1>Login</h1>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button id="login">Login</button>
+    </div>
+    <div id="homePage" class="page">
+        <h1>Home</h1>
+        <p>Welcome to the home page!</p>
+        <button id="print">Print number</button>
+\       <button id="logout">Logout</button>
+        
+    </div>
+
+    <script>
+        let ws;
+        let requestId = 0;
+
+        // Utility function to create JSON-RPC 2.0 requests
+        const createRpcRequest = (method, params = []) => {
+            return {
+                jsonrpc: '2.0',
+                id: requestId++,
+                method,
+                params
+            };
+        };
+
+        // WebSocket connection handler
+        const connectWebSocket = () => {
+            ws = new WebSocket('wss://localhost:443');
+
+            ws.onopen = () => {
+                console.log('WebSocket connection opened');
+            };
+
+            ws.onmessage = (event) => {
+                const response = JSON.parse(event.data);
+                handleResponse(response);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket connection closed');
+            };
+        };
+
+        const handleResponse = (response) => {
+
+            console.log(response);
+
+            // Handle error responses
+            if (response.error) {
+                console.error(`Error ${response.error.code}: ${response.error.message}`);
+            }
+            else{
+                // Handle login response
+                if (response.id === loginRequestId) {
+                    if (response.result && response.result.success) {
+                        document.getElementById('loginPage').classList.remove('active');
+                        document.getElementById('homePage').classList.add('active');
+                    } else {
+                        alert('Login failed');
+                    }
+                }
+
+            }
+        };
+
+        // Login button event listener
+        let loginRequestId;
+        document.getElementById('login').onclick = () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            connectWebSocket();
+
+            ws.onopen = () => {
+                const loginRequest = createRpcRequest('Login', [username, password]);
+                loginRequestId = loginRequest.id;
+                ws.send(JSON.stringify(loginRequest));
+            };
+        };
+
+        document.getElementById('print').onclick = () => {
+            const value = 123456;
+            const printRequest = createRpcRequest('print_uint32', [value]);
+            ws.send(JSON.stringify(printRequest));
+        };
+
+        // Logout button event listener
+        document.getElementById('logout').onclick = () => {
+            const logoutRequest = createRpcRequest('Logout');
+            ws.send(JSON.stringify(logoutRequest));
+            ws.close();
+            document.getElementById('homePage').classList.remove('active');
+            document.getElementById('loginPage').classList.add('active');
+        };
+    </script>
+</body>
+</html>

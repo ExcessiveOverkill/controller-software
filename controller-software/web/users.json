@@ -1,0 +1,10 @@
+{
+    "admin": {
+        "password": "password",
+        "allowedFunctions": ["Machine_on", "Machine_off", "print_uint32", "Logout"]
+    },
+    "user1": {
+        "password": "user1pass",
+        "allowedFunctions": ["Machine_on", "Logout"]
+    }
+}

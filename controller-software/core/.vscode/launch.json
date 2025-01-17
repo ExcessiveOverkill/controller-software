@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Remote Debug on Zynq",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/zynq_files/controller/bin/controller_core",
+            "args": [],
+            "stopAtEntry": true,
+            "targetArchitecture": "arm",
+            "cwd": "${workspaceFolder}/build/ZYNQ-Debug",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb-multiarch", // Ensure gdb-multiarch is installed in WSL
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Launch gdbserver on Zynq",
+            "miDebuggerServerAddress": "192.168.1.238:1234", // Replace with your SSH alias and port
+            "sourceFileMap": {
+                "/home/em-os/controller/": "${workspaceFolder}/zynq_files/controller/" // Adjust if your source files are in a different location
+            },
+            "logging": {
+                "trace": true,
+                "traceResponse": true,
+                "engineLogging": true
+            }
+        }
+    ]
+}
