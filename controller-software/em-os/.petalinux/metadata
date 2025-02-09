@@ -1,5 +1,0 @@
-PETALINUX_VER=2023.1
-VALIDATE_HW_CHKSUM=1
-YOCTO_SDK=839cb8db4728cc0ea4ad3c5083907dd2
-HARDWARE_PATH=/home/excessive/github/controller-software/controller-software/petalinux/controller_firmware_top.xsa
-HDF_EXT=xsa
