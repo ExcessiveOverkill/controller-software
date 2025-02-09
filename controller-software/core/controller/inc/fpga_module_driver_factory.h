@@ -9,16 +9,19 @@
 #include <json.hpp>
 
 #include "fpga_instructions.h"
+#include "node_core.h"
 
 using json = nlohmann::json;
 
 // base driver for which all other module drivers will inherit from
 class base_driver {
 public:
-    const uint32_t* microseconds = nullptr;    // pointer to the microseconds counter in the fpga manager, used for timing
+    const uint64_t* microseconds = nullptr;    // pointer to the microseconds counter in the fpga manager, used for timing
 
-    virtual uint32_t load_config(json config, std::vector<uint64_t>* instructions) = 0; // configures the internal memory pointers
-    //virtual uint32_t get_base_instructions(std::vector<uint64_t>* instructions) = 0; // gets the base instructions for the driver, just for syncing required memory with the PS
+    virtual uint32_t load_config(json* config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr) = 0; // configures the internal memory pointers and user nodes
+    
+    virtual uint32_t custom_load_config() = 0; // custom configuration for the driver
+
     virtual uint32_t run() = 0; // run the driver, called after each FPGA update
 
     fpga_mem base_mem;  // this is what is required for MINIMUM functionality of a driver
@@ -37,6 +40,11 @@ protected:
     bool load_json_value(const json& config, const std::string& value_name, T* dest); 
 
     uint8_t node_address = 255;   // address of the node in the FPGA
+
+    Node_Core* node_core = nullptr; // pointer to the node core for the FPGA
+    fpga_instructions* fpga_instr = nullptr; // pointer to the fpga instructions for the FPGA
+    json* config = nullptr; // pointer to the json config for the driver
+    Address_Map_Loader loader;  // loader for the address map
 };
 
 
@@ -51,8 +59,6 @@ bool base_driver::load_json_value(const json& config, const std::string& value_n
     *dest = config[value_name].get<T>();
     return true;
 }
-
-
 
 
 

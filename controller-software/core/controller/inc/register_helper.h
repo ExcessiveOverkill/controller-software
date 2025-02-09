@@ -1,6 +1,5 @@
 #include "json.hpp"
 #include <string>
-#include "fpga_instructions.h"
 
 #pragma once
 
@@ -12,42 +11,21 @@ Helper class to load json address file
 Goal is to make functions/objects that pair with the functions/objects used in the HDL code to initially create the address map
 */
 
-enum class variable_type : uint8_t {
-    UINT8,
-    UINT16,
-    UINT32,
-    INT8,
-    INT16,
-    INT32,
-    //FLOAT,    // not implemented yet
-    BOOL,
+struct fpga_mem{    // memory allocated to the driver by the FPGA manager
+    uint32_t software_PS_PL_size = 0;    // must be in 4 byte increments
+    uint32_t hardware_PS_PL_size = 0; // in 32 bit words
+    void* software_PS_PL_ptr = nullptr;  // pointer in user space
+    uint32_t hardware_PS_PL_mem_offset = 0;  // offset in the PS->PL memory, used for instructions
+
+    uint32_t software_PL_PS_size = 0;    // must be in 4 byte increments
+    uint32_t hardware_PL_PS_size = 0; // in 32 bit words
+    void* software_PL_PS_ptr = nullptr;  // pointer in user space
+    uint32_t hardware_PL_PS_mem_offset = 0;  // offset in the PS->PL memory, used for instructions
 };
-
-enum class variable_format : uint8_t {
-    BOOL,
-    SIGNED,
-    UNSIGNED,
-    //FLOAT,    // not implemented yet
-    PACKED,
-};
-
-
-struct register_json_data{
-    uint16_t node_memory_address = 0;
-    uint8_t count = 0;
-    uint8_t width = 0;
-    uint16_t group_index = 0;
-    uint8_t starting_bit = 0;
-    variable_format format;
-    bool read = false;      // read and write registers are not curerntly supported
-    bool write = false;
-};
-
-
 
 class Register {
     public:
-        Register(json* json_data, const std::string register_name, uint16_t index, uint16_t parent_absolute_address);
+        Register(json* json_data, const std::string register_name, uint16_t index, uint16_t parent_absolute_address, std::string prefix_name);
         ~Register();
 
         template <typename T = uint32_t>
@@ -58,6 +36,7 @@ class Register {
 
         uint32_t create_copy_instructions(std::vector<uint64_t>*);    // create a copy instruction to copy the register to/from the PS/PL.
 
+        //uint32_t create_copy_instruction(fpga_instructions::copy** cpy);    // create a copy instruction to copy the register to/from the PS/PL.
 
         // Read the register
         template <typename T = uint32_t>
@@ -69,6 +48,14 @@ class Register {
 
         // write a single bit
         bool set_bit(bool value, uint8_t index);
+
+        enum class variable_format : uint8_t {
+            BOOL,
+            SIGNED,
+            UNSIGNED,
+            //FLOAT,    // not implemented yet
+            PACKED,
+        };
 
         struct PL_data{
             std::string name;
@@ -82,6 +69,7 @@ class Register {
             bool read = false;
             bool write = false;
             uint8_t node_index = 0;
+            variable_format var_format = variable_format::UNSIGNED;
         };
 
         // these are only set if the data is being synced with the PS
@@ -95,6 +83,8 @@ class Register {
         PS_data ps_data;
 
         bool is_sub_register = false;
+
+        std::string full_name;
 
         
     protected:
@@ -121,23 +111,25 @@ class Register {
 
 class Group {
     public:
-    struct data{
-        std::string name;
-        uint16_t address_offset = 0;
-        uint16_t absolute_address = 0;
-        uint32_t alignment = 1;
-        uint16_t count = 1;
-        uint16_t index = 0;
-    };
+        struct data{
+            std::string name;
+            uint16_t address_offset = 0;
+            uint16_t absolute_address = 0;
+            uint32_t alignment = 1;
+            uint16_t count = 1;
+            uint16_t index = 0;
+        };
 
-    Group(json* json_data, const std::string group_name, uint16_t index, uint16_t parent_absolute_address);
+        Group(json* json_data, const std::string group_name, uint16_t index, uint16_t parent_absolute_address, std::string prefix_name);
 
-    template <typename T = uint32_t>
-    Register* get_register(std::string register_name, uint16_t index);    // get a register in the group
+        template <typename T = uint32_t>
+        Register* get_register(std::string register_name, uint16_t index);    // get a register in the group
 
-    Group* get_group(std::string group_name, uint16_t index);    // get a group in the group
-        
-    data group_data;
+        Group* get_group(std::string group_name, uint16_t index);    // get a group in the group
+            
+        data group_data;
+
+        std::string full_name;
 
     private:
         void get_group_data(const std::string group_name);    // get the data for a group
@@ -167,8 +159,8 @@ class Address_Map_Loader {
         Address_Map_Loader();
         ~Address_Map_Loader();
 
-        void setup(json* node_config, fpga_mem* base_mem, uint8_t node_index, std::vector<uint64_t>* instructions);   // setup the loader
-        
+        void setup(std::string name, json* config, fpga_mem* base_mem);   // setup the loader
+
         template <typename T = uint32_t>
         Register* get_register(std::string register_name, uint16_t index);    // get a full register, types are only for checking compatibility
 
@@ -176,11 +168,15 @@ class Address_Map_Loader {
 
         void sync_with_PS(Register* reg);    // sync a register with the PS, only needed for parent registers (not sub-registers), must be called before sub-registers are created
 
+        Register* get_register_by_full_name(std::string full_name);    // get a register by the full name
+
+        uint8_t get_node_index();    // get the node index
+
         std::vector<uint64_t>* instructions = nullptr;
 
     private:
 
-        json* node_config = nullptr;
+        json* config = nullptr;
 
         fpga_mem* base_mem = nullptr;
 
@@ -190,16 +186,17 @@ class Address_Map_Loader {
         uint32_t software_PS_PL_size = 0;
         uint32_t software_PL_PS_size = 0;
 
-        uint8_t node_index = 0;
+        uint8_t node_index = 255;
 
         Group* base_group = nullptr;
 
-        //template <typename T>
-        //void verify_type_compatibility(register_json_data* config);    // make sure the type is compatible with the type in the json file
+        //fpga_instructions* fpga_instr = nullptr;
 
         template <typename T>
         bool load_json_value(const json& config, const std::string& value_name, T* dest);    // helper function for loading values from the config file
         
+        std::string module_name = "";
+        uint8_t module_index = 0;   // index of the module if there are multiple instances of the same module in the fpga
 };
 
 class Dynamic_Register{

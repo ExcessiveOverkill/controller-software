@@ -3,28 +3,6 @@
 
 #pragma once
 
-// Define static member variables
-
-uint32_t Base_API::data_buffer_size = 0;
-uint32_t Base_API::control_buffer_size = 0;
-
-void* Base_API::web_to_controller_data_base_address = nullptr;
-void* Base_API::controller_to_web_data_base_address = nullptr;
-
-void* Base_API::web_to_controller_control_base_address = nullptr;
-void* Base_API::controller_to_web_control_base_address = nullptr;
-
-volatile uint32_t* Base_API::persistent_web_mem = nullptr;
-
-uint32_t Base_API::web_to_controller_data_mem_index = 0;
-uint32_t Base_API::controller_to_web_data_mem_index = 0;
-
-uint32_t Base_API::web_to_controller_control_mem_index = 0;
-uint32_t Base_API::controller_to_web_control_mem_index = 0;
-
-uint32_t Base_API::web_to_controller_call_count = 0;
-uint32_t Base_API::controller_to_web_call_count = 0;
-
 #define MAX_COMPLETED_CALL_TO_GET 10
 
 class web_api {
@@ -32,7 +10,7 @@ class web_api {
         std::vector<std::shared_ptr<Base_API>> calls;
         std::vector<std::shared_ptr<Base_API>> completed_calls;
         shared_mem shared_mem_obj;
-        default_call default_call_obj;
+        Base_API default_call_obj;
         api_call_id_t api_call_id = api_call_id_t::DEFAULT;
 
         uint32_t get_next_api_call_id_from_shared_mem();

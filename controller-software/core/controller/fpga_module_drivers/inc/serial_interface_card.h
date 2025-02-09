@@ -1,5 +1,5 @@
 #include "fpga_module_driver_factory.h"
-#include "register_helper.h"
+//#include "register_helper.h"
 
 
 #pragma once
@@ -9,8 +9,9 @@ public:
     serial_interface_card();
     ~serial_interface_card();
 
-    uint32_t load_config(json config, std::vector<uint64_t>* instructions) override;
-    //uint32_t get_base_instructions(std::vector<uint64_t>* instructions) override;
+    uint32_t load_config(json* config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr) override;
+    
+    uint32_t custom_load_config() override;
 
     uint32_t run() override;
 

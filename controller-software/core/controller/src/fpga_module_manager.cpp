@@ -2,7 +2,6 @@
 #include "fpga_module_driver_factory.h"
 #include <fstream>
 #include <chrono>
-#include "register_helper.h"
 
 fpga_module_manager::fpga_module_manager(){
     config = json::object();
@@ -115,12 +114,14 @@ uint32_t fpga_module_manager::load_drivers(){
 
     for (json::iterator it = config.begin(); it != config.end(); ++it) {
         json node_config = it.value();
+        std::string node_name = it.key();
+        std::cout << "Loading node: " << node_name << std::endl;
 
         if(!node_config.contains("node")){    // skip if its not a node
             continue;
         }
         node_count++;
-        uint32_t ret = load_driver(node_config);
+        uint32_t ret = load_driver(config, node_name);
         if(ret != 0){
             missing_driver = true;
         }
@@ -128,7 +129,7 @@ uint32_t fpga_module_manager::load_drivers(){
 
     // add some NOP instructions to make sure the final send instructions are completed before the axi transfer starts
     for(int i = 0; i < (node_count+2)*4; i++){
-        fpga_instructions.push_back(create_instruction_NOP());
+        fpga_instructions_old.push_back(create_instruction_NOP());
     }
 
     if(missing_driver){
@@ -150,8 +151,6 @@ std::shared_ptr<base_driver> fpga_module_manager::get_driver(uint32_t index){
 uint32_t fpga_module_manager::run_update(){
     // run the update sequence for the FPGA
 
-    microseconds = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
     // run  the drivers
     for(auto driver : drivers){
         driver->run();
@@ -167,7 +166,7 @@ uint32_t fpga_module_manager::write_instructions_to_fpga(){
     // write the instructions to the FPGA memory
     // TODO: add support for multiple instruction blocks (when instruction count becomes very large)
     uint32_t index = 0;
-    for(auto instruction : fpga_instructions){
+    for(auto instruction : fpga_instructions_old){
         reinterpret_cast<uint64_t*>(PS_PL_dma_instructions_ptr)[index] = instruction;
         index++;
     }
@@ -175,9 +174,9 @@ uint32_t fpga_module_manager::write_instructions_to_fpga(){
     return 0;
 }
 
-uint32_t fpga_module_manager::load_driver(json node_config){
+uint32_t fpga_module_manager::load_driver(json config, std::string module_name){
     // load driver based on json config file
-    json compatible_drivers = node_config["node"]["compatible_drivers"];
+    json compatible_drivers = config[module_name]["node"]["compatible_drivers"];
 
     bool driver_found = false;
 
@@ -199,12 +198,12 @@ uint32_t fpga_module_manager::load_driver(json node_config){
     }
 
     if (!driver_found) {
-        std::cerr << "Error: No compatible drivers found for node: " << node_config["node"]["name"].get<std::string>() << ", it will not be accessible" << std::endl;
+        std::cerr << "Error: No compatible drivers found for node: " << module_name << ", it will not be accessible" << std::endl;
         return 1;
     }
 
     // configure driver
-    drivers.back()->microseconds = &microseconds;   // used for syncronized timing
+    drivers.back()->microseconds = microseconds;   // used for syncronized timing
 
     if(set_memory_pointers(&drivers.back()->base_mem) != 0){
         std::cerr << "Failed to set memory pointers" << std::endl;
@@ -212,7 +211,7 @@ uint32_t fpga_module_manager::load_driver(json node_config){
         return 2;
     }
 
-    if(drivers.back()->load_config(node_config, &fpga_instructions) != 0){
+    if(drivers.back()->load_config(&config, module_name, node_core, &fpga_instr) != 0){
         std::cerr << "Failed to load driver post config" << std::endl;
         drivers.pop_back();
         return 3;
@@ -226,6 +225,17 @@ uint32_t fpga_module_manager::load_driver(json node_config){
     }
 
     return 0;
+}
+
+uint32_t fpga_module_manager::save_ps_nodes(std::string file_path){
+    // save the fpga driver PS nodes to a json file so the user can see what is available
+
+    return 1;   // not implemented yet
+}
+
+void fpga_module_manager::set_microseconds(const uint64_t* microseconds){
+    // set the microseconds pointer for the drivers
+    this->microseconds = microseconds;
 }
 
 template <typename T>
@@ -285,3 +295,9 @@ uint32_t fpga_module_manager::create_global_variables(){
     return 0;
 }
 
+
+uint32_t fpga_module_manager::compile_instructions(){
+    // compile the instructions for the FPGA
+    fpga_instr.compile();
+    return 0;
+}

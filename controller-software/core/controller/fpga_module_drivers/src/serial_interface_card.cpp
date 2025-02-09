@@ -8,25 +8,59 @@ serial_interface_card::serial_interface_card(){
 serial_interface_card::~serial_interface_card(){
 }
 
-uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* instructions){
+uint32_t serial_interface_card::load_config(json* config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr){
+    this->node_core = node_core;
+    this->fpga_instr = fpga_instr;
+    this->config = config;
 
-    if(!load_json_value(config, "node_address", &node_address)){
-        std::cerr << "Failed to load node address" << std::endl;
+    loader.setup(module_name, config, &base_mem);
+
+    node_address = loader.get_node_index();
+
+    if(custom_load_config() != 0){
+        std::cerr << "Failed to load custom config" << std::endl;
         return 1;
     }
 
-    // configure registers
-    Address_Map_Loader loader;
-    loader.setup(&config, &base_mem, node_address, instructions);
+    return 0;
+}
 
+
+uint32_t serial_interface_card::custom_load_config(){
+
+    // load register from config json
     auto port_mode_enable = loader.get_register("port_mode_enable", 0);
-    loader.sync_with_PS(port_mode_enable);
+
+    // create PS/PL node varaiable to sync with
+    /* 
+    
+    TODO: make these objects
+
+    should be accessible like global variables in the node editor
+
+    take in the register object and a name when creating
+
+    support dynamic register objects
+
+    contains a copy object for fpga instructions
+
+    copy object may update the related module's copy memory address directly in the instruction vector once compiled (for dynamic registers)
+
+    node object replaces how registers currently handle assigning and accessing PS memory
+
+    */
+
+    //loader.sync_with_PS(port_mode_enable);
+    // auto cpy = loader.sync_with_PS_new(port_mode_enable);
+    // cpy->set_time_reference(0);
+    // cpy->set_execution_window(0, 1000);
+    // cpy->set_write_priority();
     regs2.rs485_mode_enable = port_mode_enable->get_register("rs485_mode_enable");
     regs2.rs422_mode_enable = port_mode_enable->get_register("rs422_mode_enable");
     regs2.quadrature_mode_enable = port_mode_enable->get_register("rs422_mode_enable");
 
     auto i2c_config = loader.get_register("i2c_config", 0);
-    loader.sync_with_PS(i2c_config);
+    //loader.sync_with_PS(i2c_config);
     regs2.i2c_config_read_mode = i2c_config->get_register("read");
     regs2.i2c_config_device_address = i2c_config->get_register("device_address");
     regs2.i2c_config_reg_address = i2c_config->get_register("register_address");
@@ -34,12 +68,12 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
     regs2.i2c_config_start = i2c_config->get_register("start");
 
     regs2.i2c_data_tx = loader.get_register("i2c_data_tx", 0);
-    loader.sync_with_PS(regs2.i2c_data_tx);
+    //loader.sync_with_PS(regs2.i2c_data_tx);
     regs2.i2c_data_rx = loader.get_register("i2c_data_rx", 0);
-    loader.sync_with_PS(regs2.i2c_data_rx);
+    //loader.sync_with_PS(regs2.i2c_data_rx);
 
     auto i2c_status = loader.get_register("i2c_status", 0);
-    loader.sync_with_PS(i2c_status);
+    //loader.sync_with_PS(i2c_status);
     regs2.i2c_status_busy = i2c_status->get_register("busy");
     regs2.i2c_status_error = i2c_status->get_register("error");
     

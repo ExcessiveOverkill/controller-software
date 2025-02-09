@@ -3,7 +3,7 @@
 #include "register_helper.h"
 
 
-Register::Register(json* json_data, const std::string register_name, uint16_t register_index, uint16_t parent_absolute_address){
+Register::Register(json* json_data, const std::string register_name, uint16_t register_index, uint16_t parent_absolute_address, std::string prefix_name){
     // this json object must contain the register object
     if (!json_data->contains(register_name)){
         throw std::runtime_error("Register not found");
@@ -16,6 +16,8 @@ Register::Register(json* json_data, const std::string register_name, uint16_t re
     pl_data.absolute_address = parent_absolute_address + pl_data.address_offset + register_index;
 
     pl_data.bit_mask = (1 << pl_data.width) - 1;    // mask is not shifted to the correct position, it is just the correct width
+
+    full_name = prefix_name + "." + pl_data.name + ":" + std::to_string(pl_data.index);
 }
 
 Register::~Register(){
@@ -27,16 +29,30 @@ Address_Map_Loader::Address_Map_Loader(){
 Address_Map_Loader::~Address_Map_Loader(){
 }
 
-void Address_Map_Loader::setup(json* node_config, fpga_mem* base_mem, uint8_t node_index, std::vector<uint64_t>* instructions){
-    this->node_config = node_config;
+void Address_Map_Loader::setup(std::string name, json* config, fpga_mem* base_mem){
+    this->module_name = name;
+    this->config = config;
     this->base_mem = base_mem;
-    this->node_index = node_index;
-    this->instructions = instructions;
 
-    json data = (*node_config)["node"];
+    node_index = (*config)[module_name]["node_address"].get<uint8_t>();
 
-    base_group = new Group(&data, "base_group", 1, 0);
+    json data = (*config)[module_name]["node"];
 
+    base_group = new Group(&data, "base_group", 1, 0, "");
+    base_group->full_name = module_name + ":" + std::to_string(module_index);    // override the base group name to just be the module name
+}
+
+Register* Address_Map_Loader::get_register_by_full_name(std::string full_name){
+    // get a register by the full name
+    
+    // TODO: implement
+    
+    return nullptr;
+}
+
+uint8_t Address_Map_Loader::get_node_index(){
+    // get the node index
+    return node_index;
 }
 
 Dynamic_Register::Dynamic_Register(Address_Map_Loader* loader, Register* reg){
@@ -68,10 +84,10 @@ uint32_t Register::create_copy_instructions(std::vector<uint64_t>* instructions)
     // create a copy instruction to copy the register to/from the PS/PL.
 
     if(pl_data.read){
-        instructions->push_back(create_instruction_COPY(pl_data.node_index, pl_data.absolute_address, 0, ps_data.hardware_data_ptr));
+        //instructions->push_back(create_instruction_COPY(pl_data.node_index, pl_data.absolute_address, 0, ps_data.hardware_data_ptr));
     }
     else if(pl_data.write){
-        instructions->push_back(create_instruction_COPY(0, ps_data.hardware_data_ptr, pl_data.node_index, pl_data.absolute_address));
+        //instructions->push_back(create_instruction_COPY(0, ps_data.hardware_data_ptr, pl_data.node_index, pl_data.absolute_address));
     }
     else{
         throw std::runtime_error("Register must be read or write");
@@ -79,6 +95,22 @@ uint32_t Register::create_copy_instructions(std::vector<uint64_t>* instructions)
 
     return 0;
 }
+
+// uint32_t Register::create_copy_instruction(fpga_instructions::copy** cpy){
+//     // create a copy instruction to copy the register to/from the PS/PL.
+
+//     if(pl_data.read){
+//         *cpy = new fpga_instructions::copy(pl_data.node_index, pl_data.absolute_address, 0, ps_data.hardware_data_ptr);
+//     }
+//     else if(pl_data.write){
+//         *cpy = new fpga_instructions::copy(0, ps_data.hardware_data_ptr, pl_data.node_index, pl_data.absolute_address);
+//     }
+//     else{
+//         throw std::runtime_error("Register must be read or write");
+//     }
+
+//     return 0;
+// }
 
 void Address_Map_Loader::sync_with_PS(Register* reg){
     // sync the register with the PS, only needed for parent registers (not sub-registers), must be called before sub-registers are created
@@ -109,6 +141,37 @@ void Address_Map_Loader::sync_with_PS(Register* reg){
     return;
 }
 
+// fpga_instructions::copy* Address_Map_Loader::sync_with_PS_new(Register* reg){
+//     // sync the register with the PS, only needed for parent registers (not sub-registers), must be called before sub-registers are created
+
+//     if(reg->is_sub_register){
+//         throw std::runtime_error("Sync with PS can only be called on parent registers");
+//     }
+
+//     if(reg->pl_data.read){
+//         reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PL_PS_ptr) + base_mem->software_PL_PS_size / 4; // /4 to convert to 32 bit words
+//         reg->ps_data.hardware_data_ptr = base_mem->hardware_PL_PS_mem_offset + base_mem->hardware_PL_PS_size;
+//         base_mem->software_PL_PS_size += 4;  // increment by 4 bytes
+//         base_mem->hardware_PL_PS_size += 1;  // increment by 1 32 bit word
+//     }
+//     else if(reg->pl_data.write){
+//         reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PS_PL_ptr) + base_mem->software_PS_PL_size / 4; // /4 to convert to 32 bit words
+//         reg->ps_data.hardware_data_ptr = base_mem->hardware_PS_PL_mem_offset + base_mem->hardware_PS_PL_size;
+//         base_mem->software_PS_PL_size += 4;  // increment by 4 bytes
+//         base_mem->hardware_PS_PL_size += 1;  // increment by 1 32 bit word
+//     }
+//     else{
+//         throw std::runtime_error("Register must be read or write");
+//     }
+
+//     reg->pl_data.node_index = node_index;
+
+//     fpga_instructions::copy* cpy = nullptr;
+//     reg->create_copy_instruction(&cpy);
+//     fpga_instr->add(cpy);
+    
+//     return cpy;
+// }
 
 void Register::get_register_data(const std::string register_name){
     // get the data for a group
@@ -121,6 +184,21 @@ void Register::get_register_data(const std::string register_name){
     ret &= load_json_value(*json_data, "bank_size", &pl_data.bank_size);
     ret &= load_json_value(*json_data, "width", &pl_data.width);
     ret &= load_json_value(*json_data, "starting_bit", &pl_data.starting_bit);
+    
+    // std::string data_type;
+    // ret &= load_json_value(*json_data, "type", &data_type);
+    // if(data_type == "bool"){
+    //     pl_data.var_format = variable_format::BOOL;
+    // }
+    // else if(data_type == "signed"){
+    //     pl_data.var_format = variable_format::SIGNED;
+    // }
+    // else if(data_type == "unsigned"){
+    //     pl_data.var_format = variable_format::UNSIGNED;
+    // }
+    // else{
+    //     throw std::runtime_error("Invalid data type");
+    // }
 
     std::string rw;
     ret &= load_json_value(*json_data, "rw", &rw);
@@ -141,7 +219,7 @@ void Register::get_register_data(const std::string register_name){
     return;
 }
 
-Group::Group(json* json_data, const std::string group_name, uint16_t index, uint16_t parent_absolute_address){
+Group::Group(json* json_data, const std::string group_name, uint16_t index, uint16_t parent_absolute_address, std::string prefix_name){
     // this json object must contain the group object
     if (!json_data->contains(group_name)){
         throw std::runtime_error("Group not found");
@@ -151,6 +229,8 @@ Group::Group(json* json_data, const std::string group_name, uint16_t index, uint
     get_group_data(group_name);
     group_data.index = index;
     group_data.absolute_address = parent_absolute_address + group_data.address_offset + (group_data.alignment * index);
+
+    full_name = prefix_name + "." + group_name + ":" + std::to_string(group_data.index);
 }
 
 void Group::get_group_data(const std::string group_name){
@@ -175,21 +255,21 @@ Register* Group::get_register(std::string register_name, uint16_t index){
     // get a register in the group
     json data = (*json_data)["registers"];
 
-    return new Register(&data, register_name, index, group_data.absolute_address);
+    return new Register(&data, register_name, index, group_data.absolute_address, full_name);
 }
 
 Group* Group::get_group(std::string group_name, uint16_t index){
     // get a group of registers
     json data = (*json_data)["groups"];
 
-    return new Group(&data, group_name, index, group_data.absolute_address);
+    return new Group(&data, group_name, index, group_data.absolute_address, full_name);
 }
 
 template <typename T>
 Register* Register::get_register(std::string register_name){
     // get a sub-register, no index needed
     json data = (*json_data)["sub_registers"];
-    auto reg = new Register(&data, register_name, 0, 0);
+    auto reg = new Register(&data, register_name, 0, 0, full_name);
     reg->is_sub_register = true;
     reg->ps_data.software_data_ptr = ps_data.software_data_ptr;
     reg->ps_data.hardware_data_ptr = ps_data.hardware_data_ptr;
@@ -355,10 +435,10 @@ void Dynamic_Register::set_register(Register* reg){
     // modify the instruction to use the new register
     // TODO: might want to have dynamic instructions always be the last/first instructions in the list so we don't need to update multiple instruction blocks (if we have too many instructions)
     if(read){
-        instruction = create_instruction_COPY(this->reg->pl_data.node_index, reg->pl_data.absolute_address, 0, this->reg->ps_data.hardware_data_ptr);
+        //instruction = create_instruction_COPY(this->reg->pl_data.node_index, reg->pl_data.absolute_address, 0, this->reg->ps_data.hardware_data_ptr);
     }
     else{
-        instruction = create_instruction_COPY(0, this->reg->ps_data.hardware_data_ptr, this->reg->pl_data.node_index, reg->pl_data.absolute_address);
+        //instruction = create_instruction_COPY(0, this->reg->ps_data.hardware_data_ptr, this->reg->pl_data.node_index, reg->pl_data.absolute_address);
     }
     instructions->at(instruction_index) = instruction;
 }
@@ -374,7 +454,7 @@ void Dynamic_Register::enable_sync(bool enable){
         instructions->at(instruction_index) = instruction;
     }
     else{
-        instructions->at(instruction_index) = create_instruction_NOP();
+        //instructions->at(instruction_index) = create_instruction_NOP();
     }
 }
 

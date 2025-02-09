@@ -3,14 +3,16 @@
 #include <memory>
 #include "json.hpp"
 #include "fpga_interface.h"
+#include "fpga_instructions.h"
+#include "node_core.h"
 
 
 // include all drivers here
 
 #include "serial_interface_card.h"
-#include "global_timers.h"
-#include "fanuc_encoders.h"
-#include "em_serial_controller.h"
+//#include "global_timers.h"
+//#include "fanuc_encoders.h"
+//#include "em_serial_controller.h"
 
 
 #pragma once
@@ -30,15 +32,23 @@ public:
 
     uint32_t load_drivers();
 
+    uint32_t compile_instructions();
+
+    uint32_t save_ps_nodes(std::string file_path);   // save the fpga nodes to a json file
+
     uint32_t create_global_variables();
+
+    void set_microseconds(const uint64_t* microseconds);
 
     uint32_t run_update();
 
     std::shared_ptr<base_driver> get_driver(uint32_t index);
 
+    Node_Core* node_core = nullptr;
+
 private:
 
-    uint32_t microseconds = 0;
+    const uint64_t* microseconds = nullptr;
 
     json config;
     Fpga_Interface* fpga_interface;
@@ -54,12 +64,14 @@ private:
     uint32_t allocated_PS_PL_address = 0;
     uint32_t allocated_PL_PS_address = 0;
 
-    std::vector<uint64_t> fpga_instructions;
+    std::vector<uint64_t> fpga_instructions_old;
     bool instructions_modified = false;
+
+    fpga_instructions fpga_instr = fpga_instructions();
 
     std::vector<std::shared_ptr<base_driver>> drivers;  // this will point to all drivers that are loaded
 
-    uint32_t load_driver(json module_config);
+    uint32_t load_driver(json config, std::string module_name);
 
     template <typename T>
     bool load_json_value(const json& config, const std::string& value_name, T* dest); 
