@@ -1,16 +1,12 @@
 #include "fpga_module_driver_factory.h"
-#include "register_helper.h"
+//#include "register_helper.h"
 
 
 #pragma once
 
 class serial_interface_card : public base_driver {
 public:
-    serial_interface_card();
-    ~serial_interface_card();
-
-    uint32_t load_config(json config, std::vector<uint64_t>* instructions) override;
-    //uint32_t get_base_instructions(std::vector<uint64_t>* instructions) override;
+    uint32_t custom_load_config(json* user_driver_config) override;
 
     uint32_t run() override;
 
@@ -53,9 +49,12 @@ private:
         RS485 = 0,
         RS422 = 1,
         //QUADRATURE = 2 // not implemented yet
+        NONE = 255
     };
 
     port_mode port_modes[10];   // current port modes for the 10 ports
+
+    uint32_t hdl_config = 0;
 
     // TODO: make a separate class for i2c
 
@@ -66,6 +65,10 @@ private:
     void run_i2c_transfers();
 
     uint32_t configure_port_mode(uint8_t port, port_mode mode);
+
+    bool* manual_led_0_mode = nullptr;
+    bool* manual_led_1_mode = nullptr;
+    bool* manual_led_2_mode = nullptr;
 
     enum led_mode : uint8_t {
         OFF = 0,

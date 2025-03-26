@@ -1,0 +1,17 @@
+#include "fpga_module_driver_factory.h"
+//#include "register_helper.h"
+
+
+#pragma once
+
+class global_timers : public base_driver {
+public:    
+    uint32_t load_config(json config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr) override;
+
+    uint32_t run() override;
+
+private:
+
+    std::vector<Register*> timer_values;
+
+};

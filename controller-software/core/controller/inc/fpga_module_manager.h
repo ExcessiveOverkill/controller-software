@@ -3,13 +3,14 @@
 #include <memory>
 #include "json.hpp"
 #include "fpga_interface.h"
+#include "fpga_instructions.h"
 
 
 // include all drivers here
 
 #include "serial_interface_card.h"
-#include "global_timers.h"
-#include "fanuc_encoders.h"
+//#include "global_timers.h"
+//#include "fanuc_encoders.h"
 #include "em_serial_controller.h"
 
 
@@ -24,25 +25,37 @@ public:
 
     uint32_t load_config(std::string config_file);
 
+    uint32_t load_instructions(std::string file_path);
+
+    uint32_t save_instructions(std::string file_path, bool write_protected = false);
+
     uint32_t set_fpga_interface(Fpga_Interface* fpga_interface);
 
     uint32_t initialize_fpga();
 
-    uint32_t load_drivers();
+    uint32_t load_drivers(std::string driver_config_file);
+
+    uint32_t compile_instructions();
 
     uint32_t create_global_variables();
+
+    void set_microseconds(const uint64_t* microseconds);
 
     uint32_t run_update();
 
     std::shared_ptr<base_driver> get_driver(uint32_t index);
 
+    Node_Core* node_core = nullptr;
+
 private:
 
-    uint32_t microseconds = 0;
+    const uint64_t* microseconds = nullptr;
 
     json config;
     Fpga_Interface* fpga_interface;
     fpga_mem_layout mem_layout;
+
+    std::string fpga_config_path = "";
 
     void* PS_PL_control_ptr = nullptr;
     void* PL_PS_control_ptr = nullptr;
@@ -54,12 +67,14 @@ private:
     uint32_t allocated_PS_PL_address = 0;
     uint32_t allocated_PL_PS_address = 0;
 
-    std::vector<uint64_t> fpga_instructions;
+    std::vector<uint64_t> fpga_instructions_old;
     bool instructions_modified = false;
+
+    fpga_instructions fpga_instr = fpga_instructions();
 
     std::vector<std::shared_ptr<base_driver>> drivers;  // this will point to all drivers that are loaded
 
-    uint32_t load_driver(json module_config);
+    uint32_t load_driver(json config, std::string module_name, json* user_driver_config);
 
     template <typename T>
     bool load_json_value(const json& config, const std::string& value_name, T* dest); 

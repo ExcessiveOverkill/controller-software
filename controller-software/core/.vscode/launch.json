@@ -9,7 +9,7 @@
             "args": [],
             "stopAtEntry": true,
             "targetArchitecture": "arm",
-            "cwd": "${workspaceFolder}/build/ZYNQ-Debug",
+            "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
