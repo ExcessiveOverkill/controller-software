@@ -65,7 +65,9 @@ uint32_t Fpga_Interface::initialize(const fpga_mem_layout mem_layout, std::strin
 
     error_if_nullptr();
 
+    // TODO: get these values and offsets from a config file?
     fpga_main_trigger_counter = (uint16_t*)((char*)ocm_base_pointer + mem_layout.PS_to_PL_control_base_addr_offset);
+    fpga_watchdog = (uint16_t*)((char*)ocm_base_pointer + mem_layout.PS_to_PL_control_base_addr_offset + 4);
 
 
 
@@ -115,6 +117,11 @@ uint32_t Fpga_Interface::initialize(const fpga_mem_layout mem_layout, std::strin
     }
 
     return 0;
+}
+
+void Fpga_Interface::feed_watchdog() {
+    // just need to set the watchdog register to a different value
+    (*fpga_watchdog)++;
 }
 
 uint32_t Fpga_Interface::set_update_frequency(uint32_t frequency) {
@@ -171,6 +178,7 @@ uint32_t Fpga_Interface::wait_for_update() {
             if(ret > 0) {   // update detected
                 if(mem_update_running_fds->revents & POLLIN) {
                     first_cycle = false;
+                    feed_watchdog();
                     return 0;   // update finished
                 }
                 else{

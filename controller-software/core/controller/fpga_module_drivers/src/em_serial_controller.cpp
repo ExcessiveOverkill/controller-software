@@ -2,30 +2,60 @@
 
 static Driver_Registrar<em_serial_controller> registrar("em_serial_controller");
 
-uint32_t em_serial_controller::load_config(json config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr){
+uint32_t em_serial_controller::custom_load_config(json* user_driver_config){
 
-    if(!load_json_value(config, "node_address", &node_address)){
-        std::cerr << "Failed to load node address" << std::endl;
-        return 1;
+    // no accesses to register or node variable values are allowed here, only in the run function
+
+    try{
+        new_baud_rate = user_driver_config->at("baud_rate").get<uint32_t>();
+    }
+    catch(json::exception e){
+        std::cerr << "Warning: baud rate not found in user config, defaulting to 115200" << std::endl;
+        new_baud_rate = 115200;
     }
 
-    // configure registers
-    Address_Map_Loader loader;
-    loader.setup(&config, &base_mem, node_address, new std::vector<uint64_t>);
+    cpy_time_reference(0);
+    cpy_write_priority();
+    cpy_execution_window(0, 1000);
 
-    // TODO: automatically create all device objects based on the number of devices in the config
-    devices.push_back(new em_serial_device(&loader, 0));
+    // create all device objects based on the number of devices in the config
+    auto device_group = loader.get_group("devices", 0);
+    uint16_t num_devices = device_group->group_data.count;
 
+    num_devices = 1;    // TEMPORARY FOR TESTING
+
+    for(uint16_t i = 0; i < num_devices; i++){
+        auto device = new em_serial_device(this, i);
+        node_core->create_global_variable(node_var_prefix + "." + "device_" + std::to_string(i), io_type::EM_SERIAL_DEVICE);
+        node_core->set_global_variable_data_ptr(node_var_prefix + "." + "device_" + std::to_string(i), device);
+
+        // need to create global vars and instructions to copy the data before the node system is configured
+        if(user_driver_config->at("devices").contains(std::to_string(i))){
+            uint8_t cyclic_read_node_vars = user_driver_config->at("devices").at(std::to_string(i)).at("cyclic_read_node_vars").get<uint8_t>();
+            uint8_t cyclic_write_node_vars = user_driver_config->at("devices").at(std::to_string(i)).at("cyclic_write_node_vars").get<uint8_t>();
+            device->set_cyclic_read_node_vars(cyclic_read_node_vars);
+            device->set_cyclic_write_node_vars(cyclic_write_node_vars);
+        }
+        
+        devices.push_back(device);
+    }
+
+    // bit length defines the baud rate
     bit_length = loader.get_register("bit_length", 0);
-    loader.sync_with_PS(bit_length);
+    cpy_destination(bit_length);
+    cpy_source("bit_length");
+    cpy_add_instruction();
+
 
     status = loader.get_register("status", 0);
-    loader.sync_with_PS(status);
     status_update_busy = status->get_register("update_busy");
     status_update_done = status->get_register("update_done");
     status_update_error = status->get_register("update_error");
+    cpy_source(status);
+    cpy_destination("status");
+    cpy_add_instruction();
 
-    configure_baud_rate(12.5e6);
+    //configure_baud_rate(12.5e6);
 
 
     ////////////////// TESTING ///////////////////
@@ -33,26 +63,26 @@ uint32_t em_serial_controller::load_config(json config, std::string module_name,
     // control current cmd
     //devices[0]->configure_cyclic_write(5, 4);    // commanded q current is milliamps
 
-    void* cmd_ptr = nullptr;
-    devices[0]->set_cyclic_write_pointer(5, &cmd_ptr);
-    cmd_q_current_milliamps = reinterpret_cast<int32_t*>(cmd_ptr);
+    // void* cmd_ptr = nullptr;
+    // devices[0]->set_cyclic_write_pointer(5, &cmd_ptr);
+    // cmd_q_current_milliamps = reinterpret_cast<int32_t*>(cmd_ptr);
 
     // add instruction to copy commutation from encoder to drive
-    uint64_t inst = create_instruction_COPY(2, 2, 4, 195);  // copy encoder commutation to drive cyclic #3
+    //uint64_t inst = create_instruction_COPY(2, 2, 4, 195);  // copy encoder commutation to drive cyclic #3
 
-    loader.instructions->push_back(inst);
+    //loader.instructions->push_back(inst);
 
-    devices[0]->set_address(0);
-
-    for(int i = 0; i < 50; i++){    // add some NOPs to ensure all instructions are completed before the transfers start
-        loader.instructions->push_back(create_instruction_NOP());
-    }
+    //devices[0]->set_address(0);
 
     control = loader.get_register("control", 0);
-    loader.sync_with_PS(control);
     start_transfers = control->get_register("start_transfers");
+    cpy_destination(control);
+    cpy_source("control");
+    cpy_add_instruction();
 
-    enable_transfers(true);
+    //add_node_var("enable", io_type::BOOL, (void**)&enable);
+
+    //add_node_var("baud_rate", io_type::UINT32, (void**)&baud_rate);
 
     return 0;
 }
@@ -66,10 +96,14 @@ uint32_t em_serial_controller::configure_baud_rate(uint32_t baud_rate){
     uint32_t clock_cycles = 100e6 / baud_rate;
     
     if(clock_cycles * baud_rate != 100e6){
-        std::cerr << "Warning: Exact baud rate not possible with 100MHz clock" << std::endl;
+        double actual_baud_rate = double(100e6) / double(clock_cycles);
+        std::cerr << "Warning: Exact baud rate (" << baud_rate << ") not possible with 100MHz clock, actual will be " << actual_baud_rate << std::endl;
     }
 
     bit_length->set_value(clock_cycles);
+    std::cout << "Baud rate set to " << baud_rate << std::endl;
+
+    baud_rate_value = baud_rate;
     return 0;
 }
 
@@ -78,38 +112,44 @@ uint32_t em_serial_controller::enable_transfers(bool enable){
     return 0;
 }
 
-uint32_t em_serial_controller::autoconfigure_devices(){
-    // TODO: implement
-    return 1;
-}
-
 uint32_t em_serial_controller::run(){
+
+    // update baud rate if changed
+    if(new_baud_rate != baud_rate_value && new_baud_rate >= 115200){
+        configure_baud_rate(new_baud_rate);
+    }
+
+    // trigger transfers
+    // if(enable != nullptr){
+    //     enable_transfers(*enable);
+    // }
+    enable_transfers(true); // always enable for now
     
     // update devices
     for(auto& device : devices){
         device->run();
     }
 
-    // enable cyclic mode once its configured
-    if(devices[0]->get_sequential_cmds_complete() && devices[0]->get_cyclic_config_complete() && !devices[0]->get_cyclic_data_enabled()){
-        devices[0]->set_cyclic_data_enabled(true);
-    }
+    // // enable cyclic mode once its configured
+    // if(devices[0]->get_sequential_cmds_complete() && devices[0]->get_cyclic_config_complete() && !devices[0]->get_cyclic_data_enabled()){
+    //     devices[0]->set_cyclic_data_enabled(true);
+    // }
 
-    if(devices[0]->get_cyclic_data_enabled() || 0){
-        double us = *microseconds;
-        us /= 10e6;
-        double value = 32767.0 + (32767.0 * sin(us * 2.0 * 3.14159));
-        uint16_t value16 = value;
-        value16 /= 2;
-        value16 = 10000;
-        devices[0]->sequential_write(3, &value16, 2);
+    // if(devices[0]->get_cyclic_data_enabled() || 0){
+    //     double us = *microseconds;
+    //     us /= 10e6;
+    //     double value = 32767.0 + (32767.0 * sin(us * 2.0 * 3.14159));
+    //     uint16_t value16 = value;
+    //     value16 /= 2;
+    //     value16 = 10000;
+    //     devices[0]->sequential_write(3, &value16, 2);
 
-        double val = 1.0 * sin(us * 2.0 * 3.14159);
-        *cmd_q_current_milliamps = int32_t(val * 1000.0);
-        //*cmd_q_current_milliamps = 1000;
-    }
+    //     double val = 1.0 * sin(us * 2.0 * 3.14159);
+    //     *cmd_q_current_milliamps = int32_t(val * 1000.0);
+    //     //*cmd_q_current_milliamps = 1000;
+    // }
 
-    devices[0]->set_enabled(true);
+    // devices[0]->set_enabled(true);
 
     return 0;
 }
@@ -117,22 +157,30 @@ uint32_t em_serial_controller::run(){
 
 
 //////////////////////// em_serial_device ////////////////////////
-em_serial_device::em_serial_device(Address_Map_Loader* loader, uint8_t device_number){
+em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* controller, uint8_t device_number){
 
     ///////////////////////
     // TODO: get these values from the device config
-    dev_info.hardware_type_addr = 0;
-    dev_info.hardware_version_addr = 1;
-    dev_info.firmware_version_addr = 2;
-    dev_info.enable_cyclic_data_addr = 17;
-    dev_info.cyclic_read_address_0_addr = 22;
-    dev_info.cyclic_write_address_0_addr = 54;
-    dev_info.cyclic_addresses = 32;
+    // dev_info.hardware_type_addr = 0;
+    // dev_info.hardware_version_addr = 1;
+    // dev_info.firmware_version_addr = 2;
+    // dev_info.enable_cyclic_data_addr = 17;
+    // dev_info.cyclic_read_address_0_addr = 22;
+    // dev_info.cyclic_write_address_0_addr = 54;
+    // dev_info.cyclic_addresses = 32;
 
     ///////////////////////
 
+    this->controller = controller;
 
-    this->loader = loader;
+    this->loader = &controller->loader;
+
+    device_name = "device_" + std::to_string(device_number) + "_";
+
+
+    controller->cpy_time_reference(0);
+    controller->cpy_write_priority();
+    controller->cpy_execution_window(0, 1000);
 
     // create the registers
 
@@ -140,24 +188,29 @@ em_serial_device::em_serial_device(Address_Map_Loader* loader, uint8_t device_nu
 
     // sync control register
     regs.control = device_group->get_register("control", 0);
-    loader->sync_with_PS(regs.control);
     regs.control_enable = regs.control->get_register("enable");
     regs.control_enable_cyclic_data = regs.control->get_register("enable_cyclic_data");
     regs.control_rx_cyclic_packet_size = regs.control->get_register("rx_cyclic_packet_size");
+
+    controller->cpy_destination(regs.control);
+    controller->cpy_source(device_name+"control");
+    controller->cpy_add_instruction();
     
-    regs.control_rx_cyclic_packet_size->set_value(3);   // size for device address, control, and data (32 bit words not including crc)
+    //regs.control_rx_cyclic_packet_size->set_value(3);   // size for device address, control, and data (32 bit words not including crc)
 
     // sync status register
     regs.status = device_group->get_register("status", 0);
-    loader->sync_with_PS(regs.status);
     regs.status_no_response = regs.status->get_register("no_rx_response_fault");
     regs.status_response_not_finished = regs.status->get_register("rx_not_finished_fault");
     regs.status_crc_invalid = regs.status->get_register("invalid_rx_crc_fault");
+    controller->cpy_source(regs.status);
+    controller->cpy_destination(device_name+"status");
+    controller->cpy_add_instruction();
 
 
     // create cyclic registers (don't sync yet)
     for(int i = 0; i < max_cyclic_registers; i++){
-        regs.cyclic_configs[i] = device_group->get_register("cyclic_config", i);
+        //regs.cyclic_configs[i] = device_group->get_register("cyclic_config", i);
         regs.cyclic_reads[i] = device_group->get_register("cyclic_read_data", i);
         regs.cyclic_writes[i] = device_group->get_register("cyclic_write_data", i);
 
@@ -169,22 +222,50 @@ em_serial_device::em_serial_device(Address_Map_Loader* loader, uint8_t device_nu
 
 
     // sync cyclic read/write regs required for sequential commands
-    loader->sync_with_PS(regs.cyclic_writes[0]);    // tx device address
-    loader->sync_with_PS(regs.cyclic_writes[1]);    // tx sequential control
-    loader->sync_with_PS(regs.cyclic_writes[2]);    // tx sequential data
-    loader->sync_with_PS(regs.cyclic_reads[0]);     // rx device address    // TODO: make sure this only shows a matching address (probably should be done in hardware)
-    loader->sync_with_PS(regs.cyclic_reads[1]);     // rx sequential control
-    loader->sync_with_PS(regs.cyclic_reads[2]);     // rx sequential data
+    // loader->sync_with_PS(regs.cyclic_writes[0]);    // tx device address
+    // loader->sync_with_PS(regs.cyclic_writes[1]);    // tx sequential control
+    // loader->sync_with_PS(regs.cyclic_writes[2]);    // tx sequential data
+    // loader->sync_with_PS(regs.cyclic_reads[0]);     // rx device address    // TODO: make sure this only shows a matching address (probably should be done in hardware)
+    // loader->sync_with_PS(regs.cyclic_reads[1]);     // rx sequential control
+    // loader->sync_with_PS(regs.cyclic_reads[2]);     // rx sequential data
+
+    controller->cpy_destination(regs.cyclic_writes[0]);
+    controller->cpy_source(device_name+"tx_device_address");
+    controller->cpy_add_instruction();
+    controller->cpy_destination(regs.cyclic_writes[1]);
+    controller->cpy_source(device_name+"tx_sequential_control");
+    controller->cpy_add_instruction();
+    controller->cpy_destination(regs.cyclic_writes[2]);
+    controller->cpy_source(device_name+"tx_sequential_data");
+    controller->cpy_add_instruction();
+
+    controller->cpy_source(regs.cyclic_reads[0]);
+    controller->cpy_destination(device_name+"rx_device_address");
+    controller->cpy_add_instruction();
+    controller->cpy_source(regs.cyclic_reads[1]);
+    controller->cpy_destination(device_name+"rx_sequential_control");
+    controller->cpy_add_instruction();
+    controller->cpy_source(regs.cyclic_reads[2]);
+    controller->cpy_destination(device_name+"rx_sequential_data");
+    controller->cpy_add_instruction();
 
     // create dynamic register for cyclic config
     // this allows us to only take up one address in the PS and PL memory,
     // but adjust the DMA instruction to change what node/BRAM address is being used
-    regs.cyclic_config = new Dynamic_Register(loader, regs.cyclic_configs[0]);
-    regs.cyclic_config_reg = regs.cyclic_config->get_register();
+    //regs.cyclic_config = new Dynamic_Register(loader, regs.cyclic_configs[0]);
+    //regs.cyclic_config_reg = regs.cyclic_config->get_register();
+    regs.cyclic_config_reg = device_group->get_register("cyclic_config", 0);
     regs.cyclic_config_read_size = regs.cyclic_config_reg->get_register("cyclic_read_data_size");
     regs.cyclic_config_write_size = regs.cyclic_config_reg->get_register("cyclic_write_data_size");
     regs.cyclic_config_read_offset = regs.cyclic_config_reg->get_register("cyclic_read_data_starting_byte_index");
     regs.cyclic_config_write_offset = regs.cyclic_config_reg->get_register("cyclic_write_data_starting_byte_index");
+
+    controller->cpy_dynamic_source(device_name+"selected_cyclic_config", &selected_cyclic_config);
+    controller->cpy_destination(regs.cyclic_config_reg);
+    controller->cpy_source(device_name+"cyclic_config");
+    controller->cpy_add_instruction();
+
+
 
     // regs.cyclic_config_read_size->set_value(1);
     // regs.cyclic_config_write_size->set_value(1);
@@ -201,8 +282,8 @@ em_serial_device::em_serial_device(Address_Map_Loader* loader, uint8_t device_nu
     configure_cyclic_write(0xffff, 4);    // sequential data
 
     //configure_cyclic_read(10, 2);    // read the DC bus voltage
-    configure_cyclic_write(9, 2);    // write commutation data
-    configure_cyclic_write(5, 4);
+    //configure_cyclic_write(9, 2);    // write commutation data
+    //configure_cyclic_write(5, 4);
 
     //configure_cyclic_read(4, 2);
 
@@ -223,7 +304,43 @@ em_serial_device::em_serial_device(Address_Map_Loader* loader, uint8_t device_nu
 
 }
 
-uint32_t em_serial_device::set_address(uint32_t address){
+void em_serial_controller::em_serial_device::set_cyclic_read_node_vars(uint8_t num_vars){
+
+    controller->cpy_time_reference(0);
+    controller->cpy_write_priority();
+    controller->cpy_execution_window(0, 1000);
+
+    for(int i = 0; i < num_vars; i++){
+
+        // add instruction to copy the data over
+        controller->cpy_source(regs.cyclic_reads[i + 3]);
+        controller->cpy_destination(device_name+"user_cyclic_read_"+std::to_string(i));
+        controller->cpy_add_instruction();
+
+        // save the register for later reference
+        cyclic_read_node_var_regs.push_back(regs.cyclic_reads[i + 3]);
+    }
+}
+
+void em_serial_controller::em_serial_device::set_cyclic_write_node_vars(uint8_t num_vars){
+
+    controller->cpy_time_reference(0);
+    controller->cpy_write_priority();
+    controller->cpy_execution_window(0, 1000);
+
+    for(int i = 0; i < num_vars; i++){
+
+        // add instruction to copy the data over
+        controller->cpy_destination(regs.cyclic_writes[i + 3]);
+        controller->cpy_source(device_name+"user_cyclic_write_"+std::to_string(i));
+        controller->cpy_add_instruction();
+
+        // save the register for later reference
+        cyclic_write_node_var_regs.push_back(regs.cyclic_writes[i + 3]);
+    }
+}
+
+uint32_t em_serial_controller::em_serial_device::set_address(uint32_t address){
     if(address > 255){
         std::cerr << "Error: Address out of range" << std::endl;
         return 1;
@@ -233,12 +350,12 @@ uint32_t em_serial_device::set_address(uint32_t address){
     return 0;
 }
 
-uint32_t em_serial_device::get_address(uint16_t* address){
+uint32_t em_serial_controller::em_serial_device::get_address(uint16_t* address){
     *address = this->address;
     return 0;
 }
 
-uint32_t em_serial_device::set_enabled(bool enabled){
+uint32_t em_serial_controller::em_serial_device::set_enabled(bool enabled){
     if(!this->enabled && !cyclic_config_complete){
         return 1;   // cannot enable device until cyclic config is complete
     }
@@ -247,12 +364,12 @@ uint32_t em_serial_device::set_enabled(bool enabled){
     return 0;
 }
 
-uint32_t em_serial_device::get_enabled(bool* enabled){
+uint32_t em_serial_controller::em_serial_device::get_enabled(bool* enabled){
     *enabled = this->enabled;
     return 0;
 }
 
-uint32_t em_serial_device::set_cyclic_data_enabled(bool enabled){
+uint32_t em_serial_controller::em_serial_device::set_cyclic_data_enabled(bool enabled){
     if(!this->enabled){
         return 1;   // cannot change cyclic data enabled until device is enabled
     }
@@ -270,11 +387,11 @@ uint32_t em_serial_device::set_cyclic_data_enabled(bool enabled){
     return 0;
 }
 
-bool em_serial_device::get_cyclic_config_complete(){
+bool em_serial_controller::em_serial_device::get_cyclic_config_complete(){
     return cyclic_config_complete;
 }
 
-uint32_t em_serial_device::sequential_write(uint16_t address, void* data, uint8_t size){
+uint32_t em_serial_controller::em_serial_device::sequential_write(uint16_t address, void* data, uint8_t size){
     if(!this->enabled){
         return 1;   // cannot write until device is enabled
     }
@@ -283,7 +400,7 @@ uint32_t em_serial_device::sequential_write(uint16_t address, void* data, uint8_
     return 0;
 }
 
-uint32_t em_serial_device::sequential_read(uint16_t address, void* data, uint8_t size){
+uint32_t em_serial_controller::em_serial_device::sequential_read(uint16_t address, void* data, uint8_t size){
     if(!this->enabled){
         return 1;   // cannot read until device is enabled
     }
@@ -292,7 +409,7 @@ uint32_t em_serial_device::sequential_read(uint16_t address, void* data, uint8_t
     return 0;
 }
 
-uint32_t em_serial_device::add_sequential_cmd(uint16_t address, void* data, uint8_t size, bool write, bool* complete_flag, bool* complete_flag_inverted){
+uint32_t em_serial_controller::em_serial_device::add_sequential_cmd(uint16_t address, void* data, uint8_t size, bool write, bool* complete_flag, bool* complete_flag_inverted){
     if(sequential_cmds.size() >= max_outstanding_cmds){
         //std::cerr << "Error: Too many outstanding commands" << std::endl;
         return 1;   // too many outstanding commands
@@ -305,7 +422,12 @@ uint32_t em_serial_device::add_sequential_cmd(uint16_t address, void* data, uint
     cmd.complete_flag = complete_flag;
     cmd.complete_flag_inverted = complete_flag_inverted;
 
-    memcpy(&cmd.data, data, size);
+    if(write){
+        memcpy(&cmd.data, data, size);
+    }
+    else{
+        cmd.data_pointer = data;
+    }
 
     sequential_cmds.push_back(cmd);
     sequential_cmds_complete = false;
@@ -315,7 +437,7 @@ uint32_t em_serial_device::add_sequential_cmd(uint16_t address, void* data, uint
     return 0;
 }
 
-uint32_t em_serial_device::configure_cyclic_read(uint16_t address, uint8_t size){
+uint32_t em_serial_controller::em_serial_device::configure_cyclic_read(uint16_t address, uint8_t size){
     if(cyclic_data_enabled){
         return 1;   // cannot configure while cyclic data is enabled
     }
@@ -362,7 +484,7 @@ uint32_t em_serial_device::configure_cyclic_read(uint16_t address, uint8_t size)
 }
 
 // TODO: rewrite this function to not be just a copy of the read function
-uint32_t em_serial_device::configure_cyclic_write(uint16_t address, uint8_t size){
+uint32_t em_serial_controller::em_serial_device::configure_cyclic_write(uint16_t address, uint8_t size){
     if(cyclic_data_enabled){
         return 1;   // cannot configure while cyclic data is enabled
     }
@@ -408,65 +530,83 @@ uint32_t em_serial_device::configure_cyclic_write(uint16_t address, uint8_t size
     return 0;
 }
 
-uint32_t em_serial_device::set_cyclic_read_pointer(uint16_t address, void** data){
-    // find the cyclic read config with the matching address
-    for(auto& config : read_cyclic_configs){
-        if(config.address != address){
-            continue;
-        }
-        
-        if(config.cyclic_data_register->get_raw_data_ptr<uint32_t>() == nullptr){
-            // not yet synced with the PS, so sync it
-            loader->sync_with_PS(config.cyclic_data_register);
-        }
-        *data = config.cyclic_data_register->get_raw_data_ptr<uint32_t>();
-        return 0;
-        
+void em_serial_controller::em_serial_device::rerun_cylic_config(){
+    if(cyclic_data_enabled){
+        throw std::runtime_error("Error: cannot rerun cyclic config while cyclic data is enabled");
     }
-    return 1;   // address not found
+
+    for(uint32_t i = 3; i < read_cyclic_configs.size(); i++){
+        add_sequential_cmd(dev_info.cyclic_read_address_0_addr + i - 3, &read_cyclic_configs[i].address, 2, true, nullptr, nullptr); // configure the cyclic read reg in the device
+    }
+
+    for(uint32_t i = 3; i < write_cyclic_configs.size(); i++){
+        add_sequential_cmd(dev_info.cyclic_write_address_0_addr + i - 3, &write_cyclic_configs[i].address, 2, true, nullptr, nullptr); // configure the cyclic write reg in the device
+    }
+
+    cyclic_config_complete = false;
 }
 
-uint32_t em_serial_device::set_cyclic_write_pointer(uint16_t address, void** data){
-    // find the cyclic write config with the matching address
-    for(auto& config : write_cyclic_configs){
-        if(config.address != address){
-            continue;
-        }
+// uint32_t em_serial_controller::em_serial_device::set_cyclic_read_pointer(uint16_t address, void** data){
+//     // find the cyclic read config with the matching address
+//     for(auto& config : read_cyclic_configs){
+//         if(config.address != address){
+//             continue;
+//         }
         
-        if(config.cyclic_data_register->get_raw_data_ptr<uint32_t>() == nullptr){
-            // not yet synced with the PS, so sync it
-            loader->sync_with_PS(config.cyclic_data_register);
-        }
-        *data = config.cyclic_data_register->get_raw_data_ptr<uint32_t>();
-        return 0;
+//         if(config.cyclic_data_register->get_raw_data_ptr<uint32_t>() == nullptr){
+//             // not yet synced with the PS, so sync it
+//             loader->sync_with_PS(config.cyclic_data_register);
+//         }
+//         *data = config.cyclic_data_register->get_raw_data_ptr<uint32_t>();
+//         return 0;
         
-    }
-    return 1;   // address not found
-}
+//     }
+//     return 1;   // address not found
+// }
 
-uint32_t em_serial_device::run_cylic_config(){
+// uint32_t em_serial_controller::em_serial_device::set_cyclic_write_pointer(uint16_t address, void** data){
+//     // find the cyclic write config with the matching address
+//     for(auto& config : write_cyclic_configs){
+//         if(config.address != address){
+//             continue;
+//         }
+        
+//         if(config.cyclic_data_register->get_raw_data_ptr<uint32_t>() == nullptr){
+//             // not yet synced with the PS, so sync it
+//             loader->sync_with_PS(config.cyclic_data_register);
+//         }
+//         *data = config.cyclic_data_register->get_raw_data_ptr<uint32_t>();
+//         return 0;
+        
+//     }
+//     return 1;   // address not found
+// }
+
+uint32_t em_serial_controller::em_serial_device::run_cylic_config(){
     if(outstanding_cyclic_configs.size() == 0){ // no commands to run, all done
         cyclic_config_complete = true;
-        regs.cyclic_config->enable_sync(false);    // disable syncing with the PS
+        //regs.cyclic_config->enable_sync(false);    // disable syncing with the PS
+        *selected_cyclic_config = -1;   // no selected cyclic config
         return 0;
     }
     uint8_t index = outstanding_cyclic_configs[0];
     raw_cyclic_config* cmd = &raw_cyclic_configs[index];
 
-    regs.cyclic_config->set_register(regs.cyclic_configs[index]);   // adjust which cyclic config register is being used
+    //regs.cyclic_config->set_register(regs.cyclic_configs[index]);   // adjust which cyclic config register is being used
+    *selected_cyclic_config = index;    // adjust which cyclic config register is being used
     // NOTE: when using dyamic registers, partial writes may cause issues, so you should write all values after each change
     regs.cyclic_config_read_size->set_value(cmd->read_size);
     regs.cyclic_config_write_size->set_value(cmd->write_size);
     regs.cyclic_config_read_offset->set_value(cmd->read_offset);
     regs.cyclic_config_write_offset->set_value(cmd->write_offset);
-    regs.cyclic_config->enable_sync(true);    // enable syncing with the PS
+    //regs.cyclic_config->enable_sync(true);    // enable syncing with the PS
 
     outstanding_cyclic_configs.erase(outstanding_cyclic_configs.begin());
     
     return 0;
 }
 
-uint32_t em_serial_device::run_sequential_cmds(){
+uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
     if(sequential_cmds.size() == 0){
         sequential_cmds_complete = true;
         
@@ -510,8 +650,14 @@ uint32_t em_serial_device::run_sequential_cmds(){
             }
 
             consecutive_unknown_packet_errors = 0;
+
+            if(!cmd->write){
+                // read command, so save the data
+                memcpy(cmd->data_pointer, regs.cyclic_reads[2]->get_raw_data_ptr<uint32_t>(), cmd->size);
+            }
+            //std::cout << "cmd complete for address: " << cmd->address << " " << cmd->data << std::endl;
             sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
-            //std::cout << "cmd complete" << std::endl;
+            
 
         }
         else if((control_response & 0xffff) == cmd->address && ((control_response >> 25) & 0b1) == 1){  // address matches, but device signalled failure
@@ -540,9 +686,9 @@ uint32_t em_serial_device::run_sequential_cmds(){
     }
     else{
         consecutive_packet_errors++;
-        if(consecutive_packet_errors == 10){
-            std::cerr << "Error: EM serial device has too many consecutive packet errors" << std::endl;
-        }
+        // if(consecutive_packet_errors == 10){
+        //     std::cerr << "Error: EM serial device has too many consecutive packet errors" << std::endl;
+        // }
     }
 
 
@@ -580,21 +726,24 @@ uint32_t em_serial_device::run_sequential_cmds(){
     return 0;
 }
 
-bool em_serial_device::get_sequential_cmds_complete(){
+bool em_serial_controller::em_serial_device::get_sequential_cmds_complete(){
     return sequential_cmds_complete;
 }
 
-bool em_serial_device::get_cyclic_data_enabled(){
+bool em_serial_controller::em_serial_device::get_cyclic_data_enabled(){
     return cyclic_data_enabled;
 }
 
-uint32_t em_serial_device::run(){
+uint32_t em_serial_controller::em_serial_device::run(){
     // run the device, must be called at each FPGA update
 
     bool old_cyclic_data_enabled = cyclic_data_enabled;
 
     if(initial_config_complete){
         run_sequential_cmds();
+    }
+    else{
+        regs.control_rx_cyclic_packet_size->set_value(3);   // size for device address, control, and data (32 bit words not including crc)
     }
 
     run_cylic_config();

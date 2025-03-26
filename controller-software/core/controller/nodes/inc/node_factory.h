@@ -46,5 +46,7 @@ public:
         Node_Factory::registerType(typeName, []() -> std::shared_ptr<base_node> {
             return std::make_shared<T>();
         });
+
+        std::cout << "Registered node: " << typeName << std::endl;
     }
 };

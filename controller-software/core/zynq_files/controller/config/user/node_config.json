@@ -1,0 +1,148 @@
+{
+    "info": {
+        "date": "2025-03-13",
+        "time": "12:00:00",
+        "fpga_config": "controller/config/fpga_configs/test",
+        "write_protected": false
+    },
+
+    "user_node_vars":{
+    },
+
+    "node_var_values":{
+    },
+
+    "networks":{
+        "test_network":{
+            "enable":true,
+            "type":"sync",
+            "timeout_usec":10000,
+            "update_cycle_trigger_count": 100,
+
+            "nodes":{
+                "float_cmds":{
+                    "type":"api_cmd_float",
+                    "config":{
+                        "config":[
+                            {
+                                "name": "output_0",
+                                "min": -1.0,
+                                "max": 1.0,
+                                "default_value": 0.0,
+                                "timeout": 0.0
+                            }
+                        ]
+                    
+                    }
+                },
+
+                "print_float":{
+                    "type":"float_print_cout"
+                },
+
+                "print_drive_fan_measured":{
+                    "type":"uint16_print_cout"
+                },
+
+                "converter":{
+                    "type":"convert_io_types",
+                    "config":{
+                        "config":[
+                            {
+                            "name": "fan_speed_cmd",
+                            "input_type": "float",
+                            "output_type": "uint16",
+                            "input_min": 0.0,
+                            "input_max": 1.0,
+                            "output_min": 10000,
+                            "output_max": 65535,
+                            "invert": false
+                            }
+                        ]
+                    }
+                },
+
+                "servo_drive_0":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 0,
+                            "timeout_tries": 10
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json",
+                            "async_read_regs":[
+                                {
+                                    "name": "dc_bus_voltage",
+                                    "update_rate_cycles": 5
+                                }
+                            ],
+                            "cyclic_write_regs":[
+                                {
+                                    "name": "fan_speed_cmd",
+                                    "sync_with_node": true
+                                }
+                            ],
+                            "cyclic_read_regs":[
+                                {
+                                    "name": "fan_speed_measured",
+                                    "sync_with_node": true
+                                }
+                            ]
+                        }
+                        
+                    }
+                },
+
+                "serial_devices":{
+                    "type":"get_global_variable",
+                    "config":{
+                        "variables":{
+                            "device_0": "node_vars.drivers.node_4_em_serial_controller.device_0"
+                        }
+                    }
+                }
+            },
+
+            "connections":{
+                "0":{
+                    "src_node":"float_cmds",
+                    "src_port":"output_0",
+                    "dst_node":"print_float",
+                    "dst_port":"input"
+                },
+                "1":{
+                    "src_node":"float_cmds",
+                    "src_port":"output_0",
+                    "dst_node":"converter",
+                    "dst_port":"fan_speed_cmd"
+                },
+                "2":{
+                    "src_node":"float_cmds",
+                    "src_port":"output_0",
+                    "dst_node":"converter",
+                    "dst_port":"fan_speed_cmd"
+                },
+                "3":{
+                    "src_node":"serial_devices",
+                    "src_port":"device_0",
+                    "dst_node":"servo_drive_0",
+                    "dst_port":"em_device"
+                },
+                "4":{
+                    "src_node":"servo_drive_0",
+                    "src_port":"fan_speed_measured",
+                    "dst_node":"print_drive_fan_measured",
+                    "dst_port":"input"
+                },
+                "5":{
+                    "src_node":"converter",
+                    "src_port":"fan_speed_cmd",
+                    "dst_node":"servo_drive_0",
+                    "dst_port":"fan_speed_cmd"
+                }
+            }
+        }
+    }
+}

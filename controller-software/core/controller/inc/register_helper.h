@@ -59,6 +59,7 @@ class Register {
 
         struct PL_data{
             std::string name;
+            std::string full_name;
             uint16_t address_offset = 0;
             uint16_t absolute_address = 0;
             uint32_t bank_size = 1;
@@ -86,6 +87,8 @@ class Register {
 
         std::string full_name;
 
+        std::vector<void**> sub_register_var_ptrs;
+        
         
     protected:
         fpga_mem* base_mem = nullptr;
@@ -168,8 +171,6 @@ class Address_Map_Loader {
 
         void sync_with_PS(Register* reg);    // sync a register with the PS, only needed for parent registers (not sub-registers), must be called before sub-registers are created
 
-        Register* get_register_by_full_name(std::string full_name);    // get a register by the full name
-
         uint8_t get_node_index();    // get the node index
 
         std::vector<uint64_t>* instructions = nullptr;
@@ -233,3 +234,7 @@ bool Address_Map_Loader::load_json_value(const json& config, const std::string& 
     *dest = config[value_name].get<T>();
     return true;
 }
+
+uint32_t get_register_from_full_name(std::string full_name, json* config, fpga_mem* base_mem, Register** reg);
+
+uint32_t sync_with_ps(Register* reg, fpga_mem* base_mem);

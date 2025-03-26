@@ -13,6 +13,8 @@
 #include "fpga_interface.h"
 #include "fpga_module_manager.h"
 
+#pragma once
+
 
 class Controller {
     private:
@@ -21,19 +23,15 @@ class Controller {
         bool quit = false;  // flag to exit the controller
         bool quit_on_fpga_update_fail = false;    // flag to exit the controller if the FPGA update fails
 
-        static std::atomic<bool> pause_noncritical_thread; // flag to pause the noncritical thread
-        static std::condition_variable noncritical_cv;
-        static std::mutex noncritical_mtx;
-
-        uint32_t noncritical_pause_timeout_us = 10; // timeout for noncritical thread to pause
-        uint32_t software_update_period_us = 0;
+        uint32_t software_update_period_us = 1000;  // 1khz default
+        uint32_t software_update_frequency = 1000;  // 1khz default
 
         // FPGA drivers
         Fpga_Interface fpga;
         fpga_module_manager fpga_manager;
 
         // API driver
-        static controller_api api;
+        controller_api api;
         std::thread noncritical_thread;
 
         // Node core
@@ -41,22 +39,35 @@ class Controller {
         
         uint32_t critical_calls();  // hard-realtime calls that must be completed each cycle
 
-        static uint32_t noncritical_calls(Controller* controller);   // calls that can be delayed if needed
-
         void setup_main_thread();
 
         uint64_t microseconds = 0;
         void update_microseconds();
 
+        void run();
+
+        uint32_t load_fpga_config();
+        std::string fpga_config_path = "";
+
+        std::string fpga_driver_config_file = "";
+
+        uint32_t save_default_configs();
+        std::string temp_path = "";
+
+        uint32_t load_user_configs();
+        std::string user_node_config_path = "";
+        std::string user_fpga_intructions_config_path = "";
+
+        uint32_t start_nodejs();
+        void quit_nodejs();
+
 
     public:
         Controller();
 
-        void load_fpga_config(std::string config_file);
-        void load_ps_nodes(std::string file_path);
+        uint32_t load_config(std::string file_path);  // load the main config file
 
-        void run();
+        void start();
 
-        ~Controller(){
-        }
+        ~Controller();
 };

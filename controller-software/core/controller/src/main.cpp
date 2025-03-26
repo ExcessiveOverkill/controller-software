@@ -9,11 +9,9 @@ int main() {
 
     Controller controller;
 
-    controller.load_fpga_config("/home/em-os/controller/config/fpga_configs/controller_config.json");
-    //controller.load_ps_nodes("");
+    controller.load_config("controller/config/user/config.json");
 
-    controller.run();
-    
+    controller.start();
 
     //controller.run();
 
@@ -68,7 +66,6 @@ int main() {
 
     // // net->rebuild_execution_order();
     // net->run(&cycle);
-
 
     return 0;
 }

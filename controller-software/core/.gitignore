@@ -1,2 +1,8 @@
 /.ssh
 /build
+zynq_files/controller/bin
+zynq_files/controller/web
+
+# not using this yet, no need to track
+controller/inc/simdjson.h
+controller/src/simdjson.cpp

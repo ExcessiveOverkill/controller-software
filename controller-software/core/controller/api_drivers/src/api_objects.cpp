@@ -11,6 +11,12 @@ uint32_t get_new_call_object_from_call_id(std::vector<std::shared_ptr<Base_API>>
     else if(*api_call_id == api_call_id_t::PRINT_UINT32){
         calls->push_back(std::make_shared<print_uint32>());
     }
+    else if(*api_call_id == api_call_id_t::PRINT_FLOAT){
+        calls->push_back(std::make_shared<print_float>());
+    }
+    else if(*api_call_id == api_call_id_t::CONFIGURE_NODE){
+        calls->push_back(std::make_shared<configure_node>());
+    }
     else {
         return 1;   // error: unknown call ID
     }
@@ -24,6 +30,12 @@ uint32_t create_new_call_obj_from_string(std::vector<std::shared_ptr<Base_API>>*
     }
     else if(api_call_name.compare("print_uint32") == 0){
         calls->push_back(std::make_shared<print_uint32>());
+    }
+    else if(api_call_name.compare("print_float") == 0){
+        calls->push_back(std::make_shared<print_float>());
+    }
+    else if(api_call_name.compare("configure_node") == 0){
+        calls->push_back(std::make_shared<configure_node>());
     }
     else {
         return 1;

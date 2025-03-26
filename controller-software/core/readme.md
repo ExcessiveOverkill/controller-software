@@ -9,7 +9,7 @@ sudo apt install gdb-multiarch
 
 create ssh keys:
 ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-save them in the core/ssh folder
+save them in the core/.ssh folder
 
 copy ssh key to zynq:
 ssh-copy-id -i .ssh/zynq em-os@192.168.1.238
@@ -44,6 +44,11 @@ allow write access so we can update it later from vs code (note this is unsafe s
 sudo chmod u+w controller/bin/controller_core
 
 
+update zynq node modules
+in controller/web, run npm install
+
+update zynq time (required for certs to be valid)
+sudo date -s "2025-3-21 18:37:00"
 
 
 petalinux setup:

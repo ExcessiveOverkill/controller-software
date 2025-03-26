@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 #include "register_helper.h"
-
+#include "node_core.h"
 
 enum instruction_type : uint8_t {
     END = 0,
@@ -38,10 +38,14 @@ class fpga_instructions{
     public:
         class copy{
             public:
-                uint8_t src_node;
-                uint16_t src_addr;
-                uint8_t dst_node;
-                uint16_t dst_addr;
+                uint8_t src_node = 255;
+                uint16_t src_addr = 0;
+                uint8_t dst_node = 255;
+                uint16_t dst_addr = 0;
+
+                uint32_t dynamic_reg_index = -1;
+                uint16_t dynamic_reg_starting_address = 0;
+                bool is_dynamic = false;
 
                 uint32_t time_reference = 0;
                 int32_t earliest_execution = 0;
@@ -69,42 +73,56 @@ class fpga_instructions{
                 uint32_t set_write_priority();    // control the timing of the write action
                 uint32_t set_read_priority();    // control the timing of the read action
 
-                void set_source(Register* reg);
-                //void set_source(Global_Variable* var);
-                void set_destination(Register* reg);
-                //void set_destination(Global_Variable* var);
+                uint32_t set_source(std::string name);
+                uint32_t set_destination(std::string name);
+
+                // for dynamic data access
+                uint32_t set_register_index_source(std::string name);
+                void clear_register_index_source();
 
                 uint32_t load_from_json(json* json_data);
                 uint32_t save_to_json(json* json_data);
 
-            private:
-                uint32_t instruction_index = -1;
-                uint32_t time_reference_instruction = -1;
+                int32_t instruction_index = -1;
+                int32_t time_reference_instruction = -1;
 
-
-                std::string source_name = "";
-                std::string destination_name = "";
+                std::string source_name = "";   // node var or register name
+                std::string destination_name = "";  // node var or register name
+                std::string register_index_source_name = "";    // node var name
 
         };
 
 
         struct dma_settings{
-            uint32_t inter_node_cycles = 1;
-            uint32_t intra_node_cycles = 2;
-            uint32_t dma_cycles = 1;
+            uint8_t inter_node_cycles = 1;
+            uint8_t intra_node_cycles = 2;
+            uint8_t dma_cycles = 1;
             uint8_t total_nodes = 5;
             uint32_t full_cycles = 0;
         } settings;
 
-        uint32_t add(copy* instruction);
+        uint32_t add(copy instruction);
 
         uint32_t compile();
+
+        uint32_t save(std::string file_path, std::string fpga_config_file, bool write_protected = false);
+
+        uint32_t load(std::string file_path, std::string fpga_config_file);
+
+        void setup(json* fpga_config, Node_Core* node_core);
+        fpga_mem* base_mem = nullptr;
+
+        Node_Core* node_core = nullptr;
+
+        std::vector<uint64_t> condensed_instructions;
+
+        uint32_t update_dynamic_instructions(); // update the dynamic instructions without recompiling everything
 
         
 
     private:
 
-        uint32_t place_instruction(copy* instruction);
+        uint32_t place_instruction(uint32_t index);
         uint32_t condense_instructions();
 
         bool check_dma_index_available(uint32_t dma_index);
@@ -114,7 +132,16 @@ class fpga_instructions{
         uint64_t create_instruction_END();
         uint64_t create_instruction_NOP();
 
-        std::vector<copy*> instructions;
+        std::vector<copy> instructions;
 
-        std::vector<uint64_t> condensed_instructions;
+        uint32_t running_instruction_index = 0;
+
+        json* fpga_config = nullptr;
+
+        struct dynamic_data{
+            uint32_t instruction_object_index = -1;
+            uint32_t condensed_instruction_index = -1;
+        };
+
+        std::vector<dynamic_data> dynamic_instructions;
 };

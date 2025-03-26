@@ -1,0 +1,25 @@
+{
+    "node_1_serial_card": {
+        "port_modes": {
+            "0": "RS422",
+            "1": "RS485",
+            "9": "RS422"
+        },
+
+        "led_modes": {
+            "0": "BLINK_FAST",
+            "1": "NODE_VAR",
+            "2": "NODE_VAR"
+        }
+    },
+
+    "node_4_em_serial_controller": {
+        "baud_rate": 12.5e6,
+        "devices": {
+            "0": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            }
+        }
+    }
+}

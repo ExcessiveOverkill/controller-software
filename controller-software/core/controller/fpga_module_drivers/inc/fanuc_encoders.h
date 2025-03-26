@@ -6,11 +6,15 @@
 
 class fanuc_encoders : public base_driver {
 public:    
-    uint32_t load_config(json config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr) override;
+    //uint32_t load_config(json* config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr) override;
+
+    uint32_t custom_load_config(json* user_driver_config) override;
 
     uint32_t run() override;
 
 private:
+
+    Register* trigger = nullptr;
 
     Register* multiturn_count = nullptr;
     Register* singleturn_count = nullptr;
