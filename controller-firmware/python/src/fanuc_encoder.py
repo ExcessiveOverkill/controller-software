@@ -25,8 +25,6 @@ class Fanuc_Encoders(Component):
             "tx_enable" : Out(self.number_of_encoders),
             "rx" : In(self.number_of_encoders),
 
-            "trigger": In(1),
-
             "bram_address": In(16),
             "bram_write_data": In(32),
             "bram_read_data": Out(32),
@@ -51,6 +49,8 @@ class Fanuc_Encoders(Component):
             Register("done", type="bool", desc="Done"),
         ]))
 
+        self.rm.add(Register("trigger", rw="w", type="bool", desc="Trigger encoder capture"))
+
         self.rm.add(self.encoder_group)
         self.rm.generate()
 
@@ -62,7 +62,6 @@ class Fanuc_Encoders(Component):
 
         m.submodules.request_pulse = request_pulse = Request_Pulse()
 
-        m.submodules += FFSynchronizer(i=self.trigger, o=request_pulse.trigger, o_domain="sync_100")
         m.submodules += FFSynchronizer(i=self.rx, o=self.synced_rx, o_domain="sync_100")
         
         m.d.comb += self.tx_enable.eq(0xffffffff)   # enable all transmitters
@@ -89,6 +88,10 @@ class Fanuc_Encoders(Component):
             with m.Default():
                 m.d.sync_100 += self.bram_read_data.eq(0)
 
+        with m.If(self.bram_write_enable & (self.bram_address == self.rm.trigger.address_offset)):
+            m.d.sync_100 += request_pulse.trigger.eq(1)
+        with m.Else():
+            m.d.sync_100 += request_pulse.trigger.eq(0)
 
         # with m.Switch(self.bram_address[4:8]):  # up to 32 encoders, with up to 16 data addresses each
         #     for i in range(self.number_of_encoders):

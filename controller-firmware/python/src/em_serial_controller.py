@@ -178,6 +178,7 @@ class EM_Serial_Controller(Component):
         m.d.comb += self.cyclic_register_starting_bit_index.eq(self.cyclic_register_starting_byte_index<<3)
 
         self.cyclic_data_enabled = Signal()
+        self.rx_cyclic_data_enabled = Signal()
 
 
         device_group_offset = int(np.log2(self.rm.devices.alignment))   # offset for device group sections
@@ -603,7 +604,7 @@ class EM_Serial_Controller(Component):
                 12-15: cyclic write register data size (bytes)
                 16-23: cyclic read register starting byte index in 32bit word
                 """
-                with m.If((cyclic_read_data_size != 0) & ((self.current_cyclic_register < 3) | (self.cyclic_data_enabled))):
+                with m.If((cyclic_read_data_size != 0) & ((self.current_cyclic_register < 3) | (self.rx_cyclic_data_enabled))):
                     
                     m.d.sync_100 += self.cyclic_register_size.eq(cyclic_read_data_size)
                     m.d.sync_100 += self.cyclic_register_starting_byte_index.eq(cyclic_read_data_starting_byte_index)
@@ -711,6 +712,7 @@ class EM_Serial_Controller(Component):
                 with m.Else():
                     m.d.sync_100 += self.writeEnable_ToSerialPort.eq(1)
                     m.d.sync_100 += self.current_device_index.eq(self.current_device_index + 1)
+                    m.d.sync_100 += self.rx_cyclic_data_enabled.eq(self.cyclic_data_enabled)   # save cyclic data enabled state for interpreting the rx packet
 
 
 
@@ -744,7 +746,7 @@ cyclic_read_offset = regs.devices.cyclic_read_data.address_offset
 async def serialBench(ctx):
 
     # enable devices
-    ctx.set(dut.memory.data[dev0 + regs.devices.control.address_offset], dev_control(1, 1, 4))   # device 0: enable, cyclic mode, and 4 byte packet size
+    ctx.set(dut.memory.data[dev0 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 0: enable, cyclic mode, and 4 byte packet size
     #ctx.set(dut.memory.data[dev1 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 1: enable, cyclic mode, and 4 byte packet size
     #ctx.set(dut.memory.data[dev2 + regs.devices.control.address_offset], dev_control(1, 0, 3))   # device 2: enable, cyclic mode, and 4 byte packet size
 
@@ -753,8 +755,8 @@ async def serialBench(ctx):
     ctx.set(dut.memory.data[dev0 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
     ctx.set(dut.memory.data[dev0 + cyclic_config_offset+2], cyclic_config(4, 1, 4, 1))   # config RX/TX reg2 for 4 byte 1 offset
 
-    ctx.set(dut.memory.data[dev0 + cyclic_config_offset+3], cyclic_config(0, 0, 2, 1))
-    ctx.set(dut.memory.data[dev0 + cyclic_config_offset+4], cyclic_config(0, 0, 4, 3))
+    ctx.set(dut.memory.data[dev0 + cyclic_config_offset+3], cyclic_config(2, 1, 2, 1))
+    #ctx.set(dut.memory.data[dev0 + cyclic_config_offset+4], cyclic_config(0, 0, 4, 3))
 
     ctx.set(dut.memory.data[dev1 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
     ctx.set(dut.memory.data[dev1 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
@@ -782,9 +784,9 @@ async def serialBench(ctx):
 
     # load test response into debug serial port to simulate a device
     testTXpacket = [
-    0x123456AA,
-    0x70605040,
-    0xB0A09080
+    0x345678AA,
+    0x34567812,
+    0x00ABCD12
     ]
     offset = dut.debugSerialPort.rm.tx_data.address_offset
     for e, index in enumerate(range(offset, offset+len(testTXpacket))):

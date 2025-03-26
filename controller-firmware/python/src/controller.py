@@ -8,6 +8,7 @@ from interface_cards.serial_interface import serial_interface_card
 from fanuc_encoder import Fanuc_Encoders
 from global_timer import Global_Timers
 from em_serial_controller import EM_Serial_Controller
+from yaskawa_encoders import Yaskawa_Encoders
 
 
 
@@ -227,20 +228,7 @@ class Controller(wiring.Component):
         if(self.DATA_MEMORY_SIZE < self.PS_TO_PL_DATA_SIZE // 4):
             raise Exception("Data memory size is smaller than the data memory access size")
 
-        # self.desc.addDriverData("OCM_BASE_ADDR", self.OCM_BASE_ADDR)
-        # self.desc.addDriverData("OCM_SIZE", self.OCM_SIZE)
-        # self.desc.addDriverData("PS_TO_PL_CONTROL_OFFSET", self.PS_TO_PL_CONTROL_OFFSET)
-        # self.desc.addDriverData("PS_TO_PL_CONTROL_SIZE", self.PS_TO_PL_CONTROL_SIZE)
-        # self.desc.addDriverData("PL_TO_PS_CONTROL_OFFSET", self.PL_TO_PS_CONTROL_OFFSET)
-        # self.desc.addDriverData("PL_TO_PS_CONTROL_SIZE", self.PL_TO_PS_CONTROL_SIZE)
-        # self.desc.addDriverData("PS_TO_PL_DATA_OFFSET", self.PS_TO_PL_DATA_OFFSET)
-        # self.desc.addDriverData("PS_TO_PL_DATA_SIZE", self.PS_TO_PL_DATA_SIZE)
-        # self.desc.addDriverData("PL_TO_PS_DATA_OFFSET", self.PL_TO_PS_DATA_OFFSET)
-        # self.desc.addDriverData("PL_TO_PS_DATA_SIZE", self.PL_TO_PS_DATA_SIZE)
-        # self.desc.addDriverData("PS_TO_PL_DMA_INSTRUCTION_OFFSET", self.PS_TO_PL_DMA_INSTRUCTION_OFFSET)
-        # self.desc.addDriverData("PS_TO_PL_DMA_INSTRUCTION_SIZE", self.PS_TO_PL_DMA_INSTRUCTION_SIZE)
-        # self.desc.addDriverData("INSTRUCTION_MEMORY_SIZE", self.INSTRUCTION_MEMORY_SIZE)
-        # self.desc.addDriverData("DATA_MEMORY_SIZE", self.DATA_MEMORY_SIZE)
+
 
         driver_settings = {
             "OCM_BASE_ADDR": self.OCM_BASE_ADDR,
@@ -257,6 +245,12 @@ class Controller(wiring.Component):
             "PS_TO_PL_DMA_INSTRUCTION_SIZE": self.PS_TO_PL_DMA_INSTRUCTION_SIZE,
             "INSTRUCTION_MEMORY_SIZE": self.INSTRUCTION_MEMORY_SIZE,
             "DATA_MEMORY_SIZE": self.DATA_MEMORY_SIZE,
+            "NODE_COUNT": len(self.nodes),
+            
+            # these settings are based on the shift DMA architecture
+            "INTER_NODE_CYCLES": 1,
+            "INTRA_NODE_CYCLES": 2,
+            "DMA_CYCLES": 1,
         }
         self.rm = RegisterMapGenerator("controller", ["controller"], driver_settings)
         self.rm.generate()
@@ -460,6 +454,9 @@ class Controller(wiring.Component):
 
         # PS to PL
         self.cycle_timer_config = Signal(16, reset=0xFFFF)   # main timer for triggering FPGA updates, 25Mhz clock, lowest possible update frequency is ~380hz
+        self.watchdog_register = Signal(16)  # a value other than 0 must be written to enable the FPGA, tis value must change regularly to keep the FPGA enabled
+        self.last_watchdog_value = Signal(16)  # last value written to the watchdog register
+        self.watchdog_counter = Signal(8)  # this counter is decremented every cycle, if it reaches 0, the FPGA updates are permanently disabled
 
         if(self.sim):
             self.cycle_timer_config = Signal(16, reset=0x0010)
@@ -651,8 +648,13 @@ class Controller(wiring.Component):
                 with m.Switch(self.internal_axi_write_address):
                     with m.Case(0):
                         with m.If(self.internal_axi_write_enable):
-                            m.d.sync_100 += self.cycle_timer_config.eq(self.internal_axi_write_data[0:16])
-                            m.d.sync_100 += self.dma_instruction_block_select.eq(self.internal_axi_write_data[16:20])
+                            m.d.sync_100 += self.cycle_timer_config.eq(self.internal_axi_write_data[0:16])  # set the cycle timer
+                            m.d.sync_100 += self.dma_instruction_block_select.eq(self.internal_axi_write_data[16:20])   # set the dma instruction block select
+                            m.d.sync_100 += self.watchdog_register.eq(self.internal_axi_write_data[32:48])  # set the watchdog register
+
+                    # with m.Case(1):
+                    #     with m.If(self.internal_axi_write_enable):
+                    #         m.d.sync_100 += self.watchdog_register.eq(self.internal_axi_write_data[0:16])  # set the watchdog register
                     with m.Default():
                         pass
                 m.d.sync_100 += self.internal_axi_write_ready.eq(1)
@@ -664,7 +666,7 @@ class Controller(wiring.Component):
                 m.d.sync_100 += self.internal_axi_write_ready.eq(1)
 
             with m.Case(2): # dma instructions
-                m.d.comb += self.instruction_write_address.eq(self.internal_axi_write_address | self.dma_instruction_block_select << 12)    # TODO: verify this works
+                m.d.comb += self.instruction_write_address.eq(self.internal_axi_write_address | self.dma_instruction_block_select << 12)    # TODO: verify this block select works
                 m.d.comb += self.instruction_write_data.eq(self.internal_axi_write_data)
                 m.d.comb += self.instruction_write_en.eq(self.internal_axi_write_enable)
                 m.d.sync_100 += self.internal_axi_write_ready.eq(1)
@@ -745,8 +747,18 @@ class Controller(wiring.Component):
                 m.d.sync_100 += self.pl_ps_interrupts[0].eq(0)
                 with m.If(self.cycle_timer == 0):
                     with m.If(self.cycle_timer_config != 0):    # writing zero to the timer will permanently stop the system (must be done before FPGA reconfiguration)
-                        m.next = "start_dma"
+                        with m.If(self.watchdog_counter != 0):  # dma allowed to run
+                            m.d.sync_100 += self.watchdog_counter.eq(self.watchdog_counter - 1)
+                            m.next = "start_dma"
+                        
+                        with m.Else():  # watchdog has expired, dma cannot run, but axi transfers are still allowed
+                            m.next = "start_axi_transfer"
 
+                    
+                    with m.If(self.watchdog_register != self.last_watchdog_value):  # new watchdog value written
+                        m.d.sync_100 += self.last_watchdog_value.eq(self.watchdog_register)
+                        m.d.sync_100 += self.watchdog_counter.eq(16)   # reset the watchdog counter
+                            
             
             with m.State("start_dma"):
                 m.d.sync_100 += self.shift_dma.start.eq(1)
@@ -890,22 +902,41 @@ class Controller(wiring.Component):
             card.slotIn.eq(self.slot_B_in),
             self.slot_B_out.eq(card.slotOut),
             self.slot_B_out_enable.eq(card.slotOutEnable),
+
+            #self.debug_pins[6].eq(self.slot_B_out[20]),
+            #self.debug_pins[7].eq(self.slot_B_out[21]),
         ]
 
         encoders = m.submodules["fanuc_encoders"]
         m.d.comb += [
             encoders.rx[0].eq(card.rs422_rx[0]),
             card.rs422_tx[0].eq(encoders.tx[0]),
+            #self.debug_pins[0].eq(encoders.tx[0]),
+            #self.debug_pins[1].eq(encoders.rx[0]),
         ]
 
-        timers = m.submodules["global_timers"]
+        yaskawa_encoders = m.submodules["yaskawa_encoders"]
         m.d.comb += [
-            timers.trigger.eq(self.cycle_timer == 0),
-            encoders.trigger.eq(timers.timer_pulse[0]),
-            #self.debug_pins[0].eq(encoders.rx[0]),
-            #self.debug_pins[1].eq(encoders.bram_read_data[0]),
-            #self.debug_pins.eq(encoders.bram_read_data),
+            yaskawa_encoders.rx[0].eq(card.rs485_rx[1]),
+            card.rs485_tx[1].eq(yaskawa_encoders.tx[0]),
+            card.rs485_tx_enable[1].eq(yaskawa_encoders.tx_enable[0]),
+            # self.debug_pins.eq(yaskawa_encoders.debug),
+            # self.debug_pins[0].eq(self.slot_B_out[8]),
+            # self.debug_pins[1].eq(self.slot_B_out_enable[8]),
+            # self.debug_pins[2].eq(self.slot_B_in[8]),
+            # self.debug_pins[3].eq(self.slot_B_out[9]),
+            # self.debug_pins[4].eq(self.slot_B_out_enable[9]),
+            # self.debug_pins[5].eq(self.slot_B_in[9])
         ]
+
+        # timers = m.submodules["global_timers"]
+        # m.d.comb += [
+        #     timers.trigger.eq(self.cycle_timer == 0),
+        #     encoders.trigger.eq(timers.timer_pulse[0]),
+        #     #self.debug_pins[0].eq(encoders.rx[0]),
+        #     #self.debug_pins[1].eq(encoders.bram_read_data[0]),
+        #     #self.debug_pins.eq(encoders.bram_read_data),
+        # ]
 
         serial_controller = m.submodules["em_serial_controller"]
         m.d.comb += [
@@ -915,7 +946,18 @@ class Controller(wiring.Component):
             self.debug_pins[0].eq(serial_controller.tx),
             self.debug_pins[1].eq(serial_controller.rx),
         ]
-        
+
+        #m.d.comb += self.debug_pins[0:6].eq(self.shift_dma.timer_count)
+
+        with m.If((serial_controller.bram_address == 128+3) & (serial_controller.bram_write_enable == 0)):
+            m.d.comb += self.debug_pins[2].eq(1)
+        m.d.comb += self.debug_pins[3].eq(serial_controller.bram_read_data[0])
+        m.d.comb += self.debug_pins[4].eq(serial_controller.bram_read_data[1])
+        m.d.comb += self.debug_pins[5].eq(serial_controller.bram_read_data[2])
+        m.d.comb += self.debug_pins[6].eq(serial_controller.bram_read_data[3])
+        m.d.comb += self.debug_pins[7].eq(serial_controller.bram_read_data[4])
+
+
         #m.d.comb += self.debug_pins[2:].eq(serial_controller.debugPins)
 
         # with m.If((self.shift_dma.read_node_address_input == 4) & (self.shift_dma.read_bram_address_input == 0x1)): # read dev 0 status
@@ -928,12 +970,12 @@ class Controller(wiring.Component):
         # with m.If((self.shift_dma.write_node_address_input == 0) & (self.shift_dma.write_bram_address_input == 6)):
         #     m.d.comb += self.debug_pins[3].eq(1)
 
-        with m.If((self.shift_dma.data_memory_address == 8) & (self.shift_dma.data_memory_write_enable == 1)):
-            m.d.comb += self.debug_pins[2].eq(1)
-        m.d.comb += self.debug_pins[3].eq(self.shift_dma.data_memory_write_data[0])
-        m.d.comb += self.debug_pins[4].eq(self.shift_dma.data_memory_write_data[1])
-        m.d.comb += self.debug_pins[5].eq(self.shift_dma.data_memory_write_data[2])
-        m.d.comb += self.debug_pins[6].eq(self.shift_dma.data_memory_write_data[3])
+        # with m.If((self.shift_dma.data_memory_address == 8) & (self.shift_dma.data_memory_write_enable == 1)):
+        #     m.d.comb += self.debug_pins[2].eq(1)
+        # m.d.comb += self.debug_pins[3].eq(self.shift_dma.data_memory_write_data[0])
+        # m.d.comb += self.debug_pins[4].eq(self.shift_dma.data_memory_write_data[1])
+        # m.d.comb += self.debug_pins[5].eq(self.shift_dma.data_memory_write_data[2])
+        # m.d.comb += self.debug_pins[6].eq(self.shift_dma.data_memory_write_data[3])
 
         #m.d.comb += self.debug_pins[5].eq(self.axi_transfer_busy)
         
@@ -960,7 +1002,7 @@ class Controller(wiring.Component):
         ]
 
         import json
-        with open("controller_config.json", "w") as file:
+        with open("fpga_config.json", "w") as file:
             json.dump(device_map, file, indent=4)
 
 
@@ -975,7 +1017,8 @@ sim = 0
 nodes = {
     "serial_card" : serial_interface_card(),
     "fanuc_encoders" : Fanuc_Encoders(6),
-    "global_timers" : Global_Timers(),
+    "yaskawa_encoders" : Yaskawa_Encoders(6),
+    #"global_timers" : Global_Timers(),
     "em_serial_controller" : EM_Serial_Controller(max_packet_size=64, max_number_of_devices=16),
 }
 

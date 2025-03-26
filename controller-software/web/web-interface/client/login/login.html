@@ -1,0 +1,26 @@
+<!-- client/login.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; }
+    form { max-width: 300px; margin: auto; }
+    label { display: block; margin-top: 1em; }
+    button { margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>Login</h1>
+  <form action="/login" method="post">
+    <label for="username">Username:</label>
+    <input type="text" name="username" id="username" required>
+    
+    <label for="password">Password:</label>
+    <input type="password" name="password" id="password" required>
+    
+    <button type="submit">Login</button>
+  </form>
+</body>
+</html>
