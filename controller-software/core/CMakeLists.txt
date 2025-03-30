@@ -64,6 +64,6 @@ target_link_libraries(${EXECUTABLE} PRIVATE libpthread.so)
 add_custom_command(TARGET controller_core POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:${EXECUTABLE}>
-        ${CMAKE_CURRENT_SOURCE_DIR}/zynq_files/controller/bin
+        ${CMAKE_CURRENT_SOURCE_DIR}/zynq_files/controller/bin/controller_core
 )
 
