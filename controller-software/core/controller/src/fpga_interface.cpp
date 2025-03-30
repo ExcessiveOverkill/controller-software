@@ -97,7 +97,7 @@ uint32_t Fpga_Interface::initialize(const fpga_mem_layout mem_layout, std::strin
     *fpga_main_trigger_counter = 0xFFFF; // set back to maximum for lowest update frequency
 
     cache_flush_all();
-
+ 
     // clear PL controlled memory
     memset((char*)ocm_base_pointer + mem_layout.PL_to_PS_data_base_addr_offset, 0, mem_layout.PL_to_PS_data_size);
     memset((char*)ocm_base_pointer + mem_layout.PL_to_PS_control_base_addr_offset, 0, mem_layout.PL_to_PS_control_size);

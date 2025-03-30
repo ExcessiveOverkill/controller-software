@@ -45,6 +45,9 @@ class em_serial_controller : public base_driver {
         
                 uint32_t set_cyclic_read_pointer(uint16_t address, void** data); // automatically move cyclic data to the pointer
                 uint32_t set_cyclic_write_pointer(uint16_t address, void** data); // automatically move pointer data to the cyclic location
+
+                uint8_t get_read_cyclic_config_count(){return read_cyclic_configs.size();}
+                uint8_t get_write_cyclic_config_count(){return write_cyclic_configs.size();}
         
                 uint32_t run(); // run the device, must be called at each FPGA update
         

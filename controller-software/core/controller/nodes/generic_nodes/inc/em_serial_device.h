@@ -91,6 +91,7 @@ class em_serial_device: public base_node{
             case state::ENABLE_CYCLIC_MODE:
                 if(device->get_cyclic_data_enabled()){
                     current_state = state::RUN;
+                    current_message_id = 0; // update all messages on the first run
                 }
                 break;
 
@@ -142,6 +143,35 @@ class em_serial_device: public base_node{
                 }
             }
 
+
+            // if no async updates ran, update messages if needed
+            if(current_message_id != -1){
+                if(device->get_pending_sequential_cmds() == 0){
+
+                    if(current_message_id < dev_desc.message_count){
+                        // select the next message
+                        device->sequential_write(dev_desc.message_control_address, &current_message_id, sizeof(uint16_t));
+
+                        message* msg = &(dev_desc.messages[current_message_id]);
+
+                        uint32_t* lower = &(msg->last_trigger_time_us.u32[0]);
+                        uint32_t* upper = &(msg->last_trigger_time_us.u32[1]);
+
+                        // read the message time
+                        device->sequential_read(dev_desc.message_time_lower_address, lower, sizeof(uint32_t));
+                        device->sequential_read(dev_desc.message_time_upper_address, upper, sizeof(uint32_t));
+
+                        current_message_id++;
+                    }
+                    else{
+                        current_message_id = -1;
+                        dump_messages();
+                    }
+                    
+                }
+
+            }
+
             return;
         }
 
@@ -150,6 +180,13 @@ class em_serial_device: public base_node{
             for(auto& cpy : cyclic_node_copies){
                 uint16_t test = *(reinterpret_cast<uint16_t*>(cpy.src));
                 memcpy(cpy.dst, cpy.src, cpy.size);
+            }
+        }
+
+        void dump_messages(){
+            // print all messages to terminal
+            for(auto& msg : dev_desc.messages){
+                std::cout << "Trigger time (us): " << msg.second.last_trigger_time_us.u64 << "\tSeverity: " << msg.second.str_severity << "\tMessage: " << msg.second.path << " - " << msg.second.message << ": " << msg.second.description << std::endl;
             }
         }
 
@@ -193,21 +230,25 @@ class em_serial_device: public base_node{
                         "cyclic_read_regs":[
                             {
                                 "name": "register_name",
-                                "sync_with_node": true
+                                "sync_with_node": true,
+                                "cyclic_index": 3
                             },
                             {
                                 "name": "register_name2",
-                                "sync_with_node": true
+                                "sync_with_node": true,
+                                "cyclic_index": 4
                             }
                         ],
                         "cyclic_write_regs":[
                             {
                                 "name": "register_name",
-                                "sync_with_node": true
+                                "sync_with_node": true,
+                                "cyclic_index": 3
                             },
                             {
                                 "name": "register_name2",
-                                "sync_with_node": true
+                                "sync_with_node": true,
+                                "cyclic_index": 4
                             }
                         ]
 
@@ -285,7 +326,9 @@ class em_serial_device: public base_node{
                 r.sync_with_node = reg["sync_with_node"].get<bool>();
                 r.address = dev_desc.registers[r.name].index;   // get the address from the device descriptor
                 r.size = dev_desc.registers[r.name].size;   // get the size from the device descriptor
-                cyclic_read_regs.push_back(r);
+                r.cyclic_index = reg["cyclic_index"].get<uint8_t>();
+                highest_cyclic_read_index = std::max(highest_cyclic_read_index, r.cyclic_index);
+                cyclic_read_regs.emplace(r.cyclic_index, r);
             }
 
             // load cyclic write registers
@@ -299,7 +342,9 @@ class em_serial_device: public base_node{
                 r.sync_with_node = reg["sync_with_node"].get<bool>();
                 r.address = dev_desc.registers[r.name].index;   // get the address from the device descriptor
                 r.size = dev_desc.registers[r.name].size;   // get the size from the device descriptor
-                cyclic_write_regs.push_back(r);
+                r.cyclic_index = reg["cyclic_index"].get<uint8_t>();
+                highest_cyclic_write_index = std::max(highest_cyclic_write_index, r.cyclic_index);
+                cyclic_write_regs.emplace(r.cyclic_index, r);
             }
 
             // load set registers
@@ -341,7 +386,8 @@ class em_serial_device: public base_node{
             // configure cyclic updates and add inputs/outputs
 
             // outputs from the device
-            for(auto& reg : cyclic_read_regs){
+            for(auto& r : cyclic_read_regs){
+                cyclic_reg& reg = r.second;
 
                 if(reg.sync_with_node){ // we need to move the data to the node system and create an output
                     uint8_t* data = new uint8_t[reg.size];  // create a new place to store the data
@@ -354,7 +400,8 @@ class em_serial_device: public base_node{
             }
 
             // inputs to the device
-            for(auto& reg : cyclic_write_regs){
+            for(auto& r : cyclic_write_regs){
+                cyclic_reg& reg = r.second;
 
                 if(reg.sync_with_node){ // we need to move the data from the node system and create an input
                     inputs.emplace(reg.name, input(dev_desc.registers[reg.name].type, nullptr));    // create an input for the async write
@@ -381,6 +428,8 @@ class em_serial_device: public base_node{
             RUN,
             RESET
         }current_state = state::INITIAL_CONFIG;
+
+        uint32_t current_message_id = -1;    // used to track the current message when reading all messages from the device
 
         //uint32_t comm_fault_count = 0;  // faults from packet failure
         //uint32_t device_protocol_fault_count = 0;   // faults from the device protocol (tried to do something that is not allowed)
@@ -428,10 +477,15 @@ class em_serial_device: public base_node{
 
         struct message{
             uint8_t severity = 0;
-            uint32_t value = 0;
+            std::string str_severity = "";
+            uint16_t id = 0;
             std::string path = "";
             std::string message = "";
             std::string description = "";
+            union last_trigger_time_us{
+                uint32_t u32[2];
+                uint64_t u64;
+            }last_trigger_time_us;
         };
 
         struct device_descriptor{
@@ -440,6 +494,11 @@ class em_serial_device: public base_node{
             std::map<std::string, reg> registers;   // name, register
             std::map<uint32_t, message> messages;  // identifier, message
             bool loaded = false;
+            uint16_t message_count = 0;
+            uint16_t message_control_address = 0;
+            uint16_t message_time_lower_address = 0;
+            uint16_t message_time_upper_address = 0;
+            uint16_t dummy_reg_address = 0;
         } dev_desc;
 
         struct async_reg{
@@ -454,6 +513,7 @@ class em_serial_device: public base_node{
 
         struct cyclic_reg{
             std::string name = "";
+            uint8_t cyclic_index = 0; // index of the cyclic memory in the FPGA module
             bool sync_with_node = false;
             uint8_t size = 0; // size of the data in bytes
             uint16_t address = 0;   // register address to read/write
@@ -476,8 +536,11 @@ class em_serial_device: public base_node{
 
         std::vector<async_reg> async_read_regs;
         std::vector<async_reg> async_write_regs;
-        std::vector<cyclic_reg> cyclic_read_regs;
-        std::vector<cyclic_reg> cyclic_write_regs;
+        std::map<uint8_t, cyclic_reg> cyclic_read_regs;
+        std::map<uint8_t, cyclic_reg> cyclic_write_regs;
+
+        uint8_t highest_cyclic_read_index = 0;
+        uint8_t highest_cyclic_write_index = 0;
 
         std::vector<set_reg> set_regs;
 
@@ -563,6 +626,7 @@ class em_serial_device: public base_node{
 
 
             // load messages
+            dev_desc.message_count = 0;
             for(auto& msg_class_j : j["messages"].items()){
 
                 std::string msg_class = msg_class_j.key();
@@ -589,15 +653,32 @@ class em_serial_device: public base_node{
                         std::cerr << "Error: unknown message severity found in device descriptor: " << file_path << std::endl;
                         return 4;
                     }
-                    msg.value = msg_j.value()["value"].get<uint32_t>();
-                    msg.path = msg_class + msg_j.key();
+                    msg.str_severity = severity;
+                    msg.id = msg_j.value()["id"].get<uint16_t>();
+                    msg.path = msg_class + "." + msg_j.key();
                     msg.message = msg_j.value()["readable_name"].get<std::string>();
                     msg.description = msg_j.value()["description"].get<std::string>();
+                    msg.last_trigger_time_us.u64 = 0;
 
-                    dev_desc.messages.emplace(msg.value, msg);
+                    dev_desc.message_count++;
+
+                    dev_desc.messages.emplace(msg.id, msg);
 
                 }
             }
+
+            // set message control addresses
+            if(dev_desc.registers.find("message_control") == dev_desc.registers.end() ||
+                dev_desc.registers.find("message_time_lower") == dev_desc.registers.end() ||
+                dev_desc.registers.find("message_time_upper") == dev_desc.registers.end() ||
+                dev_desc.registers.find("dummy_register") == dev_desc.registers.end()){
+                throw std::runtime_error("Error: missing required message control registers in device descriptor");
+            }
+
+            dev_desc.message_control_address = dev_desc.registers["message_control"].index;
+            dev_desc.message_time_lower_address = dev_desc.registers["message_time_lower"].index;
+            dev_desc.message_time_upper_address = dev_desc.registers["message_time_upper"].index;
+            dev_desc.dummy_reg_address = dev_desc.registers["dummy_register"].index;
 
             dev_desc.loaded = true;
 
@@ -653,41 +734,108 @@ class em_serial_device: public base_node{
 
             device->set_address(comm.device_address);
 
-            
+            bool skipped_index = false;
+
             // configure cyclic reads
-            for(auto& reg : cyclic_read_regs){
-                if(reg.sync_with_node){
-                    if(used_cyclic_read_node_vars >= device->cyclic_read_node_var_regs.size()){
-                        std::cerr << "Error: too many node cyclic read registers configured" << std::endl;
-                        return 3;
+            for(uint8_t i = 0; i <= highest_cyclic_read_index; i++){
+
+                // reserved for device communication
+                if(i < 3){
+                    if(cyclic_read_regs.find(i) != cyclic_read_regs.end()){
+                        throw std::runtime_error("Error: cyclic read register index " + std::to_string(i) + " is reserved for device communication");
                     }
-                    // copy from global var to the note output
-                    cyclic_node_copy c;
-                    c.src = device->cyclic_read_node_var_regs[used_cyclic_read_node_vars]->get_raw_data_ptr<uint32_t>();
-                    c.dst = reg.data_ptr;
-                    c.size = reg.size;
-                    cyclic_node_copies.push_back(c);
-                    used_cyclic_read_node_vars++;
+                    continue;
                 }
-                device->configure_cyclic_read(reg.address, reg.size);
+
+                // reserved for node vars
+                if(i < device->cyclic_read_node_var_regs.size() + 3){
+                    if(cyclic_read_regs.find(i) != cyclic_read_regs.end()){
+                        auto reg = cyclic_read_regs.find(i)->second;
+                        if(reg.sync_with_node){
+                            // copy from global var to the note output
+                            cyclic_node_copy c;
+                            c.src = device->cyclic_read_node_var_regs[used_cyclic_read_node_vars]->get_raw_data_ptr<uint32_t>();
+                            c.dst = reg.data_ptr;
+                            c.size = reg.size;
+                            cyclic_node_copies.push_back(c);
+                            device->configure_cyclic_read(reg.address, reg.size);
+                        }
+                        else{
+                            throw std::runtime_error("Error: cyclic read register index " + std::to_string(i) + " is reserved for synced node vars");
+                        }
+                    }
+                    else{
+                        // no user config, set it to the dummy register
+                        device->configure_cyclic_read(dev_desc.dummy_reg_address, sizeof(uint8_t));
+                    }
+                    continue;
+                }
+
+                // any remaining indexes must be used for FPGA direct access
+                if(cyclic_read_regs.find(i) != cyclic_read_regs.end()){
+                    auto reg = cyclic_read_regs.find(i)->second;
+                    if(reg.sync_with_node){
+                        throw std::runtime_error("Error: cyclic read register index " + std::to_string(i) + " is reserved for FPGA direct access");
+                    }
+                    if(skipped_index){
+                        throw std::runtime_error("Error: cyclic read register index " + std::to_string(i) + " skipped an index, configs must be contiguous");
+                    }
+                    device->configure_cyclic_read(reg.address, reg.size);
+                }
+                else{
+                    skipped_index = true;
+                }
             }
 
             // configure cyclic writes
-            for(auto& reg : cyclic_write_regs){
-                if(reg.sync_with_node){
-                    if(used_cyclic_write_node_vars >= device->cyclic_write_node_var_regs.size()){
-                        std::cerr << "Error: too many node cyclic write registers configured" << std::endl;
-                        return 3;
+            for(uint8_t i = 0; i <= highest_cyclic_write_index; i++){
+
+                // reserved for device communication
+                if(i < 3){
+                    if(cyclic_write_regs.find(i) != cyclic_write_regs.end()){
+                        throw std::runtime_error("Error: cyclic write register index " + std::to_string(i) + " is reserved for device communication");
                     }
-                    // copy from the node input to the global var
-                    cyclic_node_copy c;
-                    c.src = reg.in->data_pointer;   // TODO: fix this, if the inpuup changes the pointer will be invalid
-                    c.dst = device->cyclic_write_node_var_regs[used_cyclic_write_node_vars]->get_raw_data_ptr<uint32_t>();
-                    c.size = reg.size;
-                    cyclic_node_copies.push_back(c);
-                    used_cyclic_write_node_vars++;
+                    continue;
                 }
-                device->configure_cyclic_write(reg.address, reg.size);
+
+                // reserved for node vars
+                if(i < device->cyclic_write_node_var_regs.size() + 3){
+                    if(cyclic_write_regs.find(i) != cyclic_write_regs.end()){
+                        auto reg = cyclic_write_regs.find(i)->second;
+                        if(reg.sync_with_node){
+                            // copy from global var to the note output
+                            cyclic_node_copy c;
+                            c.dst = device->cyclic_write_node_var_regs[used_cyclic_write_node_vars]->get_raw_data_ptr<uint32_t>();
+                            c.src = reg.in->data_pointer;
+                            c.size = reg.size;
+                            cyclic_node_copies.push_back(c);
+                            device->configure_cyclic_write(reg.address, reg.size);
+                        }
+                        else{
+                            throw std::runtime_error("Error: cyclic write register index " + std::to_string(i) + " is reserved for synced node vars");
+                        }
+                    }
+                    else{
+                        // no user config, set it to the dummy register
+                        device->configure_cyclic_write(dev_desc.dummy_reg_address, sizeof(uint8_t));
+                    }
+                    continue;
+                }
+
+                // any remaining indexes must be used for FPGA direct access
+                if(cyclic_write_regs.find(i) != cyclic_write_regs.end()){
+                    auto reg = cyclic_write_regs.find(i)->second;
+                    if(reg.sync_with_node){
+                        throw std::runtime_error("Error: cyclic write register index " + std::to_string(i) + " is reserved for FPGA direct access");
+                    }
+                    if(skipped_index){
+                        throw std::runtime_error("Error: cyclic write register index " + std::to_string(i) + " skipped an index, configs must be contiguous");
+                    }
+                    device->configure_cyclic_write(reg.address, reg.size);
+                }
+                else{
+                    skipped_index = true;
+                }
             }
 
             driver_setup_done = true;

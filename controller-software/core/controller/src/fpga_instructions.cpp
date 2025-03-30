@@ -485,11 +485,21 @@ uint32_t fpga_instructions::compile(){
             if(register_index_source_node_var != ""){
                 throw std::invalid_argument("dynamic register index cannot be used with fpga to fpga transfer");
             }
+            instruction->src_addr = source_reg->pl_data.absolute_address;
+            instruction->src_node = source_reg->pl_data.node_index;
+            instruction->dst_addr = destination_reg->pl_data.absolute_address;
+            instruction->dst_node = destination_reg->pl_data.node_index;
+
+            delete source_reg;
+            delete destination_reg;
         }
         else if(source_reg != nullptr){
             // copy from fpga reg to node var
             sync_with_ps(source_reg, base_mem);
-            node_core->set_global_variable_data_ptr(destination_node_var, source_reg->ps_data.software_data_ptr);
+            if(node_core->set_global_variable_data_ptr(destination_node_var, source_reg->ps_data.software_data_ptr)){
+                std::cerr << "Error: failed to set global variable data pointer" << std::endl;
+                return 1;
+            }
             instruction->src_addr = source_reg->pl_data.absolute_address;
             instruction->src_node = source_reg->pl_data.node_index;
             instruction->dst_addr = source_reg->ps_data.hardware_data_ptr;
@@ -502,7 +512,10 @@ uint32_t fpga_instructions::compile(){
         else if(destination_reg != nullptr){
             // copy from node var to fpga reg
             sync_with_ps(destination_reg, base_mem);
-            node_core->set_global_variable_data_ptr(source_node_var, destination_reg->ps_data.software_data_ptr);
+            if(node_core->set_global_variable_data_ptr(source_node_var, destination_reg->ps_data.software_data_ptr)){
+                std::cerr << "Error: failed to set global variable data pointer" << std::endl;
+                return 1;
+            }
             instruction->src_addr = destination_reg->ps_data.hardware_data_ptr;
             instruction->src_node = 0;
             instruction->dst_addr = destination_reg->pl_data.absolute_address;

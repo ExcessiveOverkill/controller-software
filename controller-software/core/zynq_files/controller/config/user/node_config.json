@@ -36,14 +36,6 @@
                     }
                 },
 
-                "print_float":{
-                    "type":"float_print_cout"
-                },
-
-                "print_drive_fan_measured":{
-                    "type":"uint16_print_cout"
-                },
-
                 "converter":{
                     "type":"convert_io_types",
                     "config":{
@@ -81,13 +73,20 @@
                             "cyclic_write_regs":[
                                 {
                                     "name": "fan_speed_cmd",
-                                    "sync_with_node": true
+                                    "sync_with_node": true,
+                                    "cyclic_index": 3
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "sync_with_node": false,
+                                    "cyclic_index": 5
                                 }
                             ],
                             "cyclic_read_regs":[
                                 {
                                     "name": "fan_speed_measured",
-                                    "sync_with_node": true
+                                    "sync_with_node": true,
+                                    "cyclic_index": 3
                                 }
                             ]
                         }
@@ -109,8 +108,8 @@
                 "0":{
                     "src_node":"float_cmds",
                     "src_port":"output_0",
-                    "dst_node":"print_float",
-                    "dst_port":"input"
+                    "dst_node":"converter",
+                    "dst_port":"fan_speed_cmd"
                 },
                 "1":{
                     "src_node":"float_cmds",
@@ -119,24 +118,12 @@
                     "dst_port":"fan_speed_cmd"
                 },
                 "2":{
-                    "src_node":"float_cmds",
-                    "src_port":"output_0",
-                    "dst_node":"converter",
-                    "dst_port":"fan_speed_cmd"
-                },
-                "3":{
                     "src_node":"serial_devices",
                     "src_port":"device_0",
                     "dst_node":"servo_drive_0",
                     "dst_port":"em_device"
                 },
-                "4":{
-                    "src_node":"servo_drive_0",
-                    "src_port":"fan_speed_measured",
-                    "dst_node":"print_drive_fan_measured",
-                    "dst_port":"input"
-                },
-                "5":{
+                "3":{
                     "src_node":"converter",
                     "src_port":"fan_speed_cmd",
                     "dst_node":"servo_drive_0",

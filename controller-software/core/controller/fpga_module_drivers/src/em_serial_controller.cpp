@@ -654,8 +654,11 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
             if(!cmd->write){
                 // read command, so save the data
                 memcpy(cmd->data_pointer, regs.cyclic_reads[2]->get_raw_data_ptr<uint32_t>(), cmd->size);
+                //std::cout << "read cmd complete for address: " << cmd->address << " " << *reinterpret_cast<uint32_t*>(cmd->data_pointer) << std::endl;
             }
-            //std::cout << "cmd complete for address: " << cmd->address << " " << cmd->data << std::endl;
+            else{
+                //std::cout << "write cmd complete for address: " << cmd->address << " " << cmd->data << std::endl;
+            }
             sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
             
 
