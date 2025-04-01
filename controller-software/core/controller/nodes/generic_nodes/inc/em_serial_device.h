@@ -71,18 +71,18 @@ class em_serial_device: public base_node{
                 break;
 
             case state::DISABLE_CYCLIC_MODE:
-                if(device->get_sequential_cmds_complete() && device->get_cyclic_data_enabled()){
-                    device->set_cyclic_data_enabled(false);
-                }
                 if(device->get_sequential_cmds_complete() && !device->get_cyclic_data_enabled() && device->consecutive_packet_errors == 0){
                     device->rerun_cylic_config();
                     current_state = state::CONFIGURE_CYCLIC_MODE;
                 }
-                
+                if(device->get_sequential_cmds_complete()){
+                    device->set_cyclic_data_enabled(false);
+                }
+                device->force_disable_cyclic_data();
                 break;
             
             case state::CONFIGURE_CYCLIC_MODE:
-                if(device->get_cyclic_config_complete()){
+                if(device->get_cyclic_config_complete() && device->get_sequential_cmds_complete()){
                     device->set_cyclic_data_enabled(true);
                     current_state = state::ENABLE_CYCLIC_MODE;
                 }

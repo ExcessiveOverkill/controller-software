@@ -37,6 +37,8 @@ public:
 
     uint32_t compile_instructions();
 
+    void set_update_frequency(uint32_t frequency);
+
     uint32_t create_global_variables();
 
     void set_microseconds(const uint64_t* microseconds);

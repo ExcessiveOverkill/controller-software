@@ -14,10 +14,6 @@ uint32_t em_serial_controller::custom_load_config(json* user_driver_config){
         new_baud_rate = 115200;
     }
 
-    cpy_time_reference(0);
-    cpy_write_priority();
-    cpy_execution_window(0, 1000);
-
     // create all device objects based on the number of devices in the config
     auto device_group = loader.get_group("devices", 0);
     uint16_t num_devices = device_group->group_data.count;
@@ -40,12 +36,33 @@ uint32_t em_serial_controller::custom_load_config(json* user_driver_config){
         devices.push_back(device);
     }
 
+    // tx regs
+    cpy_time_reference(0);
+    cpy_write_priority();
+    cpy_execution_window(0, 1000);
+
     // bit length defines the baud rate
     bit_length = loader.get_register("bit_length", 0);
     cpy_destination(bit_length);
     cpy_source("bit_length");
     cpy_add_instruction();
 
+    // tx regs
+    cpy_time_reference(1000);
+    cpy_write_priority();
+    cpy_execution_window(0, 10);
+
+    control = loader.get_register("control", 0);
+    start_transfers = control->get_register("start_transfers");
+    cpy_destination(control);
+    cpy_source("control");
+    cpy_add_instruction();
+
+    
+    // rx regs
+    cpy_time_reference(-2);    // -2 means use the end of the update period as the time reference
+    cpy_read_priority();
+    cpy_execution_window(-1000, 0);
 
     status = loader.get_register("status", 0);
     status_update_busy = status->get_register("update_busy");
@@ -53,31 +70,6 @@ uint32_t em_serial_controller::custom_load_config(json* user_driver_config){
     status_update_error = status->get_register("update_error");
     cpy_source(status);
     cpy_destination("status");
-    cpy_add_instruction();
-
-    //configure_baud_rate(12.5e6);
-
-
-    ////////////////// TESTING ///////////////////
-
-    // control current cmd
-    //devices[0]->configure_cyclic_write(5, 4);    // commanded q current is milliamps
-
-    // void* cmd_ptr = nullptr;
-    // devices[0]->set_cyclic_write_pointer(5, &cmd_ptr);
-    // cmd_q_current_milliamps = reinterpret_cast<int32_t*>(cmd_ptr);
-
-    // add instruction to copy commutation from encoder to drive
-    //uint64_t inst = create_instruction_COPY(2, 2, 4, 195);  // copy encoder commutation to drive cyclic #3
-
-    //loader.instructions->push_back(inst);
-
-    //devices[0]->set_address(0);
-
-    control = loader.get_register("control", 0);
-    start_transfers = control->get_register("start_transfers");
-    cpy_destination(control);
-    cpy_source("control");
     cpy_add_instruction();
 
     //add_node_var("enable", io_type::BOOL, (void**)&enable);
@@ -177,7 +169,7 @@ em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* c
 
     device_name = "device_" + std::to_string(device_number) + "_";
 
-
+    // settings for tx regs
     controller->cpy_time_reference(0);
     controller->cpy_write_priority();
     controller->cpy_execution_window(0, 1000);
@@ -197,6 +189,11 @@ em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* c
     controller->cpy_add_instruction();
     
     //regs.control_rx_cyclic_packet_size->set_value(3);   // size for device address, control, and data (32 bit words not including crc)
+
+    // settings for rx regs
+    controller->cpy_time_reference(-2);    // -2 means use the end of the update period as the time reference
+    controller->cpy_read_priority();
+    controller->cpy_execution_window(-1000, 0);
 
     // sync status register
     regs.status = device_group->get_register("status", 0);
@@ -229,6 +226,11 @@ em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* c
     // loader->sync_with_PS(regs.cyclic_reads[1]);     // rx sequential control
     // loader->sync_with_PS(regs.cyclic_reads[2]);     // rx sequential data
 
+    // settings for tx regs
+    controller->cpy_time_reference(0);
+    controller->cpy_write_priority();
+    controller->cpy_execution_window(0, 1000);
+
     controller->cpy_destination(regs.cyclic_writes[0]);
     controller->cpy_source(device_name+"tx_device_address");
     controller->cpy_add_instruction();
@@ -239,6 +241,11 @@ em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* c
     controller->cpy_source(device_name+"tx_sequential_data");
     controller->cpy_add_instruction();
 
+    // settings for rx regs
+    controller->cpy_time_reference(-2);    // -2 means use the end of the update period as the time reference
+    controller->cpy_read_priority();
+    controller->cpy_execution_window(-1000, 0);
+
     controller->cpy_source(regs.cyclic_reads[0]);
     controller->cpy_destination(device_name+"rx_device_address");
     controller->cpy_add_instruction();
@@ -248,6 +255,12 @@ em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* c
     controller->cpy_source(regs.cyclic_reads[2]);
     controller->cpy_destination(device_name+"rx_sequential_data");
     controller->cpy_add_instruction();
+
+
+    // settings for tx regs
+    controller->cpy_time_reference(0);
+    controller->cpy_write_priority();
+    controller->cpy_execution_window(0, 1000);
 
     // create dynamic register for cyclic config
     // this allows us to only take up one address in the PS and PL memory,
@@ -306,9 +319,10 @@ em_serial_controller::em_serial_device::em_serial_device(em_serial_controller* c
 
 void em_serial_controller::em_serial_device::set_cyclic_read_node_vars(uint8_t num_vars){
 
-    controller->cpy_time_reference(0);
-    controller->cpy_write_priority();
-    controller->cpy_execution_window(0, 1000);
+    // settings for rx regs
+    controller->cpy_time_reference(-2);    // -2 means use the end of the update period as the time reference
+    controller->cpy_read_priority();
+    controller->cpy_execution_window(-1000, 0);
 
     for(int i = 0; i < num_vars; i++){
 
@@ -324,6 +338,7 @@ void em_serial_controller::em_serial_device::set_cyclic_read_node_vars(uint8_t n
 
 void em_serial_controller::em_serial_device::set_cyclic_write_node_vars(uint8_t num_vars){
 
+    // settings for tx regs
     controller->cpy_time_reference(0);
     controller->cpy_write_priority();
     controller->cpy_execution_window(0, 1000);
@@ -753,9 +768,15 @@ uint32_t em_serial_controller::em_serial_device::run(){
 
     regs.control_enable->set_value(enabled);
 
+    if(force_disable_cyclic_data_flag){
+        cyclic_data_enabled = false;
+        force_disable_cyclic_data_flag = false;
+    }
+
     if(old_cyclic_data_enabled && !cyclic_data_enabled){
         // cyclic data was just disabled
         regs.control_enable_cyclic_data->set_value(0);
+        regs.control_rx_cyclic_packet_size->set_value(3);
     }
     else if(!old_cyclic_data_enabled && cyclic_data_enabled){
         // cyclic data was just enabled

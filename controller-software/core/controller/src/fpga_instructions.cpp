@@ -413,6 +413,10 @@ uint32_t fpga_instructions::add(copy instruction){
     return 0;
 }
 
+void fpga_instructions::set_update_frequency(uint32_t frequency){
+    full_update_counts = 100e6 / frequency; // DMA cycles in one update period
+}
+
 uint32_t fpga_instructions::compile(){
     /*
     cycle through all instructions
@@ -430,6 +434,9 @@ uint32_t fpga_instructions::compile(){
         std::string destination_node_var = "";
         std::string register_index_source_node_var = "";
 
+        if(instruction->time_reference == -2){  // -2 means use the end of the update period as the time reference
+            instruction->time_reference = full_update_counts - 2500;    // ~25us before the end of the update period to ensure there is time for the AXI transfer (~20us) to complete
+        }
 
         if(instruction->source_name == ""){
             std::cerr << "Error: instruction source not set" << std::endl;
@@ -532,7 +539,8 @@ uint32_t fpga_instructions::compile(){
         }
 
         if(register_index_source_node_var != ""){
-            node_core->set_global_variable_data_ptr(register_index_source_node_var, &(instruction->dynamic_reg_index));
+            uint32_t* dynamic_reg_index = &(instruction->dynamic_reg_index);
+            node_core->set_global_variable_data_ptr(register_index_source_node_var, dynamic_reg_index);
         }
 
     }
@@ -579,9 +587,12 @@ uint32_t fpga_instructions::compile(){
 
     std::cout << "instructions placed" << std::endl;
 
-    // for(auto instruction : instructions){
-    //     std::cout << instruction.dma_execution_cycle << std::endl;
-    // }
+    for(auto instruction : instructions){
+        if(instruction.block_placeholder){
+            continue;
+        }
+        std::cout << instruction.dma_execution_cycle << "\t" << instruction.source_name << " -> " << instruction.destination_name << std::endl;
+    }
 
     condense_instructions();
 
@@ -713,27 +724,47 @@ uint32_t fpga_instructions::condense_instructions(){
 
     dynamic_instructions.clear();   // clear the dynamic instructions list
 
-    std::sort(instructions.begin(), instructions.end(), [](const copy &a, const copy &b) {
-        return a.dma_execution_cycle < b.dma_execution_cycle;
+
+    // TODO: cant sort the instructions here because we need to keep the order of the instructions for pointers referencing them
+    // instead make a temporary array of pointers to the instructions and sort that
+
+    // std::sort(instructions.begin(), instructions.end(), [](const copy &a, const copy &b) {
+    //     return a.dma_execution_cycle < b.dma_execution_cycle;
+    // });
+
+    struct sorted_instruction{
+        uint32_t original_index;
+        copy* instruction;
+    };
+
+    sorted_instruction sorted_instructions[instructions.size()];
+
+    for (size_t i = 0; i < instructions.size(); ++i) {
+        sorted_instructions[i].instruction = &instructions[i];
+        sorted_instructions[i].original_index = i;
+    }
+
+    std::sort(sorted_instructions, sorted_instructions + instructions.size(), [](const sorted_instruction a, const sorted_instruction b) {
+        return a.instruction->dma_execution_cycle < b.instruction->dma_execution_cycle;
     });
 
-    uint32_t instruction_object_index = 0;
-    for(auto instruction : instructions){
+    for(auto sorted_inst : sorted_instructions){
+        copy* instruction = sorted_inst.instruction;
 
-        if(instruction.block_placeholder){
+        if(instruction->block_placeholder){
             continue;
         }
 
-        if(!instruction.placed){
+        if(!instruction->placed){
             throw std::invalid_argument("instruction is not placed");
         }
 
-        if(instruction.dma_execution_cycle <= prev_send_cycle && index != 0){
+        if(instruction->dma_execution_cycle <= prev_send_cycle && index != 0){
             throw std::invalid_argument("instruction dma execution cycle is before previous instruction");
             return 1;
         }
 
-        uint32_t diff = instruction.dma_execution_cycle - prev_send_cycle;
+        uint32_t diff = instruction->dma_execution_cycle - prev_send_cycle;
         if(diff > 2){
             cycle += diff - 1;
             condensed_instructions.push_back(create_instruction_WAIT(cycle));
@@ -746,13 +777,13 @@ uint32_t fpga_instructions::condense_instructions(){
         // }
 
         
-        condensed_instructions.push_back(create_instruction_COPY(instruction.src_node, instruction.src_addr, instruction.dst_node, instruction.dst_addr));
+        condensed_instructions.push_back(create_instruction_COPY(instruction->src_node, instruction->src_addr, instruction->dst_node, instruction->dst_addr));
         
 
         // add dynamic data to vector so we know where to update them later
-        if(instruction.is_dynamic){
+        if(instruction->is_dynamic){
             dynamic_data data;
-            data.instruction_object_index = instruction_object_index;
+            data.instruction_object_index = sorted_inst.original_index;
             data.condensed_instruction_index = condensed_instructions.size()-1;
             dynamic_instructions.push_back(data);
         }
@@ -760,13 +791,16 @@ uint32_t fpga_instructions::condense_instructions(){
         cycle++;
         index++;
 
-        prev_send_cycle = instruction.dma_execution_cycle;
-
-        instruction_object_index++;
+        prev_send_cycle = instruction->dma_execution_cycle;
     }
 
     // add a final wait to ensure all instructions are completed
-    condensed_instructions.push_back(create_instruction_WAIT(cycle + settings.full_cycles));
+    //condensed_instructions.push_back(create_instruction_WAIT(cycle + settings.full_cycles));
+
+
+    // run DMA for entire cycle to keep the AXI transfer in sync
+    condensed_instructions.push_back(create_instruction_WAIT(full_update_counts - 2500));   // ~25us before the end of the update period to ensure there is time for the AXI transfer (~20us) to complete
+
     index++;
 
     condensed_instructions.push_back(create_instruction_END());
@@ -779,6 +813,8 @@ uint32_t fpga_instructions::update_dynamic_instructions(){
 
     for(auto data : dynamic_instructions){
         copy* instruction = &(instructions[data.instruction_object_index]);
+
+        uint32_t* dynamic_reg_index = &(instruction->dynamic_reg_index);
 
         if(instruction->dynamic_reg_index == -1){
             condensed_instructions[data.condensed_instruction_index] = create_instruction_NOP();    // do nothing
@@ -806,7 +842,7 @@ uint64_t fpga_instructions::create_instruction_COPY(uint8_t src_node, uint16_t s
 }
 
 uint64_t fpga_instructions::create_instruction_WAIT(uint32_t cycles){
-    //std::cout << "wait: " << cycles << std::endl;
+    std::cout << "wait: " << cycles << std::endl;
     return ((uint64_t)cycles) | ((uint64_t)instruction_type::WAIT << 48);
 }
 

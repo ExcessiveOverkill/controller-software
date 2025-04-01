@@ -339,6 +339,10 @@ uint32_t fpga_module_manager::create_global_variables(){
     return 0;
 }
 
+void fpga_module_manager::set_update_frequency(uint32_t frequency){
+    // set the update frequency for the FPGA
+    fpga_instr.set_update_frequency(frequency);
+}
 
 uint32_t fpga_module_manager::compile_instructions(){
     // compile the instructions for the FPGA
