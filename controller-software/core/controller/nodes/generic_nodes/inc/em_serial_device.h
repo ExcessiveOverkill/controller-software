@@ -46,18 +46,19 @@ class em_serial_device: public base_node{
 
             //device_protocol_fault_count = device->consecutive_packet_errors + device->consecutive_unknown_packet_errors;    // unused at the moment
 
-            if(device->consecutive_packet_errors > comm.timeout_tries){
-                if(communication_error == false){
-                    if(current_state == state::RUN){
-                        std::cerr << "Error: EM serial device communication error" << std::endl;
-                    }
-                    if(current_state != state::DISABLE_CYCLIC_MODE && current_state != state::INITIAL_CONFIG){
-                        current_state = state::RESET;
-                    }
-                }
+            if(device->consecutive_packet_errors == comm.timeout_tries){
                 communication_error = true;
+                if(current_state == state::RUN){
+                    std::cerr << "Error: EM serial device communication error, attempting to reconnect..." << std::endl;
+                }
+                if(current_state != state::DISABLE_CYCLIC_MODE){
+                    device->clear_pending_sequential_cmds();
+                    device->force_disable_cyclic_data();
+                    current_state = state::DISABLE_CYCLIC_MODE;
+                }
+                
             }
-            else{
+            else if(device->consecutive_packet_errors == 0){
                 communication_error = false;
             }
 
@@ -71,14 +72,10 @@ class em_serial_device: public base_node{
                 break;
 
             case state::DISABLE_CYCLIC_MODE:
-                if(device->get_sequential_cmds_complete() && !device->get_cyclic_data_enabled() && device->consecutive_packet_errors == 0){
+                if(device->get_sequential_cmds_complete() && !device->get_cyclic_data_enabled()){
                     device->rerun_cylic_config();
                     current_state = state::CONFIGURE_CYCLIC_MODE;
                 }
-                if(device->get_sequential_cmds_complete()){
-                    device->set_cyclic_data_enabled(false);
-                }
-                device->force_disable_cyclic_data();
                 break;
             
             case state::CONFIGURE_CYCLIC_MODE:
@@ -93,6 +90,9 @@ class em_serial_device: public base_node{
                     current_state = state::RUN;
                     current_message_id = 0; // update all messages on the first run
                 }
+                else if(device->get_sequential_cmds_complete()){
+                    device->set_cyclic_data_enabled(true);
+                }
                 break;
 
             case state::RUN:
@@ -102,6 +102,7 @@ class em_serial_device: public base_node{
 
             case state::RESET:
                 device->clear_pending_sequential_cmds();
+                device->force_disable_cyclic_data();
                 current_state = state::DISABLE_CYCLIC_MODE;
                 break;
 

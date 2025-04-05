@@ -622,26 +622,51 @@ uint32_t em_serial_controller::em_serial_device::run_cylic_config(){
 }
 
 uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
-    if(sequential_cmds.size() == 0){
-        sequential_cmds_complete = true;
-        
+    /*
+    we can't send and wait for the request to complete before sending the next cmd since the PS rx/tx mem transfers happen at the same time
+
+    so each cycle we send the next command no matter what (cmd number according to index var), and then check if the last command has completed successfully
+    if the vector is smaller than the index, send a blank command
+
+    if the last command has completed successfully, we remove it from vector (item 0)
+
+    if the last command has not completed successfully, index is set to 0
+
+    when no commands are left, set the index to 0 and set the complete flag to true
+
+    */
+
+
+    // send the next command
+    if(sequential_cmds.size() <= current_sequential_cmd_index){
+        // no new command to send, so send a blank one
+
         regs.cyclic_writes[1]->set_value(0);
         regs.cyclic_writes[2]->set_value(0);
-
-        consecutive_unknown_packet_errors = 0;
-        consecutive_packet_errors = 0;
-
-        return 0;   // no commands to run
     }
+    else{
+        // send the next command
 
-    // TODO: figure out why it is taking 3 cycles to complete and verify a command
+        sequential_cmd* cmd = &sequential_cmds[current_sequential_cmd_index];
+
+        uint32_t control = cmd->address;
+        control |= cmd->write << 16;    // set the write bit
+
+        regs.cyclic_writes[1]->set_value(control); // cyclic reg 1 is sequential control
+        //std::cout << "control: " << (control & 0xffff) << std::endl;
+
+        if(cmd->write){
+            regs.cyclic_writes[2]->set_value(cmd->data); // cyclic reg 2 is the sequential data to write
+            //std::cout << "write: " << cmd->data << std::endl;
+        }
+        else{
+            regs.cyclic_writes[2]->set_value(0); // send zero when reading
+            //std::cout << "read" << std::endl;
+        }
+
+    }
 
     sequential_cmd* cmd = &sequential_cmds[0];
-
-    // print all cmds for testing
-    for(auto& cmd : sequential_cmds){
-        //std::cout << "cmd: " << cmd.address << " " << cmd.data << std::endl;
-    }
 
     // check if the last command is complete
 
@@ -650,13 +675,16 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
     fault.crc_invalid = regs.status_crc_invalid->get_value();
 
     uint32_t status = regs.status->get_value();
-
     
-    if(!fault.no_response && !fault.response_not_finished && !fault.crc_invalid){   // no faults
-    //if(1){
+    if(!fault.no_response && !fault.response_not_finished && !fault.crc_invalid){   // no packet faults
 
         uint32_t control_response = regs.cyclic_reads[1]->get_value();
-        if((control_response & 0xffff) == cmd->address && ((control_response >> 24) & 0b1) == 1){   // check if the address matches and the device signaled success
+
+        if(current_sequential_cmd_index < 2){
+            // blank command, so nothing to check
+            current_sequential_cmd_index++;
+        }
+        else if((control_response & 0xffff) == cmd->address && ((control_response >> 24) & 0b1) == 1){   // check if the address matches and the device signaled success
             if(cmd->complete_flag != nullptr){
                 *cmd->complete_flag = true;
             }
@@ -675,42 +703,28 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
                 //std::cout << "write cmd complete for address: " << cmd->address << " " << cmd->data << std::endl;
             }
             sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
-            
 
         }
         else if((control_response & 0xffff) == cmd->address && ((control_response >> 25) & 0b1) == 1){  // address matches, but device signalled failure
             // TODO: handle signalled failure
-            //std::cerr << "Error: EM serial device signalled invalid command" << std::endl;
             sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
-            //std::cout << "cmd failed" << std::endl;
-            consecutive_unknown_packet_errors = 0;
+            //std::cout << "Error: device signalled failure for address: " << cmd->address << std::endl;
         }
-        else{
+        else{   // incorrect device address received, this is likely an issue with the connected device or packet timing
             // TODO: handle unexpected result
-            //std::cerr << "Error: EM serial device unexpected result" << std::endl;
-
-            if(consecutive_unknown_packet_errors == 5){ // attempt to retry a few times
-                sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
-                consecutive_unknown_packet_errors = 0;
-            }
-            else{
-                consecutive_unknown_packet_errors++;
-            }
-            //std::cout << "unknown result" << std::endl;
-
+            sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
+            //std::cout << "Error: device signalled read/write failure for address: " << cmd->address << std::endl;
         }
 
         consecutive_packet_errors = 0;
     }
     else{
+        current_sequential_cmd_index = 0;   // send the failed command again
         consecutive_packet_errors++;
-        // if(consecutive_packet_errors == 10){
-        //     std::cerr << "Error: EM serial device has too many consecutive packet errors" << std::endl;
+        // if(consecutive_packet_errors < 20){
+        //     std::cout << "Error: packet error: " << status << std::endl;
         // }
     }
-
-
-    // run the command
 
     if(sequential_cmds.size() == 0){
         sequential_cmds_complete = true;
@@ -721,24 +735,9 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
         consecutive_unknown_packet_errors = 0;
         consecutive_packet_errors = 0;
 
+        current_sequential_cmd_index = 0;
+
         return 0;   // no commands to run
-    }
-
-    cmd = &sequential_cmds[0];  // get the current command
-
-    uint32_t control = cmd->address;
-    control |= cmd->write << 16;    // set the write bit
-
-    regs.cyclic_writes[1]->set_value(control); // cyclic reg 1 is sequential control
-    //std::cout << "control: " << (control & 0xffff) << std::endl;
-
-    if(cmd->write){
-        regs.cyclic_writes[2]->set_value(cmd->data); // cyclic reg 2 is the sequential data to write
-        //std::cout << "write: " << cmd->data << std::endl;
-    }
-    else{
-        regs.cyclic_writes[2]->set_value(0); // send zero when reading
-        //std::cout << "read" << std::endl;
     }
     
     return 0;
@@ -768,6 +767,10 @@ uint32_t em_serial_controller::em_serial_device::run(){
 
     regs.control_enable->set_value(enabled);
 
+    // if(!old_cyclic_data_enabled && cyclic_data_enabled){
+    //     // cyclic data was just enabled
+    //     force_disable_cyclic_data_flag = false; // clear this since it is left over and we don't want to immediately disable cyclic data
+    // }
     if(force_disable_cyclic_data_flag){
         cyclic_data_enabled = false;
         force_disable_cyclic_data_flag = false;

@@ -17,7 +17,7 @@
             "enable":true,
             "type":"sync",
             "timeout_usec":10000,
-            "update_cycle_trigger_count": 100,
+            "update_cycle_trigger_count": 1,
 
             "nodes":{
                 "float_cmds":{
@@ -46,7 +46,7 @@
                             "output_type": "uint16",
                             "input_min": 0.0,
                             "input_max": 1.0,
-                            "output_min": 10000,
+                            "output_min": 16384,
                             "output_max": 65535,
                             "invert": false
                             }
@@ -60,7 +60,7 @@
                         "enabled": true,
                         "comm":{
                             "device_address": 0,
-                            "timeout_tries": 10
+                            "timeout_tries": 20
                         },
                         "device":{
                             "device_descriptor": "controller/config/em_devices/device_0_0.json",

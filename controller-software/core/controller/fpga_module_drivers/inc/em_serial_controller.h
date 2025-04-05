@@ -97,7 +97,8 @@ class em_serial_controller : public base_driver {
                 };
                 const uint8_t max_outstanding_cmds = 64;    // TODO: get this from some config?
                 std::vector<sequential_cmd> sequential_cmds;
-        
+                uint8_t current_sequential_cmd_index = 0;
+                        
                 #define MAX_CYCLIC_REGS 64  // TODO: get this from some config
                 uint16_t max_cyclic_registers = MAX_CYCLIC_REGS;
                 bool cyclic_read_enabled[MAX_CYCLIC_REGS];
