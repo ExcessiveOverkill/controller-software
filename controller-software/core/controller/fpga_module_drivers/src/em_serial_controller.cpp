@@ -411,8 +411,7 @@ uint32_t em_serial_controller::em_serial_device::sequential_write(uint16_t addre
         return 1;   // cannot write until device is enabled
     }
 
-    add_sequential_cmd(address, data, size, true, nullptr, nullptr);
-    return 0;
+    return add_sequential_cmd(address, data, size, true, nullptr, nullptr);
 }
 
 uint32_t em_serial_controller::em_serial_device::sequential_read(uint16_t address, void* data, uint8_t size){
@@ -420,8 +419,7 @@ uint32_t em_serial_controller::em_serial_device::sequential_read(uint16_t addres
         return 1;   // cannot read until device is enabled
     }
 
-    add_sequential_cmd(address, data, size, false, nullptr, nullptr);
-    return 0;
+    return add_sequential_cmd(address, data, size, false, nullptr, nullptr);
 }
 
 uint32_t em_serial_controller::em_serial_device::add_sequential_cmd(uint16_t address, void* data, uint8_t size, bool write, bool* complete_flag, bool* complete_flag_inverted){
@@ -641,6 +639,9 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
     if(sequential_cmds.size() <= current_sequential_cmd_index){
         // no new command to send, so send a blank one
 
+        // TODO: fix issue where if a new cmd is added but the size is still under the index, it won't be sent
+        // for now it is handled by the unknown response retry, but it should be fixed to send immediately
+
         regs.cyclic_writes[1]->set_value(0);
         regs.cyclic_writes[2]->set_value(0);
     }
@@ -708,12 +709,13 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
         else if((control_response & 0xffff) == cmd->address && ((control_response >> 25) & 0b1) == 1){  // address matches, but device signalled failure
             // TODO: handle signalled failure
             sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
-            //std::cout << "Error: device signalled failure for address: " << cmd->address << std::endl;
+            std::cout << "Error: device signalled failure for address: " << cmd->address << std::endl;
         }
         else{   // incorrect device address received, this is likely an issue with the connected device or packet timing
             // TODO: handle unexpected result
-            sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
-            //std::cout << "Error: device signalled read/write failure for address: " << cmd->address << std::endl;
+            // sequential_cmds.erase(sequential_cmds.begin()); // move onto next command
+            current_sequential_cmd_index = 0;   // send the failed command again    
+            //std::cout << "Error: invalid response for address: " << cmd->address << std::endl;
         }
 
         consecutive_packet_errors = 0;

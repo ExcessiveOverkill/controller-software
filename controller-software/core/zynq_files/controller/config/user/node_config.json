@@ -88,6 +88,28 @@
                                     "sync_with_node": true,
                                     "cyclic_index": 3
                                 }
+                            ],
+                            "set":[
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 5000
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "commutation_offset",
+                                    "value": 0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 1
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 5000
+                                }
                             ]
                         }
                         

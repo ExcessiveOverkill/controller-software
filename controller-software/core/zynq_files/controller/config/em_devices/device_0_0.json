@@ -1,5 +1,5 @@
 {
-    "generated_date": "2025-04-05 15:45:53.328543",
+    "generated_date": "2025-04-08 17:04:07.796353",
     "hw_info": {
         "type": 0,
         "version": 0,
@@ -43,21 +43,101 @@
             "permissions": "read",
             "index": 2
         },
+        "communication_update_interval": {
+            "type": "uint32_t",
+            "value": 200000,
+            "unit": "10ns",
+            "description": "How often the controller sends a packet to the device, this is used for clock synchronization. note that is must be an even multiple of main PWM frequency",
+            "permissions": "read/write",
+            "index": 3
+        },
+        "pwm_timer_phase_offset": {
+            "type": "uint32_t",
+            "value": 0,
+            "unit": "counts",
+            "description": "How many counts to delay the start of the main phase PWM timer when synchronizing with the controller",
+            "permissions": "read/write",
+            "index": 4
+        },
+        "enable_controller_syncronization": {
+            "type": "uint8_t",
+            "value": 1,
+            "unit": "",
+            "description": "Enable or disable the controller synchronization feature, this is used to synchronize the device clock with the controller",
+            "permissions": "read/write",
+            "index": 5
+        },
+        "controller_syncronization_valid": {
+            "type": "uint8_t",
+            "value": 0,
+            "unit": "",
+            "description": "Indicates if the device is synchronized with the controller",
+            "permissions": "read",
+            "index": 6
+        },
         "fan_speed_cmd": {
             "type": "uint16_t",
             "value": 0,
             "unit": "",
-            "description": "Fan speed in max rpm/0xffff",
+            "description": "Cmd fan speed (max 0xffff)",
             "permissions": "read/write",
-            "index": 3
+            "index": 7
         },
         "fan_speed_measured": {
             "type": "uint16_t",
             "value": 0,
             "unit": "",
-            "description": "Measured fan speed in max rpm/0xffff",
+            "description": "Measured fan speed (max 0xffff)",
             "permissions": "read",
-            "index": 4
+            "index": 8
+        },
+        "fan_auto_speed_enable": {
+            "type": "uint8_t",
+            "value": 1,
+            "unit": "",
+            "description": "Enable automatic fan speed control",
+            "permissions": "read/write",
+            "index": 9
+        },
+        "fan_zero_speed_temp": {
+            "type": "uint8_t",
+            "value": 30,
+            "unit": "celsius",
+            "description": "Temperature at/below which the fan will be off",
+            "permissions": "read/write",
+            "index": 10
+        },
+        "fan_max_speed_temp": {
+            "type": "uint8_t",
+            "value": 50,
+            "unit": "celsius",
+            "description": "Temperature at/above which the fan will be at max speed",
+            "permissions": "read/write",
+            "index": 11
+        },
+        "heatsink_temp": {
+            "type": "float",
+            "value": 0,
+            "unit": "celsius",
+            "description": "Measured heatsink temperature",
+            "permissions": "read",
+            "index": 12
+        },
+        "board_temp": {
+            "type": "float",
+            "value": 0,
+            "unit": "celsius",
+            "description": "Measured PCB temperature",
+            "permissions": "read",
+            "index": 13
+        },
+        "ambient_temp": {
+            "type": "float",
+            "value": 0,
+            "unit": "celsius",
+            "description": "Measured ambient temperature",
+            "permissions": "read",
+            "index": 14
         },
         "current_limit_q": {
             "type": "uint16_t",
@@ -65,7 +145,7 @@
             "unit": "milliamps",
             "description": "Maximum current cmd allowed through the q axis",
             "permissions": "read/write",
-            "index": 5
+            "index": 15
         },
         "current_limit_d": {
             "type": "uint16_t",
@@ -73,7 +153,7 @@
             "unit": "milliamps",
             "description": "Maximum current cmd allowed through the d axis",
             "permissions": "read/write",
-            "index": 6
+            "index": 16
         },
         "current_command_q": {
             "type": "int32_t",
@@ -81,7 +161,7 @@
             "unit": "milliamps",
             "description": "q setpoint for the internal current control",
             "permissions": "read/write",
-            "index": 7
+            "index": 17
         },
         "current_command_d": {
             "type": "int32_t",
@@ -89,7 +169,7 @@
             "unit": "milliamps",
             "description": "d setpoint for the internal current control",
             "permissions": "read/write",
-            "index": 8
+            "index": 18
         },
         "current_measured_q": {
             "type": "int32_t",
@@ -97,7 +177,7 @@
             "unit": "milliamps",
             "description": "Actual measured q current through motor",
             "permissions": "read",
-            "index": 9
+            "index": 19
         },
         "current_measured_d": {
             "type": "int32_t",
@@ -105,7 +185,7 @@
             "unit": "milliamps",
             "description": "Actual measured d current through motor",
             "permissions": "read",
-            "index": 10
+            "index": 20
         },
         "phase_resistance": {
             "type": "float",
@@ -113,7 +193,7 @@
             "unit": "ohms",
             "description": "Phase resistance between 2 motor terminals",
             "permissions": "read/write",
-            "index": 11
+            "index": 21
         },
         "commutation_command": {
             "type": "uint16_t",
@@ -121,7 +201,7 @@
             "unit": "counts",
             "description": "Value 0-65525 representing the current electrical angle of the motor (or an even multiple of it)",
             "permissions": "read/write",
-            "index": 12
+            "index": 22
         },
         "commutation_offset": {
             "type": "uint16_t",
@@ -129,7 +209,7 @@
             "unit": "counts",
             "description": "Offset to add to the commutation command, applied after the scale factor",
             "permissions": "read/write",
-            "index": 13
+            "index": 23
         },
         "commutation_scale": {
             "type": "uint16_t",
@@ -137,7 +217,7 @@
             "unit": "",
             "description": "How many electrical cycles are in one commutation command cycle",
             "permissions": "read/write",
-            "index": 14
+            "index": 24
         },
         "calibration_current": {
             "type": "uint16_t",
@@ -145,7 +225,7 @@
             "unit": "milliamps",
             "description": "Current to use for all calibration modes",
             "permissions": "read/write",
-            "index": 15
+            "index": 25
         },
         "dc_bus_voltage": {
             "type": "uint16_t",
@@ -153,7 +233,7 @@
             "unit": "volts",
             "description": "Measured DC bus voltage",
             "permissions": "read",
-            "index": 16
+            "index": 26
         },
         "current_loop_p_gain": {
             "type": "float",
@@ -161,7 +241,7 @@
             "unit": "",
             "description": "Proportional gain for current loop",
             "permissions": "read/write",
-            "index": 17
+            "index": 27
         },
         "current_loop_i_gain": {
             "type": "float",
@@ -169,7 +249,7 @@
             "unit": "",
             "description": "Integral gain for current loop",
             "permissions": "read/write",
-            "index": 18
+            "index": 28
         },
         "current_loop_i_limit": {
             "type": "float",
@@ -177,7 +257,7 @@
             "unit": "",
             "description": "Integral limit for current loop",
             "permissions": "read/write",
-            "index": 19
+            "index": 29
         },
         "current_loop_voltage_change_limit": {
             "type": "float",
@@ -185,7 +265,7 @@
             "unit": "V/s",
             "description": "Voltage change limit for current loop",
             "permissions": "read/write",
-            "index": 20
+            "index": 30
         },
         "max_ouput_voltage": {
             "type": "uint16_t",
@@ -193,15 +273,31 @@
             "unit": "volts",
             "description": "Maximum output voltage (PWM dutycycle)",
             "permissions": "read/write",
-            "index": 21
+            "index": 31
         },
         "requested_state": {
             "type": "uint8_t",
             "value": 0,
             "unit": "",
-            "description": "FAULT: 1, IDLE: 2, RUN: 3",
+            "description": "IDLE: 1, RUN: 2, FAULT_RESET: 3, CHANGE_MODE: 4",
             "permissions": "read/write",
-            "index": 22
+            "index": 32
+        },
+        "device_mode": {
+            "type": "uint8_t",
+            "value": 0,
+            "unit": "",
+            "description": "0: DEFAULT, 1: FOC, 2: PFC + REGEN, 3: REGEN",
+            "permissions": "read/write",
+            "index": 33
+        },
+        "device_mode_sub_config": {
+            "type": "uint8_t",
+            "value": 0,
+            "unit": "",
+            "description": "configuration for the selected device mode, this varies based on the mode selected",
+            "permissions": "read/write",
+            "index": 34
         },
         "dummy_register": {
             "type": "uint8_t",
@@ -209,7 +305,7 @@
             "unit": "",
             "description": "Dummy register for pointing cyclic regs to when not in use",
             "permissions": "read/write",
-            "index": 23
+            "index": 35
         },
         "message_control": {
             "type": "uint16_t",
@@ -217,7 +313,7 @@
             "unit": "",
             "description": "Selects the message to read back",
             "permissions": "read/write",
-            "index": 24
+            "index": 36
         },
         "message_time_lower": {
             "type": "uint32_t",
@@ -225,7 +321,7 @@
             "unit": "microseconds",
             "description": "last time that the selected message was triggered",
             "permissions": "read",
-            "index": 25
+            "index": 37
         },
         "message_time_upper": {
             "type": "uint32_t",
@@ -233,7 +329,7 @@
             "unit": "microseconds",
             "description": "last time that the selected message was triggered",
             "permissions": "read",
-            "index": 26
+            "index": 38
         },
         "device_communication_watchdog_timeout": {
             "type": "uint16_t",
@@ -241,7 +337,7 @@
             "unit": "milliseconds",
             "description": "How long before a timeout occurs due to no valid packet transfers",
             "permissions": "read/write",
-            "index": 27
+            "index": 39
         },
         "enable_cyclic_data": {
             "type": "uint8_t",
@@ -249,7 +345,7 @@
             "unit": "",
             "description": "Enable sending/receiving configured cyclic data",
             "permissions": "read/write",
-            "index": 28
+            "index": 40
         },
         "firmware_update_data_0": {
             "type": "uint32_t",
@@ -257,7 +353,7 @@
             "unit": "binary data",
             "description": "Used to transfer firmware data during a device firmware update",
             "permissions": "read/write",
-            "index": 29
+            "index": 41
         },
         "firmware_update_data_1": {
             "type": "uint32_t",
@@ -265,7 +361,7 @@
             "unit": "binary data",
             "description": "Used to transfer firmware data during a device firmware update",
             "permissions": "read/write",
-            "index": 30
+            "index": 42
         },
         "firmware_update_data_2": {
             "type": "uint32_t",
@@ -273,7 +369,7 @@
             "unit": "binary data",
             "description": "Used to transfer firmware data during a device firmware update",
             "permissions": "read/write",
-            "index": 31
+            "index": 43
         },
         "firmware_update_data_3": {
             "type": "uint32_t",
@@ -281,7 +377,7 @@
             "unit": "binary data",
             "description": "Used to transfer firmware data during a device firmware update",
             "permissions": "read/write",
-            "index": 32
+            "index": 44
         },
         "cyclic_read_address_0": {
             "type": "uint16_t",
@@ -289,7 +385,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 33
+            "index": 45
         },
         "cyclic_read_address_1": {
             "type": "uint16_t",
@@ -297,7 +393,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 34
+            "index": 46
         },
         "cyclic_read_address_2": {
             "type": "uint16_t",
@@ -305,7 +401,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 35
+            "index": 47
         },
         "cyclic_read_address_3": {
             "type": "uint16_t",
@@ -313,7 +409,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 36
+            "index": 48
         },
         "cyclic_read_address_4": {
             "type": "uint16_t",
@@ -321,7 +417,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 37
+            "index": 49
         },
         "cyclic_read_address_5": {
             "type": "uint16_t",
@@ -329,7 +425,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 38
+            "index": 50
         },
         "cyclic_read_address_6": {
             "type": "uint16_t",
@@ -337,7 +433,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 39
+            "index": 51
         },
         "cyclic_read_address_7": {
             "type": "uint16_t",
@@ -345,7 +441,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 40
+            "index": 52
         },
         "cyclic_read_address_8": {
             "type": "uint16_t",
@@ -353,7 +449,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 41
+            "index": 53
         },
         "cyclic_read_address_9": {
             "type": "uint16_t",
@@ -361,7 +457,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 42
+            "index": 54
         },
         "cyclic_read_address_10": {
             "type": "uint16_t",
@@ -369,7 +465,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 43
+            "index": 55
         },
         "cyclic_read_address_11": {
             "type": "uint16_t",
@@ -377,7 +473,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 44
+            "index": 56
         },
         "cyclic_read_address_12": {
             "type": "uint16_t",
@@ -385,7 +481,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 45
+            "index": 57
         },
         "cyclic_read_address_13": {
             "type": "uint16_t",
@@ -393,7 +489,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 46
+            "index": 58
         },
         "cyclic_read_address_14": {
             "type": "uint16_t",
@@ -401,7 +497,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 47
+            "index": 59
         },
         "cyclic_read_address_15": {
             "type": "uint16_t",
@@ -409,7 +505,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 48
+            "index": 60
         },
         "cyclic_read_address_16": {
             "type": "uint16_t",
@@ -417,7 +513,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 49
+            "index": 61
         },
         "cyclic_read_address_17": {
             "type": "uint16_t",
@@ -425,7 +521,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 50
+            "index": 62
         },
         "cyclic_read_address_18": {
             "type": "uint16_t",
@@ -433,7 +529,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 51
+            "index": 63
         },
         "cyclic_read_address_19": {
             "type": "uint16_t",
@@ -441,7 +537,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 52
+            "index": 64
         },
         "cyclic_read_address_20": {
             "type": "uint16_t",
@@ -449,7 +545,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 53
+            "index": 65
         },
         "cyclic_read_address_21": {
             "type": "uint16_t",
@@ -457,7 +553,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 54
+            "index": 66
         },
         "cyclic_read_address_22": {
             "type": "uint16_t",
@@ -465,7 +561,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 55
+            "index": 67
         },
         "cyclic_read_address_23": {
             "type": "uint16_t",
@@ -473,7 +569,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 56
+            "index": 68
         },
         "cyclic_read_address_24": {
             "type": "uint16_t",
@@ -481,7 +577,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 57
+            "index": 69
         },
         "cyclic_read_address_25": {
             "type": "uint16_t",
@@ -489,7 +585,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 58
+            "index": 70
         },
         "cyclic_read_address_26": {
             "type": "uint16_t",
@@ -497,7 +593,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 59
+            "index": 71
         },
         "cyclic_read_address_27": {
             "type": "uint16_t",
@@ -505,7 +601,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 60
+            "index": 72
         },
         "cyclic_read_address_28": {
             "type": "uint16_t",
@@ -513,7 +609,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 61
+            "index": 73
         },
         "cyclic_read_address_29": {
             "type": "uint16_t",
@@ -521,7 +617,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 62
+            "index": 74
         },
         "cyclic_read_address_30": {
             "type": "uint16_t",
@@ -529,7 +625,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 63
+            "index": 75
         },
         "cyclic_read_address_31": {
             "type": "uint16_t",
@@ -537,7 +633,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic reading",
             "permissions": "read/write",
-            "index": 64
+            "index": 76
         },
         "cyclic_write_address_0": {
             "type": "uint16_t",
@@ -545,7 +641,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 65
+            "index": 77
         },
         "cyclic_write_address_1": {
             "type": "uint16_t",
@@ -553,7 +649,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 66
+            "index": 78
         },
         "cyclic_write_address_2": {
             "type": "uint16_t",
@@ -561,7 +657,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 67
+            "index": 79
         },
         "cyclic_write_address_3": {
             "type": "uint16_t",
@@ -569,7 +665,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 68
+            "index": 80
         },
         "cyclic_write_address_4": {
             "type": "uint16_t",
@@ -577,7 +673,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 69
+            "index": 81
         },
         "cyclic_write_address_5": {
             "type": "uint16_t",
@@ -585,7 +681,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 70
+            "index": 82
         },
         "cyclic_write_address_6": {
             "type": "uint16_t",
@@ -593,7 +689,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 71
+            "index": 83
         },
         "cyclic_write_address_7": {
             "type": "uint16_t",
@@ -601,7 +697,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 72
+            "index": 84
         },
         "cyclic_write_address_8": {
             "type": "uint16_t",
@@ -609,7 +705,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 73
+            "index": 85
         },
         "cyclic_write_address_9": {
             "type": "uint16_t",
@@ -617,7 +713,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 74
+            "index": 86
         },
         "cyclic_write_address_10": {
             "type": "uint16_t",
@@ -625,7 +721,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 75
+            "index": 87
         },
         "cyclic_write_address_11": {
             "type": "uint16_t",
@@ -633,7 +729,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 76
+            "index": 88
         },
         "cyclic_write_address_12": {
             "type": "uint16_t",
@@ -641,7 +737,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 77
+            "index": 89
         },
         "cyclic_write_address_13": {
             "type": "uint16_t",
@@ -649,7 +745,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 78
+            "index": 90
         },
         "cyclic_write_address_14": {
             "type": "uint16_t",
@@ -657,7 +753,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 79
+            "index": 91
         },
         "cyclic_write_address_15": {
             "type": "uint16_t",
@@ -665,7 +761,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 80
+            "index": 92
         },
         "cyclic_write_address_16": {
             "type": "uint16_t",
@@ -673,7 +769,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 81
+            "index": 93
         },
         "cyclic_write_address_17": {
             "type": "uint16_t",
@@ -681,7 +777,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 82
+            "index": 94
         },
         "cyclic_write_address_18": {
             "type": "uint16_t",
@@ -689,7 +785,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 83
+            "index": 95
         },
         "cyclic_write_address_19": {
             "type": "uint16_t",
@@ -697,7 +793,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 84
+            "index": 96
         },
         "cyclic_write_address_20": {
             "type": "uint16_t",
@@ -705,7 +801,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 85
+            "index": 97
         },
         "cyclic_write_address_21": {
             "type": "uint16_t",
@@ -713,7 +809,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 86
+            "index": 98
         },
         "cyclic_write_address_22": {
             "type": "uint16_t",
@@ -721,7 +817,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 87
+            "index": 99
         },
         "cyclic_write_address_23": {
             "type": "uint16_t",
@@ -729,7 +825,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 88
+            "index": 100
         },
         "cyclic_write_address_24": {
             "type": "uint16_t",
@@ -737,7 +833,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 89
+            "index": 101
         },
         "cyclic_write_address_25": {
             "type": "uint16_t",
@@ -745,7 +841,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 90
+            "index": 102
         },
         "cyclic_write_address_26": {
             "type": "uint16_t",
@@ -753,7 +849,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 91
+            "index": 103
         },
         "cyclic_write_address_27": {
             "type": "uint16_t",
@@ -761,7 +857,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 92
+            "index": 104
         },
         "cyclic_write_address_28": {
             "type": "uint16_t",
@@ -769,7 +865,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 93
+            "index": 105
         },
         "cyclic_write_address_29": {
             "type": "uint16_t",
@@ -777,7 +873,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 94
+            "index": 106
         },
         "cyclic_write_address_30": {
             "type": "uint16_t",
@@ -785,7 +881,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 95
+            "index": 107
         },
         "cyclic_write_address_31": {
             "type": "uint16_t",
@@ -793,7 +889,7 @@
             "unit": "address",
             "description": "Set to a register address to enable continuous cyclic writing",
             "permissions": "read/write",
-            "index": 96
+            "index": 108
         }
     },
     "messages": {
@@ -829,26 +925,38 @@
                 "description": "Measured leakage current was too high",
                 "severity": "error",
                 "id": 4
+            },
+            "measurement_not_ready": {
+                "readable_name": "Current measurement not ready",
+                "description": "Current measurement was not ready",
+                "severity": "critical",
+                "id": 5
             }
         },
         "communication": {
-            "timeout": {
+            "timeout_warning": {
                 "readable_name": "Timeout",
                 "description": "No valid packets received within the timeout period",
+                "severity": "warning",
+                "id": 6
+            },
+            "timeout_error": {
+                "readable_name": "Timeout error",
+                "description": "No valid packets received within the timeout period, and the current state cannot run without communication",
                 "severity": "error",
-                "id": 5
+                "id": 7
             },
             "invalid_address": {
                 "readable_name": "Invalid address",
                 "description": "read/write attempted on an address that either doesn't exist, or has incompatible permissions",
                 "severity": "warning",
-                "id": 6
+                "id": 8
             },
             "invalid_cyclic_config": {
                 "readable_name": "Invalic cyclic config",
                 "description": "Attempted to configure a cyclic value that either doesn't exist, or has incompatible permissions",
                 "severity": "warning",
-                "id": 7
+                "id": 9
             }
         },
         "system": {
@@ -856,31 +964,63 @@
                 "readable_name": "Overtemp",
                 "description": "Measured temperature from one of the sensors was too high",
                 "severity": "error",
-                "id": 8
+                "id": 10
             },
-            "undertemp": {
-                "readable_name": "Undertemp",
-                "description": "Measured temperature from one of the sensors was too low",
+            "temp_sensor_fail": {
+                "readable_name": "Temperature sensor failure",
+                "description": "Temperature sensor failure detected, this usually indicates a wiring or hardware fault",
                 "severity": "error",
-                "id": 9
+                "id": 11
             },
             "overvoltage": {
                 "readable_name": "Overvoltage",
                 "description": "Measured DC bus voltage was too high",
+                "time_delay_us": "5e3",
                 "severity": "critical",
-                "id": 10
+                "id": 12
+            },
+            "undervoltage": {
+                "readable_name": "Undervoltage",
+                "description": "Measured DC bus voltage was too low",
+                "time_delay_us": "100e3",
+                "severity": "error",
+                "id": 13
             },
             "floating_voltage_too_high": {
                 "readable_name": "Floating voltage too high",
                 "description": "Measured voltage on the output phases while off was too high",
-                "severity": "critical",
-                "id": 11
+                "severity": "error",
+                "id": 14
             },
             "control_deadline_missed": {
                 "readable_name": "Control deadline missed",
                 "description": "Control loop did not run in time",
                 "severity": "critical",
-                "id": 12
+                "id": 15
+            },
+            "invalid_state": {
+                "readable_name": "Invalid state",
+                "description": "Invalid state selected",
+                "severity": "error",
+                "id": 16
+            },
+            "invalid_mode": {
+                "readable_name": "Invalid mode",
+                "description": "Invalid mode selected",
+                "severity": "error",
+                "id": 17
+            },
+            "invalid_sub_mode": {
+                "readable_name": "Invalid sub mode",
+                "description": "Invalid sub mode selected",
+                "severity": "error",
+                "id": 18
+            },
+            "could_not_start": {
+                "readable_name": "Could not start",
+                "description": "Could not start the selected mode",
+                "severity": "error",
+                "id": 19
             }
         },
         "phase_pwm": {
@@ -888,29 +1028,29 @@
                 "readable_name": "Voltage saturation",
                 "description": "PWM output was saturated, unable to reach commanded voltage",
                 "severity": "warning",
-                "id": 13
+                "id": 20
             }
         },
         "sto": {
             "sto_active": {
                 "readable_name": "STO active",
                 "description": "Safe torque off is active",
-                "severity": "critical",
-                "id": 14
+                "severity": "error",
+                "id": 21
             },
             "sto_fault_matching_channels": {
                 "readable_name": "Channels do not match",
                 "description": "STO channel feedback shows channels do not match, this usually indicates a wiring or hardware fault",
                 "time_delay_us": "10e3",
                 "severity": "critical",
-                "id": 15
+                "id": 22
             },
             "sto_hardware_fault": {
                 "readable_name": "Hardware fault",
                 "description": "STO internal hardware fault detected, feedback channels active when they should not be",
                 "time_delay_us": "2e3",
                 "severity": "critical",
-                "id": 16
+                "id": 23
             }
         },
         "RL_calib_mode": {
@@ -918,13 +1058,13 @@
                 "readable_name": "Inductance calibration failed",
                 "description": "Inductance calibration failed, current did not fall within expected range",
                 "severity": "error",
-                "id": 17
+                "id": 24
             },
             "resistance_calib_fail": {
                 "readable_name": "Resistance calibration failed",
                 "description": "Resistance calibration failed, unable to reach calibration current",
                 "severity": "error",
-                "id": 18
+                "id": 25
             }
         },
         "pfc": {
@@ -932,25 +1072,25 @@
                 "readable_name": "Input voltage low",
                 "description": "Measured input voltage was too low",
                 "severity": "error",
-                "id": 19
+                "id": 26
             },
             "input_voltage_high": {
                 "readable_name": "Input voltage high",
                 "description": "Measured input voltage was too high",
                 "severity": "error",
-                "id": 20
+                "id": 27
             },
             "input_current_saturated": {
                 "readable_name": "Input positive current limit reached",
                 "description": "Input current was too high, positive current limit reached while trying to regulate the dc bus voltage",
                 "severity": "warning",
-                "id": 21
+                "id": 28
             },
             "input_current_negative_saturated": {
                 "readable_name": "Input negative current limit reached",
                 "description": "Input reverse current was too high, negative current limit reached while trying to regulate the dc bus voltage",
                 "severity": "error",
-                "id": 22
+                "id": 29
             }
         },
         "regen": {
@@ -958,19 +1098,19 @@
                 "readable_name": "Regen voltage limit reached",
                 "description": "Regen voltage limit reached while trying to regulate the dc bus voltage",
                 "severity": "warning",
-                "id": 23
+                "id": 30
             },
             "current_saturated": {
                 "readable_name": "Regen current limit reached",
                 "description": "Regen current limit reached while trying to regulate the dc bus voltage",
                 "severity": "warning",
-                "id": 24
+                "id": 31
             },
             "resistance_mismatch": {
                 "readable_name": "Regen resistance mismatch",
                 "description": "Regen resistance mismatch detected, this usually indicates an incorrect configuration or wiring fault",
                 "severity": "error",
-                "id": 25
+                "id": 32
             }
         }
     }

@@ -87,6 +87,7 @@ class em_serial_device: public base_node{
 
             case state::ENABLE_CYCLIC_MODE:
                 if(device->get_cyclic_data_enabled()){
+                    run_one_shot_settings();
                     current_state = state::RUN;
                     current_message_id = 0; // update all messages on the first run
                 }
@@ -115,12 +116,47 @@ class em_serial_device: public base_node{
             return 0;
         }
 
+        void run_one_shot_settings(){
+            // run the one-shot settings
+            for(auto& reg : set_regs){
+                device->sequential_write(reg.address, &reg.data, reg.size);
+            }
+        }
+
+        void run_api_calls(){
+
+            // run the writes
+            bool writes_done = true;
+            for(auto& write : api_write_regs){
+                if(write.sent){
+                    continue;
+                }
+                if(device->sequential_write(write.address, write.data, write.size) == 0){
+                    write.sent = true;
+                    writes_done = false;
+                }
+            }
+
+            if(writes_done && device->get_sequential_cmds_complete()){
+                // clear the done writes
+                api_write_regs.clear();
+            }
+
+            // run the reads
+            for(auto& read : api_read_regs){
+                device->sequential_read(dev_desc.registers[read].index, &(dev_desc.registers[read].data), dev_desc.registers[read].size);
+            }
+            api_read_regs.clear();
+        }
+
         void run_async_updates(){
 
             // skip if too many cmds are outstanding
             if(device->get_pending_sequential_cmds() > 5){
                 return;
             }
+
+            run_api_calls();
 
             // run async command if their update count has been reached
 
@@ -251,21 +287,174 @@ class em_serial_device: public base_node{
                                 "sync_with_node": true,
                                 "cyclic_index": 4
                             }
+                        ],
+                        "set": [    // one-shot write a value to a register, these will be run on each device reconnect
+                            {
+                                "name": "register_name",
+                                "value": 0.5
+                            }
                         ]
-
-                    }
-                },
-
-            // one-shot write a value to a register, these will be run on each device reconnect
-            "set": [
-                {
-                    "name": "register_name",
-                    "value": 0.5
+                    },
+                    "write":[   // async writes, these occur once when sent
+                        "register_name": 0.5,
+                        "register_name2": 0.5,
+                        "register_name3": 0.5
+                    ],
+                    "read":[    // async reads, these occur once when sent, but will lag 1 read cycle due to how updates are done
+                        "register_name",
+                        "register_name2",
+                        "register_name3"
+                    ]
                 }
-            ]
+            
             }
             
             */
+
+            // load api write registers
+            for(auto& reg : (*json_settings)["write"].items()){
+                set_reg r;
+                std::string name = reg.key();
+                if(dev_desc.registers.find(name) == dev_desc.registers.end()){
+                    std::cerr << "Error: write register name: " << name << " not found in device descriptor" << std::endl;
+                    (*json_settings)["error"].emplace("write", "register name: " + name + " not found in device descriptor");
+                    return 1;
+                }
+                if(dev_desc.registers[name].writable == false){
+                    std::cerr << "Error: write register: " << name << " is not writable" << std::endl;
+                    (*json_settings)["error"].emplace("write", "register: " + name + " is not writable");
+                    return 1;
+                }
+                
+                r.size = dev_desc.registers[name].size;   // get the size from the device descriptor
+                r.address = dev_desc.registers[name].index;   // get the address from the device descriptor
+
+
+                // TODO: really need to make a good io class to handle all of these conversions and data types instead of this mess
+                switch (dev_desc.registers[name].type){
+                    case io_type::BOOL:
+                        r.data[0] = reg.value().get<bool>() ? 1 : 0;
+                        break;
+                    case io_type::UINT8:
+                        r.data[0] = reg.value().get<std::uint8_t>();
+                        break;
+                    case io_type::UINT16:
+                        {
+                        uint16_t t = reg.value().get<std::uint16_t>();
+                        memcpy(r.data, &t, sizeof(uint16_t));
+                        }
+                        break;
+                    case io_type::UINT32:
+                        {
+                        uint32_t t = reg.value().get<std::uint32_t>();
+                        memcpy(r.data, &t, sizeof(uint32_t));
+                        }
+                        break;
+                    case io_type::INT8:
+                        r.data[0] = reg.value().get<std::int8_t>();
+                        break;
+                    case io_type::INT16:
+                        {
+                        int16_t t = reg.value().get<std::int16_t>();
+                        memcpy(r.data, &t, sizeof(int16_t));
+                        }
+                        break;
+                    case io_type::INT32:
+                        {
+                        int32_t t = reg.value().get<std::int32_t>();
+                        memcpy(r.data, &t, sizeof(int32_t));
+                        }
+                        break;
+                    case io_type::FLOAT:
+                        {
+                        float t = reg.value().get<float>();
+                        memcpy(r.data, &t, sizeof(float));
+                        }
+                        break;
+                    default:
+                        std::cerr << "Error: write register: " << name << " has an invalid type" << std::endl;
+                        (*json_settings)["error"].emplace("write", "register: " + name + " has an invalid type");
+                        return 1;
+                }
+
+                api_write_regs.push_back(r);
+            }
+
+            // load api read registers into a temporary JSON object
+            json read_values = json::object();
+            for(auto& reg : (*json_settings)["read"]){
+                std::string name = reg.get<std::string>();
+                if(dev_desc.registers.find(name) == dev_desc.registers.end()){
+                    std::cerr << "Error: read register name: " << name << " not found in device descriptor" << std::endl;
+                    (*json_settings)["error"].emplace("read", "register name: " + name + " not found in device descriptor");
+                    return 1;
+                }
+                if(dev_desc.registers[name].readable == false){
+                    std::cerr << "Error: read register: " << name << " is not readable" << std::endl;
+                    (*json_settings)["error"].emplace("read", "register: " + name + " is not readable");
+                    return 1;
+                }
+    
+                // add current known value of the reg to the temporary json object
+                switch (dev_desc.registers[name].type){
+                    case io_type::BOOL:
+                        read_values[name] = dev_desc.registers[name].data[0] == 1;
+                        break;
+                    case io_type::UINT8:
+                        read_values[name] = dev_desc.registers[name].data[0];
+                        break;
+                    case io_type::UINT16:
+                        {
+                        uint16_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(uint16_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::UINT32:
+                        {
+                        uint32_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(uint32_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::INT8:
+                        read_values[name] = dev_desc.registers[name].data[0];
+                        break;
+                    case io_type::INT16:
+                        {
+                        int16_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(int16_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::INT32:
+                        {
+                        int32_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(int32_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::FLOAT:
+                        {
+                        float t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(float));
+                        read_values[name] = t;
+                        }
+                        break;
+                    default:
+                        std::cerr << "Error: read register: " << name << " has an invalid type" << std::endl;
+                        (*json_settings)["error"].emplace("read", "register: " + name + " has an invalid type");
+                        return 1;
+                }
+    
+                api_read_regs.push_back(name);
+            }
+            // replace the original "read" array with the constructed object containing register values
+            (*json_settings)["read"] = read_values;
+
+            if(driver_setup_done){  // skip if the driver has already been setup, TODO: allow reconfiguration later through api config
+                return 0;
+            }
 
             if(json_settings->contains("comm")){
                 if(json_settings->at("comm").contains("device_address")){
@@ -282,7 +471,6 @@ class em_serial_device: public base_node{
                     return 1;
                 }
                 dev_desc.loaded = true;
-                
             }
 
 
@@ -349,14 +537,68 @@ class em_serial_device: public base_node{
             }
 
             // load set registers
-            for(auto& reg : (*json_settings)["set"]){
+            for(auto& reg : (*json_settings)["device"]["set"]){
                 set_reg r;
-                r.name = reg["name"].get<std::string>();
-                if(dev_desc.registers.find(r.name) == dev_desc.registers.end()){
-                    std::cerr << "Error: set register name not found in device descriptor" << std::endl;
+                std::string name = reg["name"].get<std::string>();
+                if(dev_desc.registers.find(name) == dev_desc.registers.end()){
+                    std::cerr << "Error: set register name: " << name << " not found in device descriptor" << std::endl;
                     return 1;
                 }
-                r.value = reg["value"].get<std::string>();
+                if(dev_desc.registers[name].writable == false){
+                    std::cerr << "Error: set register: " << name << " is not writable" << std::endl;
+                    return 1;
+                }
+
+                r.size = dev_desc.registers[name].size;   // get the size from the device descriptor
+                r.address = dev_desc.registers[name].index;   // get the address from the device descriptor
+
+
+                // TODO: really need to make a good io class to handle all of these conversions and data types instead of this mess
+                switch (dev_desc.registers[name].type){
+                    case io_type::BOOL:
+                        r.data[0] = reg["value"].get<bool>() ? 1 : 0;
+                        break;
+                    case io_type::UINT8:
+                        r.data[0] = reg["value"].get<std::uint8_t>();
+                        break;
+                    case io_type::UINT16:
+                        {
+                        uint16_t t = reg["value"].get<std::uint16_t>();
+                        memcpy(r.data, &t, sizeof(uint16_t));
+                        }
+                        break;
+                    case io_type::UINT32:
+                        {
+                        uint32_t t = reg["value"].get<std::uint32_t>();
+                        memcpy(r.data, &t, sizeof(uint32_t));
+                        }
+                        break;
+                    case io_type::INT8:
+                        r.data[0] = reg["value"].get<std::int8_t>();
+                        break;
+                    case io_type::INT16:
+                        {
+                        int16_t t = reg["value"].get<std::int16_t>();
+                        memcpy(r.data, &t, sizeof(int16_t));
+                        }
+                        break;
+                    case io_type::INT32:
+                        {
+                        int32_t t = reg["value"].get<std::int32_t>();
+                        memcpy(r.data, &t, sizeof(int32_t));
+                        }
+                        break;
+                    case io_type::FLOAT:
+                        {
+                        float t = reg["value"].get<float>();
+                        memcpy(r.data, &t, sizeof(float));
+                        }
+                        break;
+                    default:
+                        std::cerr << "Error: set register: " << name << " has an invalid type" << std::endl;
+                        return 1;
+                }
+
                 set_regs.push_back(r);
             }
 
@@ -466,6 +708,7 @@ class em_serial_device: public base_node{
             uint8_t size = 0; // size of the data in bytes
             bool readable = false;
             bool writable = false;
+            uint8_t data[4] = {0, 0, 0, 0};
         };
 
         struct message_severities{  // these values may be changed based on the device descriptor
@@ -524,8 +767,10 @@ class em_serial_device: public base_node{
         };
 
         struct set_reg{
-            std::string name = "";
-            std::string value = ""; // string will be converted to the correct type
+            uint8_t size = 0; // size of the data in bytes
+            uint16_t address = 0;   // register address
+            uint8_t data[4] = {0, 0, 0, 0}; // data to write
+            bool sent = false;   // if the data has been sent
         };
 
         struct cyclic_node_copy{
@@ -539,6 +784,9 @@ class em_serial_device: public base_node{
         std::vector<async_reg> async_write_regs;
         std::map<uint8_t, cyclic_reg> cyclic_read_regs;
         std::map<uint8_t, cyclic_reg> cyclic_write_regs;
+
+        std::vector<set_reg> api_write_regs;
+        std::vector<std::string> api_read_regs;
 
         uint8_t highest_cyclic_read_index = 0;
         uint8_t highest_cyclic_write_index = 0;
