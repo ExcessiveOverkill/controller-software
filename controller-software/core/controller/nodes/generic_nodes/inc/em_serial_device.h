@@ -49,7 +49,16 @@ class em_serial_device: public base_node{
             if(device->consecutive_packet_errors == comm.timeout_tries){
                 communication_error = true;
                 if(current_state == state::RUN){
-                    std::cerr << "Error: EM serial device communication error, attempting to reconnect..." << std::endl;
+                    std::cerr << "Error: EM serial device " << device->get_full_name() << " communication error, attempting to reconnect..." << std::endl;
+
+                    if(firmware_buffer != nullptr){
+                        std::cerr << "Error: connection lost while transfering firmware, update aborted, restart device before retrying" << std::endl;
+                        firmware_offset = 0;
+                        firmware_total_percent = 0;
+                        firmware_write_wait = false;
+                        delete[] firmware_buffer;
+                        firmware_buffer = nullptr;
+                    }
                 }
                 if(current_state != state::DISABLE_CYCLIC_MODE){
                     device->clear_pending_sequential_cmds();
@@ -151,6 +160,8 @@ class em_serial_device: public base_node{
 
         void run_async_updates(){
 
+            run_firmware_update();
+
             // skip if too many cmds are outstanding
             if(device->get_pending_sequential_cmds() > 5){
                 return;
@@ -212,6 +223,51 @@ class em_serial_device: public base_node{
             return;
         }
 
+        void run_firmware_update(){
+            if(firmware_buffer == nullptr){
+                return;
+            }
+
+            if(device->get_pending_sequential_cmds() == 0){
+                if(firmware_write_wait){
+                    // waiting for last send data to finish
+                    // it is now complete and we can signal to write it to flash
+                    device->sequential_write(dev_desc.firmware_write_address, (void*)&firmware_offset, sizeof(uint32_t));
+                    firmware_offset += 8*4; // 8 32-bit words
+                    firmware_write_wait = false;
+                }
+                else if(firmware_offset < firmware_size){
+                    // not waitng on a write, so we can send the next chunk of data
+                    uint32_t* data = reinterpret_cast<uint32_t*>(&firmware_buffer[firmware_offset]);
+                    device->sequential_write(dev_desc.firmware_data_0, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_1, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_2, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_3, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_4, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_5, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_6, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_7, data++, sizeof(uint32_t));
+
+                    firmware_write_wait = true;
+
+                    if((firmware_offset*100)/firmware_size >= firmware_total_percent){
+                        std::cout << "Firmware update progress: " << static_cast<int>(firmware_total_percent) << "%" << std::endl;
+                        firmware_total_percent++;
+                    }
+                }
+                else{
+                    // firmware update is complete, trigger the restart
+                    std::cout << "Firmware update restarting device..." << std::endl;
+                    device->sequential_write(dev_desc.firmware_write_address, (void*)&firmware_update_restart_val, sizeof(uint32_t));
+                    firmware_offset = 0;
+                    firmware_total_percent = 0;
+                    firmware_write_wait = false;
+                    delete[] firmware_buffer;
+                    firmware_buffer = nullptr;
+                }
+            }
+        }
+
         void run_cyclic_updates(){
             // copy data from the input ports to the global vars and from the global vars to the output ports
             for(auto& cpy : cyclic_node_copies){
@@ -222,8 +278,10 @@ class em_serial_device: public base_node{
 
         void dump_messages(){
             // print all messages to terminal
+
+            std::cout << "\nEM Serial device " << device->get_full_name() << " messages:" << std::endl;
             for(auto& msg : dev_desc.messages){
-                std::cout << "Trigger time (us): " << msg.second.last_trigger_time_us.u64 << "\tSeverity: " << msg.second.str_severity << "\tMessage: " << msg.second.path << " - " << msg.second.message << ": " << msg.second.description << std::endl;
+                std::cout << "Trigger time (us): " << msg.second.last_trigger_time_us.u64 << "\t" << msg.second.str_severity << "\t" << msg.second.path << " - " << msg.second.message << std::endl;
             }
         }
 
@@ -304,12 +362,25 @@ class em_serial_device: public base_node{
                         "register_name",
                         "register_name2",
                         "register_name3"
-                    ]
+                    ],
+                    "print_errors": true,   // print errors to the console
+                    "firmware_update": "file/path/to/firmware.bin"   // firmware update binary, this will immediately start the update process
                 }
             
             }
             
             */
+
+            // print messages to the console
+            if(json_settings->contains("print_errors")){
+                current_message_id = 0;
+            }
+
+            // load firmware update
+            if(json_settings->contains("firmware_update")){
+                std::string firmware_file = (*json_settings)["firmware_update"].get<std::string>();
+                load_firmware_bin_file(firmware_file);
+            }
 
             // load api write registers
             for(auto& reg : (*json_settings)["write"].items()){
@@ -743,6 +814,16 @@ class em_serial_device: public base_node{
             uint16_t message_time_lower_address = 0;
             uint16_t message_time_upper_address = 0;
             uint16_t dummy_reg_address = 0;
+            uint16_t status_reg_address = 0;
+            uint16_t firmware_write_address = 0;
+            uint16_t firmware_data_0 = 0;
+            uint16_t firmware_data_1 = 0;
+            uint16_t firmware_data_2 = 0;
+            uint16_t firmware_data_3 = 0;
+            uint16_t firmware_data_4 = 0;
+            uint16_t firmware_data_5 = 0;
+            uint16_t firmware_data_6 = 0;
+            uint16_t firmware_data_7 = 0;
         } dev_desc;
 
         struct async_reg{
@@ -792,6 +873,52 @@ class em_serial_device: public base_node{
         uint8_t highest_cyclic_write_index = 0;
 
         std::vector<set_reg> set_regs;
+
+        uint8_t* firmware_buffer = nullptr;
+        uint32_t firmware_size = 0;
+        uint32_t firmware_offset = 0;
+        bool firmware_write_wait = false;
+        uint32_t firmware_update_restart_val = 0xFFFFFFFF; // value to write to the firmware update register to trigger a restart
+        uint8_t firmware_1_percent = 0;
+        uint8_t firmware_total_percent = 0;
+
+        uint32_t load_firmware_bin_file(std::string file_path){
+
+            if(firmware_buffer != nullptr){
+                std::cerr << "Error: firmware buffer is not null" << std::endl;
+                return 2; 
+            }
+
+            // load the firmware binary file and parse it
+            std::ifstream i(file_path, std::ios::binary);
+            if(!i.is_open()){
+                std::cerr << "Error: Unable to open firmware binary file" << std::endl;
+                return 1;
+            }
+
+            // get the size of the file
+            i.seekg(0, std::ios::end);
+            firmware_size = i.tellg();
+            i.seekg(0, std::ios::beg);
+
+            // ensure the size is a multiple of 8
+            if(firmware_size % 8 != 0){
+                firmware_size += 8 - (firmware_size % 8);
+            }
+
+            // read the file into a buffer
+            if(firmware_buffer != nullptr){
+                delete[] firmware_buffer;
+            }
+            firmware_buffer = new uint8_t[firmware_size];
+            i.read(reinterpret_cast<char*>(firmware_buffer), firmware_size);
+            i.close();
+
+            firmware_offset = 0;
+            firmware_1_percent = firmware_size / 100;
+
+            return 0;
+        }
 
         uint32_t load_device_descriptor_file(std::string file_path){
 
@@ -929,6 +1056,35 @@ class em_serial_device: public base_node{
             dev_desc.message_time_upper_address = dev_desc.registers["message_time_upper"].index;
             dev_desc.dummy_reg_address = dev_desc.registers["dummy_register"].index;
 
+            // set firmware write addresses
+            if(dev_desc.registers.find("firmware_update_data_address") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_0") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_1") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_2") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_3") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_4") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_5") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_6") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_7") == dev_desc.registers.end()){
+                throw std::runtime_error("Error: missing required firmware write registers in device descriptor");
+            }
+            dev_desc.firmware_write_address = dev_desc.registers["firmware_update_data_address"].index;
+            dev_desc.firmware_data_0 = dev_desc.registers["firmware_update_data_0"].index;
+            dev_desc.firmware_data_1 = dev_desc.registers["firmware_update_data_1"].index;
+            dev_desc.firmware_data_2 = dev_desc.registers["firmware_update_data_2"].index;
+            dev_desc.firmware_data_3 = dev_desc.registers["firmware_update_data_3"].index;
+            dev_desc.firmware_data_4 = dev_desc.registers["firmware_update_data_4"].index;
+            dev_desc.firmware_data_5 = dev_desc.registers["firmware_update_data_5"].index;
+            dev_desc.firmware_data_6 = dev_desc.registers["firmware_update_data_6"].index;
+            dev_desc.firmware_data_7 = dev_desc.registers["firmware_update_data_7"].index;
+
+            // set status register address
+            // Status bits, 0: IDLE, 1: RUNNING, 2: FAULT, 3: WARNING
+            if(dev_desc.registers.find("status") == dev_desc.registers.end()){
+                throw std::runtime_error("Error: missing required status register in device descriptor");
+            }
+            dev_desc.status_reg_address = dev_desc.registers["status"].index;
+
             dev_desc.loaded = true;
 
             return 0;
@@ -1001,7 +1157,6 @@ class em_serial_device: public base_node{
                     if(cyclic_read_regs.find(i) != cyclic_read_regs.end()){
                         auto reg = cyclic_read_regs.find(i)->second;
                         if(reg.sync_with_node){
-                            // copy from global var to the note output
                             cyclic_node_copy c;
                             c.src = device->cyclic_read_node_var_regs[used_cyclic_read_node_vars]->get_raw_data_ptr<uint32_t>();
                             c.dst = reg.data_ptr;
@@ -1052,7 +1207,6 @@ class em_serial_device: public base_node{
                     if(cyclic_write_regs.find(i) != cyclic_write_regs.end()){
                         auto reg = cyclic_write_regs.find(i)->second;
                         if(reg.sync_with_node){
-                            // copy from global var to the note output
                             cyclic_node_copy c;
                             c.dst = device->cyclic_write_node_var_regs[used_cyclic_write_node_vars]->get_raw_data_ptr<uint32_t>();
                             c.src = reg.in->data_pointer;

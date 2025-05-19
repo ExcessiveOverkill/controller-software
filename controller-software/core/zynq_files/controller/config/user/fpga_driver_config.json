@@ -1,8 +1,9 @@
 {
-    "node_1_serial_card": {
+    "node_1_serial_card_B": {
         "port_modes": {
             "0": "RS422",
-            "1": "RS485",
+            "1": "RS422",
+            "8": "RS422",
             "9": "RS422"
         },
 
@@ -13,7 +14,84 @@
         }
     },
 
-    "node_4_em_serial_controller": {
+    "node_2_serial_card_C": {
+        "port_modes": {
+            "0": "RS485",
+            "1": "RS485",
+            "2": "RS485",
+            "3": "RS485",
+            "4": "RS485",
+            "5": "RS485",
+            "8": "RS422",
+            "9": "RS422"
+        },
+
+        "led_modes": {
+            "0": "BLINK_FAST",
+            "1": "NODE_VAR",
+            "2": "NODE_VAR"
+        }
+    },
+
+    "node_5_em_serial_controller_A": {
+        "baud_rate": 12.5e6,
+        "devices": {
+            "0": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "1": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "2": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "3": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "4": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            }
+        }
+    },
+
+    "node_6_em_serial_controller_B": {
+        "baud_rate": 12.5e6,
+        "devices": {
+            "0": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "1": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "2": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            },
+            "3": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            }
+        }
+    },
+
+    "node_7_em_serial_controller_C": {
+        "baud_rate": 12.5e6,
+        "devices": {
+            "0": {
+                "cyclic_read_node_vars":2,
+                "cyclic_write_node_vars":2
+            }
+        }
+    },
+
+    "node_8_em_serial_controller_D": {
         "baud_rate": 12.5e6,
         "devices": {
             "0": {

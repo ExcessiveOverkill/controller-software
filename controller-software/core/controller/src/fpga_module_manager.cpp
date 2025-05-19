@@ -199,6 +199,12 @@ uint32_t fpga_module_manager::run_update(){
 uint32_t fpga_module_manager::write_instructions_to_fpga(){
     // write the instructions to the FPGA memory
     // TODO: add support for multiple instruction blocks (when instruction count becomes very large)
+    // TODO: optimize to only write the changed(dynamic) instructions
+
+    if(fpga_instr.condensed_instructions.size() > mem_layout.PS_to_PL_dma_instructions_size / sizeof(uint64_t)){
+        throw std::runtime_error("Error: Instruction size is larger than the transfer size, currently not supported");
+    }
+
     uint32_t index = 0;
     for(auto instruction : fpga_instr.condensed_instructions){
         reinterpret_cast<uint64_t*>(PS_PL_dma_instructions_ptr)[index] = instruction;

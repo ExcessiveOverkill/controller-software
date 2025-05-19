@@ -13,6 +13,8 @@ class em_serial_controller : public base_driver {
         class em_serial_device{
             public:
                 em_serial_device(em_serial_controller* controller, uint8_t device_number);
+
+                std::string get_full_name();
         
                 uint32_t set_address(uint32_t address);
                 uint32_t get_address(uint16_t* address);

@@ -18,7 +18,7 @@ uint32_t em_serial_controller::custom_load_config(json* user_driver_config){
     auto device_group = loader.get_group("devices", 0);
     uint16_t num_devices = device_group->group_data.count;
 
-    num_devices = 1;    // TEMPORARY FOR TESTING
+    //num_devices = 1;    // TEMPORARY FOR TESTING
 
     for(uint16_t i = 0; i < num_devices; i++){
         auto device = new em_serial_device(this, i);
@@ -675,6 +675,8 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
     fault.response_not_finished = regs.status_response_not_finished->get_value();
     fault.crc_invalid = regs.status_crc_invalid->get_value();
 
+    bool* temp = &cyclic_data_enabled;
+
     uint32_t status = regs.status->get_value();
     
     if(!fault.no_response && !fault.response_not_finished && !fault.crc_invalid){   // no packet faults
@@ -724,7 +726,7 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
         current_sequential_cmd_index = 0;   // send the failed command again
         consecutive_packet_errors++;
         // if(consecutive_packet_errors < 20){
-        //     std::cout << "Error: packet error: " << status << std::endl;
+        //     std::cout << "Error: packet error on " << get_full_name() << " : " << status << std::endl;
         // }
     }
 
@@ -798,4 +800,8 @@ uint32_t em_serial_controller::em_serial_device::run(){
     }
 
     return 0;
+}
+
+std::string em_serial_controller::em_serial_device::get_full_name(){
+    return controller->node_var_prefix + "." + device_name.substr(0, device_name.size()-1);
 }

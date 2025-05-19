@@ -539,8 +539,9 @@ uint32_t fpga_instructions::compile(){
         }
 
         if(register_index_source_node_var != ""){
-            uint32_t* dynamic_reg_index = &(instruction->dynamic_reg_index);
-            node_core->set_global_variable_data_ptr(register_index_source_node_var, dynamic_reg_index);
+            //uint32_t* dynamic_reg_index = &(instruction->dynamic_reg_index);
+            //node_core->set_global_variable_data_ptr(register_index_source_node_var, dynamic_reg_index);
+            node_core->get_global_variable_data_ptr(register_index_source_node_var, (void**)&(instruction->dynamic_reg_index_ptr));
         }
 
     }
@@ -725,12 +726,9 @@ uint32_t fpga_instructions::condense_instructions(){
     dynamic_instructions.clear();   // clear the dynamic instructions list
 
 
-    // TODO: cant sort the instructions here because we need to keep the order of the instructions for pointers referencing them
+    // cant sort the instructions here because we need to keep the order of the instructions for pointers referencing them
     // instead make a temporary array of pointers to the instructions and sort that
 
-    // std::sort(instructions.begin(), instructions.end(), [](const copy &a, const copy &b) {
-    //     return a.dma_execution_cycle < b.dma_execution_cycle;
-    // });
 
     struct sorted_instruction{
         uint32_t original_index;
@@ -814,14 +812,16 @@ uint32_t fpga_instructions::update_dynamic_instructions(){
     for(auto data : dynamic_instructions){
         copy* instruction = &(instructions[data.instruction_object_index]);
 
-        uint32_t* dynamic_reg_index = &(instruction->dynamic_reg_index);
+        uint32_t* dynamic_reg_index = &(instruction->dynamic_reg_index);    // for testing
 
-        if(instruction->dynamic_reg_index == -1){
+        uint32_t index = *(instruction->dynamic_reg_index_ptr);
+
+        if(index == -1){
             condensed_instructions[data.condensed_instruction_index] = create_instruction_NOP();    // do nothing
             return 0;
         }
 
-        uint32_t addr = instruction->dynamic_reg_starting_address + instruction->dynamic_reg_index;
+        uint32_t addr = instruction->dynamic_reg_starting_address + index;
 
         if(instruction->src_node != 0){
             instruction->src_addr = addr;
@@ -830,7 +830,7 @@ uint32_t fpga_instructions::update_dynamic_instructions(){
             instruction->dst_addr = addr;
         }
 
-        condensed_instructions[data.condensed_instruction_index] = create_instruction_COPY(instruction->src_node, instruction->src_addr, instruction->dst_node, instruction->dst_addr);
+         condensed_instructions[data.condensed_instruction_index] = create_instruction_COPY(instruction->src_node, instruction->src_addr, instruction->dst_node, instruction->dst_addr);
     }
 
     return 0;

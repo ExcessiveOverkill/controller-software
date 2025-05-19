@@ -44,6 +44,7 @@ class fpga_instructions{
                 uint16_t dst_addr = 0;
 
                 uint32_t dynamic_reg_index = -1;
+                uint32_t* dynamic_reg_index_ptr = &dynamic_reg_index;
                 uint16_t dynamic_reg_starting_address = 0;
                 bool is_dynamic = false;
 
