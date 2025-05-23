@@ -7,9 +7,13 @@
     },
 
     "user_node_vars":{
+        "test_variable_0":{
+            "type":"float"
+        }
     },
 
     "node_var_values":{
+        "test_variable_0": 0.0
     },
 
     "networks":{
@@ -86,7 +90,7 @@
                                 {
                                     "name": "fan_speed_measured",
                                     "sync_with_node": true,
-                                    "cyclic_index": 3
+                                    "cyclic_index": 4
                                 }
                             ],
                             "set":[
@@ -96,7 +100,7 @@
                                 },
                                 {
                                     "name": "current_limit_d",
-                                    "value": 0.0
+                                    "value": 0
                                 },
                                 {
                                     "name": "commutation_offset",
@@ -230,7 +234,36 @@
                             "timeout_tries": 20
                         },
                         "device":{
-                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json",
+                            "cyclic_write_regs":[
+                                {
+                                    "name": "commutation_command",
+                                    "sync_with_node": false,
+                                    "cyclic_index": 3
+                                }
+                            ],
+                            "set":[
+                            {
+                                "name": "current_limit_q",
+                                "value": 860
+                            },
+                            {
+                                "name": "current_limit_d",
+                                "value": 0
+                            },
+                            {
+                                "name": "commutation_offset",
+                                "value": 0
+                            },
+                            {
+                                "name": "commutation_scale",
+                                "value": 1
+                            },
+                            {
+                                "name": "calibration_current",
+                                "value": 500
+                            }
+                        ]
                         }
                         
                     }
