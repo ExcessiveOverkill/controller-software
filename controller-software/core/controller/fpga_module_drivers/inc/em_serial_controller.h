@@ -13,12 +13,15 @@ class em_serial_controller : public base_driver {
         class em_serial_device{
             public:
                 em_serial_device(em_serial_controller* controller, uint8_t device_number);
+
+                std::string get_full_name();
         
                 uint32_t set_address(uint32_t address);
                 uint32_t get_address(uint16_t* address);
                 uint32_t set_enabled(bool enabled);
                 uint32_t get_enabled(bool* enabled);
                 uint32_t set_cyclic_data_enabled(bool enabled);
+                void force_disable_cyclic_data(){force_disable_cyclic_data_flag = true;} // used to force disable cyclic data when the system is faulted
                 bool get_cyclic_data_enabled();
                 bool get_sequential_cmds_complete();
                 bool get_cyclic_config_complete();
@@ -39,12 +42,6 @@ class em_serial_controller : public base_driver {
 
                 void rerun_cylic_config();  // resends the cyclic configs to the device
                 void clear_pending_sequential_cmds(){sequential_cmds.clear();} // clear the pending sequential cmds
-        
-                uint32_t get_cyclic_read_data_mem_address(uint16_t address, uint8_t* node_address, uint16_t* bram_address);    // get node and bram address for cyclic data, used for DMA instructions
-                uint32_t get_cyclic_write_data_mem_address(uint16_t address, uint8_t* node_address, uint16_t* bram_address);    // get node and bram address for cyclic data, used for DMA instructions
-        
-                uint32_t set_cyclic_read_pointer(uint16_t address, void** data); // automatically move cyclic data to the pointer
-                uint32_t set_cyclic_write_pointer(uint16_t address, void** data); // automatically move pointer data to the cyclic location
 
                 uint8_t get_read_cyclic_config_count(){return read_cyclic_configs.size();}
                 uint8_t get_write_cyclic_config_count(){return write_cyclic_configs.size();}
@@ -102,7 +99,8 @@ class em_serial_controller : public base_driver {
                 };
                 const uint8_t max_outstanding_cmds = 64;    // TODO: get this from some config?
                 std::vector<sequential_cmd> sequential_cmds;
-        
+                uint8_t current_sequential_cmd_index = 0;
+                        
                 #define MAX_CYCLIC_REGS 64  // TODO: get this from some config
                 uint16_t max_cyclic_registers = MAX_CYCLIC_REGS;
                 bool cyclic_read_enabled[MAX_CYCLIC_REGS];
@@ -142,6 +140,8 @@ class em_serial_controller : public base_driver {
                 bool cyclic_config_complete = true;
                 bool sequential_cmds_complete = true;
                 bool initial_config_complete = false;
+
+                bool force_disable_cyclic_data_flag = false;   // used to force disable cyclic data when the system is faulted
         
                 struct registers{   // registers needed to control and configure the device
                     Register* control = nullptr;

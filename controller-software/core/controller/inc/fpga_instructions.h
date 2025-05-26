@@ -44,6 +44,7 @@ class fpga_instructions{
                 uint16_t dst_addr = 0;
 
                 uint32_t dynamic_reg_index = -1;
+                uint32_t* dynamic_reg_index_ptr = &dynamic_reg_index;
                 uint16_t dynamic_reg_starting_address = 0;
                 bool is_dynamic = false;
 
@@ -103,6 +104,8 @@ class fpga_instructions{
 
         uint32_t add(copy instruction);
 
+        void set_update_frequency(uint32_t frequency);
+
         uint32_t compile();
 
         uint32_t save(std::string file_path, std::string fpga_config_file, bool write_protected = false);
@@ -135,6 +138,8 @@ class fpga_instructions{
         std::vector<copy> instructions;
 
         uint32_t running_instruction_index = 0;
+
+        uint32_t full_update_counts = 0;
 
         json* fpga_config = nullptr;
 

@@ -12,7 +12,7 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 save them in the core/.ssh folder
 
 copy ssh key to zynq:
-ssh-copy-id -i .ssh/zynq em-os@192.168.1.238
+ssh-copy-id -i .ssh/zynq em-os@192.168.1.243
 
 (remove past configs if zynq has been re-imaged)
 rm -r /home/excessive/.ssh
@@ -31,7 +31,7 @@ nano ~/.ssh/config
 
 add config:
 Host zynq
-    HostName 192.168.1.238    
+    HostName 192.168.1.243    
     User em-os
     IdentityFile /home/excessive/controller-software/controller-software/core/.ssh/zynq
     Port 22

@@ -56,6 +56,8 @@ uint32_t Controller::load_config(std::string file_path){
         return 4;
     }
 
+    fpga_manager.set_update_frequency(software_update_frequency);
+
     if(fpga_manager.compile_instructions()){
         std::cerr << "Failed to compile fpga instructions" << std::endl;
         return 5;

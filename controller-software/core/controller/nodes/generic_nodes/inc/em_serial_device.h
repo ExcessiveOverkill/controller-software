@@ -46,18 +46,28 @@ class em_serial_device: public base_node{
 
             //device_protocol_fault_count = device->consecutive_packet_errors + device->consecutive_unknown_packet_errors;    // unused at the moment
 
-            if(device->consecutive_packet_errors > comm.timeout_tries){
-                if(communication_error == false){
-                    if(current_state == state::RUN){
-                        std::cerr << "Error: EM serial device communication error" << std::endl;
-                    }
-                    if(current_state != state::DISABLE_CYCLIC_MODE && current_state != state::INITIAL_CONFIG){
-                        current_state = state::RESET;
+            if(device->consecutive_packet_errors == comm.timeout_tries){
+                communication_error = true;
+                if(current_state == state::RUN){
+                    std::cerr << "Error: EM serial device " << device->get_full_name() << " communication error, attempting to reconnect..." << std::endl;
+
+                    if(firmware_buffer != nullptr){
+                        std::cerr << "Error: connection lost while transfering firmware, update aborted, restart device before retrying" << std::endl;
+                        firmware_offset = 0;
+                        firmware_total_percent = 0;
+                        firmware_write_wait = false;
+                        delete[] firmware_buffer;
+                        firmware_buffer = nullptr;
                     }
                 }
-                communication_error = true;
+                if(current_state != state::DISABLE_CYCLIC_MODE){
+                    device->clear_pending_sequential_cmds();
+                    device->force_disable_cyclic_data();
+                    current_state = state::DISABLE_CYCLIC_MODE;
+                }
+                
             }
-            else{
+            else if(device->consecutive_packet_errors == 0){
                 communication_error = false;
             }
 
@@ -71,18 +81,14 @@ class em_serial_device: public base_node{
                 break;
 
             case state::DISABLE_CYCLIC_MODE:
-                if(device->get_sequential_cmds_complete() && device->get_cyclic_data_enabled()){
-                    device->set_cyclic_data_enabled(false);
-                }
-                if(device->get_sequential_cmds_complete() && !device->get_cyclic_data_enabled() && device->consecutive_packet_errors == 0){
+                if(device->get_sequential_cmds_complete() && !device->get_cyclic_data_enabled()){
                     device->rerun_cylic_config();
                     current_state = state::CONFIGURE_CYCLIC_MODE;
                 }
-                
                 break;
             
             case state::CONFIGURE_CYCLIC_MODE:
-                if(device->get_cyclic_config_complete()){
+                if(device->get_cyclic_config_complete() && device->get_sequential_cmds_complete()){
                     device->set_cyclic_data_enabled(true);
                     current_state = state::ENABLE_CYCLIC_MODE;
                 }
@@ -90,8 +96,12 @@ class em_serial_device: public base_node{
 
             case state::ENABLE_CYCLIC_MODE:
                 if(device->get_cyclic_data_enabled()){
+                    run_one_shot_settings();
                     current_state = state::RUN;
                     current_message_id = 0; // update all messages on the first run
+                }
+                else if(device->get_sequential_cmds_complete()){
+                    device->set_cyclic_data_enabled(true);
                 }
                 break;
 
@@ -102,6 +112,7 @@ class em_serial_device: public base_node{
 
             case state::RESET:
                 device->clear_pending_sequential_cmds();
+                device->force_disable_cyclic_data();
                 current_state = state::DISABLE_CYCLIC_MODE;
                 break;
 
@@ -114,12 +125,49 @@ class em_serial_device: public base_node{
             return 0;
         }
 
+        void run_one_shot_settings(){
+            // run the one-shot settings
+            for(auto& reg : set_regs){
+                device->sequential_write(reg.address, &reg.data, reg.size);
+            }
+        }
+
+        void run_api_calls(){
+
+            // run the writes
+            bool writes_done = true;
+            for(auto& write : api_write_regs){
+                if(write.sent){
+                    continue;
+                }
+                if(device->sequential_write(write.address, write.data, write.size) == 0){
+                    write.sent = true;
+                    writes_done = false;
+                }
+            }
+
+            if(writes_done && device->get_sequential_cmds_complete()){
+                // clear the done writes
+                api_write_regs.clear();
+            }
+
+            // run the reads
+            for(auto& read : api_read_regs){
+                device->sequential_read(dev_desc.registers[read].index, &(dev_desc.registers[read].data), dev_desc.registers[read].size);
+            }
+            api_read_regs.clear();
+        }
+
         void run_async_updates(){
+
+            run_firmware_update();
 
             // skip if too many cmds are outstanding
             if(device->get_pending_sequential_cmds() > 5){
                 return;
             }
+
+            run_api_calls();
 
             // run async command if their update count has been reached
 
@@ -175,6 +223,51 @@ class em_serial_device: public base_node{
             return;
         }
 
+        void run_firmware_update(){
+            if(firmware_buffer == nullptr){
+                return;
+            }
+
+            if(device->get_pending_sequential_cmds() == 0){
+                if(firmware_write_wait){
+                    // waiting for last send data to finish
+                    // it is now complete and we can signal to write it to flash
+                    device->sequential_write(dev_desc.firmware_write_address, (void*)&firmware_offset, sizeof(uint32_t));
+                    firmware_offset += 8*4; // 8 32-bit words
+                    firmware_write_wait = false;
+                }
+                else if(firmware_offset < firmware_size){
+                    // not waitng on a write, so we can send the next chunk of data
+                    uint32_t* data = reinterpret_cast<uint32_t*>(&firmware_buffer[firmware_offset]);
+                    device->sequential_write(dev_desc.firmware_data_0, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_1, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_2, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_3, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_4, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_5, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_6, data++, sizeof(uint32_t));
+                    device->sequential_write(dev_desc.firmware_data_7, data++, sizeof(uint32_t));
+
+                    firmware_write_wait = true;
+
+                    if((firmware_offset*100)/firmware_size >= firmware_total_percent){
+                        std::cout << "Firmware update progress: " << static_cast<int>(firmware_total_percent) << "%" << std::endl;
+                        firmware_total_percent++;
+                    }
+                }
+                else{
+                    // firmware update is complete, trigger the restart
+                    std::cout << "Firmware update restarting device..." << std::endl;
+                    device->sequential_write(dev_desc.firmware_write_address, (void*)&firmware_update_restart_val, sizeof(uint32_t));
+                    firmware_offset = 0;
+                    firmware_total_percent = 0;
+                    firmware_write_wait = false;
+                    delete[] firmware_buffer;
+                    firmware_buffer = nullptr;
+                }
+            }
+        }
+
         void run_cyclic_updates(){
             // copy data from the input ports to the global vars and from the global vars to the output ports
             for(auto& cpy : cyclic_node_copies){
@@ -185,8 +278,10 @@ class em_serial_device: public base_node{
 
         void dump_messages(){
             // print all messages to terminal
+
+            std::cout << "\nEM Serial device " << device->get_full_name() << " messages:" << std::endl;
             for(auto& msg : dev_desc.messages){
-                std::cout << "Trigger time (us): " << msg.second.last_trigger_time_us.u64 << "\tSeverity: " << msg.second.str_severity << "\tMessage: " << msg.second.path << " - " << msg.second.message << ": " << msg.second.description << std::endl;
+                std::cout << "Trigger time (us): " << msg.second.last_trigger_time_us.u64 << "\t" << msg.second.str_severity << "\t" << msg.second.path << " - " << msg.second.message << std::endl;
             }
         }
 
@@ -250,21 +345,187 @@ class em_serial_device: public base_node{
                                 "sync_with_node": true,
                                 "cyclic_index": 4
                             }
+                        ],
+                        "set": [    // one-shot write a value to a register, these will be run on each device reconnect
+                            {
+                                "name": "register_name",
+                                "value": 0.5
+                            }
                         ]
-
-                    }
-                },
-
-            // one-shot write a value to a register, these will be run on each device reconnect
-            "set": [
-                {
-                    "name": "register_name",
-                    "value": 0.5
+                    },
+                    "write":[   // async writes, these occur once when sent
+                        "register_name": 0.5,
+                        "register_name2": 0.5,
+                        "register_name3": 0.5
+                    ],
+                    "read":[    // async reads, these occur once when sent, but will lag 1 read cycle due to how updates are done
+                        "register_name",
+                        "register_name2",
+                        "register_name3"
+                    ],
+                    "print_errors": true,   // print errors to the console
+                    "firmware_update": "file/path/to/firmware.bin"   // firmware update binary, this will immediately start the update process
                 }
-            ]
+            
             }
             
             */
+
+            // print messages to the console
+            if(json_settings->contains("print_errors")){
+                current_message_id = 0;
+            }
+
+            // load firmware update
+            if(json_settings->contains("firmware_update")){
+                std::string firmware_file = (*json_settings)["firmware_update"].get<std::string>();
+                load_firmware_bin_file(firmware_file);
+            }
+
+            // load api write registers
+            for(auto& reg : (*json_settings)["write"].items()){
+                set_reg r;
+                std::string name = reg.key();
+                if(dev_desc.registers.find(name) == dev_desc.registers.end()){
+                    std::cerr << "Error: write register name: " << name << " not found in device descriptor" << std::endl;
+                    (*json_settings)["error"].emplace("write", "register name: " + name + " not found in device descriptor");
+                    return 1;
+                }
+                if(dev_desc.registers[name].writable == false){
+                    std::cerr << "Error: write register: " << name << " is not writable" << std::endl;
+                    (*json_settings)["error"].emplace("write", "register: " + name + " is not writable");
+                    return 1;
+                }
+                
+                r.size = dev_desc.registers[name].size;   // get the size from the device descriptor
+                r.address = dev_desc.registers[name].index;   // get the address from the device descriptor
+
+
+                // TODO: really need to make a good io class to handle all of these conversions and data types instead of this mess
+                switch (dev_desc.registers[name].type){
+                    case io_type::BOOL:
+                        r.data[0] = reg.value().get<bool>() ? 1 : 0;
+                        break;
+                    case io_type::UINT8:
+                        r.data[0] = reg.value().get<std::uint8_t>();
+                        break;
+                    case io_type::UINT16:
+                        {
+                        uint16_t t = reg.value().get<std::uint16_t>();
+                        memcpy(r.data, &t, sizeof(uint16_t));
+                        }
+                        break;
+                    case io_type::UINT32:
+                        {
+                        uint32_t t = reg.value().get<std::uint32_t>();
+                        memcpy(r.data, &t, sizeof(uint32_t));
+                        }
+                        break;
+                    case io_type::INT8:
+                        r.data[0] = reg.value().get<std::int8_t>();
+                        break;
+                    case io_type::INT16:
+                        {
+                        int16_t t = reg.value().get<std::int16_t>();
+                        memcpy(r.data, &t, sizeof(int16_t));
+                        }
+                        break;
+                    case io_type::INT32:
+                        {
+                        int32_t t = reg.value().get<std::int32_t>();
+                        memcpy(r.data, &t, sizeof(int32_t));
+                        }
+                        break;
+                    case io_type::FLOAT:
+                        {
+                        float t = reg.value().get<float>();
+                        memcpy(r.data, &t, sizeof(float));
+                        }
+                        break;
+                    default:
+                        std::cerr << "Error: write register: " << name << " has an invalid type" << std::endl;
+                        (*json_settings)["error"].emplace("write", "register: " + name + " has an invalid type");
+                        return 1;
+                }
+
+                api_write_regs.push_back(r);
+            }
+
+            // load api read registers into a temporary JSON object
+            json read_values = json::object();
+            for(auto& reg : (*json_settings)["read"]){
+                std::string name = reg.get<std::string>();
+                if(dev_desc.registers.find(name) == dev_desc.registers.end()){
+                    std::cerr << "Error: read register name: " << name << " not found in device descriptor" << std::endl;
+                    (*json_settings)["error"].emplace("read", "register name: " + name + " not found in device descriptor");
+                    return 1;
+                }
+                if(dev_desc.registers[name].readable == false){
+                    std::cerr << "Error: read register: " << name << " is not readable" << std::endl;
+                    (*json_settings)["error"].emplace("read", "register: " + name + " is not readable");
+                    return 1;
+                }
+    
+                // add current known value of the reg to the temporary json object
+                switch (dev_desc.registers[name].type){
+                    case io_type::BOOL:
+                        read_values[name] = dev_desc.registers[name].data[0] == 1;
+                        break;
+                    case io_type::UINT8:
+                        read_values[name] = dev_desc.registers[name].data[0];
+                        break;
+                    case io_type::UINT16:
+                        {
+                        uint16_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(uint16_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::UINT32:
+                        {
+                        uint32_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(uint32_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::INT8:
+                        read_values[name] = dev_desc.registers[name].data[0];
+                        break;
+                    case io_type::INT16:
+                        {
+                        int16_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(int16_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::INT32:
+                        {
+                        int32_t t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(int32_t));
+                        read_values[name] = t;
+                        }
+                        break;
+                    case io_type::FLOAT:
+                        {
+                        float t = 0;
+                        memcpy(&t, dev_desc.registers[name].data, sizeof(float));
+                        read_values[name] = t;
+                        }
+                        break;
+                    default:
+                        std::cerr << "Error: read register: " << name << " has an invalid type" << std::endl;
+                        (*json_settings)["error"].emplace("read", "register: " + name + " has an invalid type");
+                        return 1;
+                }
+    
+                api_read_regs.push_back(name);
+            }
+            // replace the original "read" array with the constructed object containing register values
+            (*json_settings)["read"] = read_values;
+
+            if(driver_setup_done){  // skip if the driver has already been setup, TODO: allow reconfiguration later through api config
+                return 0;
+            }
 
             if(json_settings->contains("comm")){
                 if(json_settings->at("comm").contains("device_address")){
@@ -281,7 +542,6 @@ class em_serial_device: public base_node{
                     return 1;
                 }
                 dev_desc.loaded = true;
-                
             }
 
 
@@ -348,14 +608,68 @@ class em_serial_device: public base_node{
             }
 
             // load set registers
-            for(auto& reg : (*json_settings)["set"]){
+            for(auto& reg : (*json_settings)["device"]["set"]){
                 set_reg r;
-                r.name = reg["name"].get<std::string>();
-                if(dev_desc.registers.find(r.name) == dev_desc.registers.end()){
-                    std::cerr << "Error: set register name not found in device descriptor" << std::endl;
+                std::string name = reg["name"].get<std::string>();
+                if(dev_desc.registers.find(name) == dev_desc.registers.end()){
+                    std::cerr << "Error: set register name: " << name << " not found in device descriptor" << std::endl;
                     return 1;
                 }
-                r.value = reg["value"].get<std::string>();
+                if(dev_desc.registers[name].writable == false){
+                    std::cerr << "Error: set register: " << name << " is not writable" << std::endl;
+                    return 1;
+                }
+
+                r.size = dev_desc.registers[name].size;   // get the size from the device descriptor
+                r.address = dev_desc.registers[name].index;   // get the address from the device descriptor
+
+
+                // TODO: really need to make a good io class to handle all of these conversions and data types instead of this mess
+                switch (dev_desc.registers[name].type){
+                    case io_type::BOOL:
+                        r.data[0] = reg["value"].get<bool>() ? 1 : 0;
+                        break;
+                    case io_type::UINT8:
+                        r.data[0] = reg["value"].get<std::uint8_t>();
+                        break;
+                    case io_type::UINT16:
+                        {
+                        uint16_t t = reg["value"].get<std::uint16_t>();
+                        memcpy(r.data, &t, sizeof(uint16_t));
+                        }
+                        break;
+                    case io_type::UINT32:
+                        {
+                        uint32_t t = reg["value"].get<std::uint32_t>();
+                        memcpy(r.data, &t, sizeof(uint32_t));
+                        }
+                        break;
+                    case io_type::INT8:
+                        r.data[0] = reg["value"].get<std::int8_t>();
+                        break;
+                    case io_type::INT16:
+                        {
+                        int16_t t = reg["value"].get<std::int16_t>();
+                        memcpy(r.data, &t, sizeof(int16_t));
+                        }
+                        break;
+                    case io_type::INT32:
+                        {
+                        int32_t t = reg["value"].get<std::int32_t>();
+                        memcpy(r.data, &t, sizeof(int32_t));
+                        }
+                        break;
+                    case io_type::FLOAT:
+                        {
+                        float t = reg["value"].get<float>();
+                        memcpy(r.data, &t, sizeof(float));
+                        }
+                        break;
+                    default:
+                        std::cerr << "Error: set register: " << name << " has an invalid type" << std::endl;
+                        return 1;
+                }
+
                 set_regs.push_back(r);
             }
 
@@ -465,6 +779,7 @@ class em_serial_device: public base_node{
             uint8_t size = 0; // size of the data in bytes
             bool readable = false;
             bool writable = false;
+            uint8_t data[4] = {0, 0, 0, 0};
         };
 
         struct message_severities{  // these values may be changed based on the device descriptor
@@ -499,6 +814,16 @@ class em_serial_device: public base_node{
             uint16_t message_time_lower_address = 0;
             uint16_t message_time_upper_address = 0;
             uint16_t dummy_reg_address = 0;
+            uint16_t status_reg_address = 0;
+            uint16_t firmware_write_address = 0;
+            uint16_t firmware_data_0 = 0;
+            uint16_t firmware_data_1 = 0;
+            uint16_t firmware_data_2 = 0;
+            uint16_t firmware_data_3 = 0;
+            uint16_t firmware_data_4 = 0;
+            uint16_t firmware_data_5 = 0;
+            uint16_t firmware_data_6 = 0;
+            uint16_t firmware_data_7 = 0;
         } dev_desc;
 
         struct async_reg{
@@ -523,8 +848,10 @@ class em_serial_device: public base_node{
         };
 
         struct set_reg{
-            std::string name = "";
-            std::string value = ""; // string will be converted to the correct type
+            uint8_t size = 0; // size of the data in bytes
+            uint16_t address = 0;   // register address
+            uint8_t data[4] = {0, 0, 0, 0}; // data to write
+            bool sent = false;   // if the data has been sent
         };
 
         struct cyclic_node_copy{
@@ -539,10 +866,59 @@ class em_serial_device: public base_node{
         std::map<uint8_t, cyclic_reg> cyclic_read_regs;
         std::map<uint8_t, cyclic_reg> cyclic_write_regs;
 
+        std::vector<set_reg> api_write_regs;
+        std::vector<std::string> api_read_regs;
+
         uint8_t highest_cyclic_read_index = 0;
         uint8_t highest_cyclic_write_index = 0;
 
         std::vector<set_reg> set_regs;
+
+        uint8_t* firmware_buffer = nullptr;
+        uint32_t firmware_size = 0;
+        uint32_t firmware_offset = 0;
+        bool firmware_write_wait = false;
+        uint32_t firmware_update_restart_val = 0xFFFFFFFF; // value to write to the firmware update register to trigger a restart
+        uint8_t firmware_1_percent = 0;
+        uint8_t firmware_total_percent = 0;
+
+        uint32_t load_firmware_bin_file(std::string file_path){
+
+            if(firmware_buffer != nullptr){
+                std::cerr << "Error: firmware buffer is not null" << std::endl;
+                return 2; 
+            }
+
+            // load the firmware binary file and parse it
+            std::ifstream i(file_path, std::ios::binary);
+            if(!i.is_open()){
+                std::cerr << "Error: Unable to open firmware binary file" << std::endl;
+                return 1;
+            }
+
+            // get the size of the file
+            i.seekg(0, std::ios::end);
+            firmware_size = i.tellg();
+            i.seekg(0, std::ios::beg);
+
+            // ensure the size is a multiple of 8
+            if(firmware_size % 8 != 0){
+                firmware_size += 8 - (firmware_size % 8);
+            }
+
+            // read the file into a buffer
+            if(firmware_buffer != nullptr){
+                delete[] firmware_buffer;
+            }
+            firmware_buffer = new uint8_t[firmware_size];
+            i.read(reinterpret_cast<char*>(firmware_buffer), firmware_size);
+            i.close();
+
+            firmware_offset = 0;
+            firmware_1_percent = firmware_size / 100;
+
+            return 0;
+        }
 
         uint32_t load_device_descriptor_file(std::string file_path){
 
@@ -680,6 +1056,35 @@ class em_serial_device: public base_node{
             dev_desc.message_time_upper_address = dev_desc.registers["message_time_upper"].index;
             dev_desc.dummy_reg_address = dev_desc.registers["dummy_register"].index;
 
+            // set firmware write addresses
+            if(dev_desc.registers.find("firmware_update_data_address") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_0") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_1") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_2") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_3") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_4") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_5") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_6") == dev_desc.registers.end() ||
+                dev_desc.registers.find("firmware_update_data_7") == dev_desc.registers.end()){
+                throw std::runtime_error("Error: missing required firmware write registers in device descriptor");
+            }
+            dev_desc.firmware_write_address = dev_desc.registers["firmware_update_data_address"].index;
+            dev_desc.firmware_data_0 = dev_desc.registers["firmware_update_data_0"].index;
+            dev_desc.firmware_data_1 = dev_desc.registers["firmware_update_data_1"].index;
+            dev_desc.firmware_data_2 = dev_desc.registers["firmware_update_data_2"].index;
+            dev_desc.firmware_data_3 = dev_desc.registers["firmware_update_data_3"].index;
+            dev_desc.firmware_data_4 = dev_desc.registers["firmware_update_data_4"].index;
+            dev_desc.firmware_data_5 = dev_desc.registers["firmware_update_data_5"].index;
+            dev_desc.firmware_data_6 = dev_desc.registers["firmware_update_data_6"].index;
+            dev_desc.firmware_data_7 = dev_desc.registers["firmware_update_data_7"].index;
+
+            // set status register address
+            // Status bits, 0: IDLE, 1: RUNNING, 2: FAULT, 3: WARNING
+            if(dev_desc.registers.find("status") == dev_desc.registers.end()){
+                throw std::runtime_error("Error: missing required status register in device descriptor");
+            }
+            dev_desc.status_reg_address = dev_desc.registers["status"].index;
+
             dev_desc.loaded = true;
 
             return 0;
@@ -752,7 +1157,6 @@ class em_serial_device: public base_node{
                     if(cyclic_read_regs.find(i) != cyclic_read_regs.end()){
                         auto reg = cyclic_read_regs.find(i)->second;
                         if(reg.sync_with_node){
-                            // copy from global var to the note output
                             cyclic_node_copy c;
                             c.src = device->cyclic_read_node_var_regs[used_cyclic_read_node_vars]->get_raw_data_ptr<uint32_t>();
                             c.dst = reg.data_ptr;
@@ -803,7 +1207,6 @@ class em_serial_device: public base_node{
                     if(cyclic_write_regs.find(i) != cyclic_write_regs.end()){
                         auto reg = cyclic_write_regs.find(i)->second;
                         if(reg.sync_with_node){
-                            // copy from global var to the note output
                             cyclic_node_copy c;
                             c.dst = device->cyclic_write_node_var_regs[used_cyclic_write_node_vars]->get_raw_data_ptr<uint32_t>();
                             c.src = reg.in->data_pointer;

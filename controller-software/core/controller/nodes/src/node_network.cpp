@@ -209,7 +209,7 @@ uint32_t node_network::configure_node(std::string node_name, json* j){
                 variable = global_variables->at(var.value().get<std::string>()).get();
             }
             else{
-                std::cerr << "Error: global variable not found" << std::endl;
+                std::cerr << "Error: global variable not found: " << var.value().get<std::string>() << std::endl;
                 return 1;   // global variable not found
             }
 
