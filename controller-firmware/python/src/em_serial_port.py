@@ -14,8 +14,6 @@ class EM_Serial_Port(Component):
 
     def __init__(self, max_packet_size:int) -> None:
         """
-        clock: input clock frequency (Hz)
-
         max_packet_size: maximum serial packet to send or receive (32 bit words)
         """
         assert(max_packet_size > 0)
@@ -305,7 +303,11 @@ class EM_Serial_Port(Component):
                     self.updateStatusDataRequest.eq(1),
                     self.rxCRC.start.eq(1),
                 ]
-                m.next = "start_bits_delay"
+                m.next = "start_delay"
+            
+            with m.State("start_delay"):    # wait for high level on rx line to allow for start bit detection
+                with m.If(self.rx_synced == 1):
+                    m.next = "start_bits_delay"
 
             with m.State("start_bits_delay"):
                 with m.If(self.rx_synced == 0):
@@ -374,75 +376,6 @@ class EM_Serial_Port(Component):
 
                 with m.Else():
                     m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
-
-        # # Wait for start bit edge
-        # with m.If(self.rxState == self.rxStates.START_BITS_DELAY):
-        #     with m.If(self.rx == 0):
-        #         m.d.sync_100 += self.rxCurrentBit.eq(0)
-        #         m.d.sync_100 += self.rxState.eq(self.rxStates.RECEIVE)
-        #         m.d.sync_100 += self.rxTimer.eq(self.bitLength + (self.bitLength // 2) - 1)   # set timer to number of start bits + 1/2 bit
-        #         m.d.sync_100 += self.rxBusy.eq(1)
-        #         m.d.sync_100 += self.updateStatusDataRequest.eq(1)
-
-        #     with m.Else():
-        #         m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
-
-        # # receive data bits
-        # with m.If(self.rxState == self.rxStates.RECEIVE):
-        #     with m.If(self.rxTimer == 0):
-        #         m.d.sync_100 += self.rxData.bit_select(self.rxCurrentBit + (self.rxCurrentByte*8), 1).eq(self.rx)    # save rx bit
-
-        #         with m.If(self.rxCurrentBit == 8 - 1):   # word is complete, receive stop bits
-        #             m.d.sync_100 += self.rxState.eq(self.rxStates.STOP_BITS_DELAY)    
-        #             m.d.sync_100 += self.rxTimer.eq(self.bitLength)     # set timer to width of stop bits + 1/2
-
-        #         with m.Else():      # continue receiving bits
-        #             m.d.sync_100 += self.rxCurrentBit.eq(self.rxCurrentBit + 1)     # increment next bit to read
-        #             m.d.sync_100 += self.rxTimer.eq(self.bitLength - 1)   # set timer to 1/2 bit width
-
-
-        #     with m.Else():
-        #         m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
-
-        # # Wait for stop bits
-        # with m.If(self.rxState == self.rxStates.STOP_BITS_DELAY):
-        #     with m.If(self.rxTimer == 0):
-                
-        #         with m.If((self.rxCurrentByte == 3) & (self.rxCurrentWord == self.rxPacketSize)):    # packet length + CRC reached
-        #             m.d.sync_100 += self.rxCurrentBit.eq(0)
-        #             m.d.sync_100 += self.rxCurrentByte.eq(0)
-        #             m.d.sync_100 += self.rxCurrentWord.eq(0)
-        #             m.d.sync_100 += self.rxBusy.eq(0)
-        #             m.d.sync_100 += self.rxDone.eq(1)
-        #             m.d.sync_100 += self.rxState.eq(self.rxStates.IDLE)
-        #             m.d.sync_100 += self.updateStatusDataRequest.eq(1)
-        #             with m.If(self.rxCRC.crc == self.rxData):   # valid CRC received
-        #                 m.d.sync_100 += self.rxCRCvalid.eq(1)
-        #             with m.Else():
-        #                 m.d.sync_100 += self.rxCRCvalid.eq(0)
-                    
-                    
-        #         with m.Else():
-        #             m.d.sync_100 += self.rxBusy.eq(1)
-        #             m.d.sync_100 += self.rxCurrentBit.eq(0)
-
-        #             with m.If(self.rxCurrentByte == 3):
-        #                 m.d.sync_100 += self.rxCurrentByte.eq(0)
-        #                 m.d.sync_100 += self.rxCurrentWord.eq(self.rxCurrentWord + 1)
-        #                 m.d.sync_100 += self.rxNewData.eq(self.rxData)
-        #                 m.d.sync_100 += self.rxCRC.data.eq(self.rxData)
-        #                 m.d.sync_100 += self.rxCRC.valid.eq(1)
-        #                 m.d.sync_100 += self.rxNewDataIndex.eq(self.rxCurrentWord)
-        #                 m.d.sync_100 += self.rxWriteDataRequest.eq(1)
-
-        #             with m.Else():
-        #                 m.d.sync_100 += self.rxCurrentByte.eq(self.rxCurrentByte + 1)
-                
-        #             m.d.sync_100 += self.rxState.eq(self.rxStates.START_BITS_DELAY)
-
-        #     with m.Else():
-        #         m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
-                
 
         return m
 

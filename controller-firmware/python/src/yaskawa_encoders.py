@@ -2,6 +2,9 @@ from amaranth import *
 from amaranth.sim import Simulator
 from amaranth.lib.wiring import Component, In, Out
 from amaranth.lib.cdc import FFSynchronizer
+from amaranth.lib.crc.catalog import CRC16_X25
+
+import math
 
 from registers2 import *
 
@@ -36,15 +39,14 @@ class Yaskawa_Encoders(Component):
         self.encoder_group = Group("encoder", self.number_of_encoders, 0x0, "Group of registers for each encoder")
         self.encoder_group.add(Register("multiturn_count", rw="r", type="unsigned", width=32, desc="Absolute multiturn count"))      # not scaled, typically only 16 bits are used
         self.encoder_group.add(Register("singleturn_count", rw="r", type="unsigned", width=32, desc="Absolute singleturn count"))    # scaled to 32 bits
-        #self.encoder_group.add(Register("commutation_count", rw="r", type="unsigned", width=16, desc="Absolute commutation count"))   # scaled to 16 bits
-        self.encoder_group.add(Register("unknown1", rw="r", type="unsigned", width=8, desc=""))
-        self.encoder_group.add(Register("unknown2", rw="r", type="unsigned", width=16, desc=""))
-        self.encoder_group.add(Register("unknown3", rw="r", type="unsigned", width=16, desc=""))
+        self.encoder_group.add(Register("commutation_count", rw="r", type="unsigned", width=16, desc="Absolute commutation count"))   # scaled to 16 bits (just single turn in this case)
+        self.encoder_group.add(Register("timestamp_slow", rw="r", type="unsigned", width=8, desc=""))
+        self.encoder_group.add(Register("timestamp_fast", rw="r", type="unsigned", width=16, desc=""))
 
 
         self.encoder_group.add(Register("status", rw="r", desc="Encoder status", sub_registers=[
             Register("battery_fail", type="bool", desc="Battery fail"),
-            Register("unindexed", type="bool", desc="Unindexed"),
+            Register("unindexed", type="bool", desc="Unindexed (currently unsupported)"),
             Register("no_response", type="bool", desc="No response"),
             Register("crc_fail", type="bool", desc="CRC fail"),
             Register("done", type="bool", desc="Done"),
@@ -68,8 +70,6 @@ class Yaskawa_Encoders(Component):
         m.submodules += FFSynchronizer(i=self.rx, o=self.synced_rx, o_domain="sync_100")
 
         
-
-
         m.submodules.request_packet = request_packet = Request_Packet()
 
 
@@ -122,39 +122,54 @@ class Yaskawa_Encoders(Component):
 
         
 
+        #m.d.sync_100 += self.debug[0].eq(self.tx_enable[0])
+        m.d.sync_100 += self.debug[0].eq(self.tx[0])
+        m.d.sync_100 += self.debug[1].eq(self.synced_rx[0])
+        #m.d.sync_100 += self.debug[3].eq(request_packet.trigger)
+        #m.d.sync_100 += self.debug[4].eq(self.encoders[0].start)
+        #m.d.sync_100 += self.debug[5].eq(self.encoders[0].done)
+
+
+
+        # debug_timer = Signal(range(25))
+        # debug_cnt = Signal(range(112))
         
-        m.d.sync_100 += self.debug[0].eq(self.synced_rx[0])
-        m.d.sync_100 += self.debug[1].eq(request_packet.trigger)
-        m.d.sync_100 += self.debug[2].eq(request_packet.done)
-        m.d.sync_100 += self.debug[3].eq(self.encoders[0].start)
-        m.d.sync_100 += self.debug[4].eq(self.encoders[0].done)
+        # debug_data = Signal()
+        # debug_clk = Signal(reset=1)
+        # debug_data_enable = Signal()
+
+        # m.d.sync_100 += self.debug[5].eq(debug_data_enable)
+        # m.d.sync_100 += self.debug[6].eq(debug_data)
+        # m.d.sync_100 += self.debug[7].eq(debug_clk)
 
 
+        # with m.If((~last_new_data[0]) & new_data[0]):
+        #     m.d.sync_100 += debug_cnt.eq(0)
+        #     m.d.sync_100 += debug_timer.eq(0)
+        #     m.d.sync_100 += debug_clk.eq(1)
 
-        debug_timer = Signal(range(25))
-        debug_cnt = Signal(range(112))
-
-
-        with m.If((~last_new_data[0]) & new_data[0]):
-            m.d.sync_100 += debug_cnt.eq(0)
-            m.d.sync_100 += debug_timer.eq(0)
+        # with m.If((debug_timer == 12) | (debug_timer == 25)):
+        #     m.d.sync_100 += debug_clk.eq(~debug_clk)
         
-        with m.If(new_data[0] & (debug_cnt != 112)):
-            with m.If(debug_timer == 25):
-                m.d.sync_100 += self.debug[7].eq(self.encoders[0].raw_data.bit_select(debug_cnt, 1))
-                m.d.sync_100 += debug_cnt.eq(debug_cnt + 1)
-                m.d.sync_100 += debug_timer.eq(0)
+        # with m.If(new_data[0] & (debug_cnt != 113)):
+        #     with m.If(debug_timer == 25):
+        #         m.d.sync_100 += debug_data.eq(self.encoders[0].raw_data.bit_select(debug_cnt, 1))
+        #         m.d.sync_100 += debug_cnt.eq(debug_cnt + 1)
+        #         m.d.sync_100 += debug_timer.eq(0)
+        #         m.d.sync_100 += debug_data_enable.eq(1)
             
-            with m.Else():
-                m.d.sync_100 += debug_timer.eq(debug_timer + 1)        
+        #     with m.Else():
+        #         m.d.sync_100 += debug_timer.eq(debug_timer + 1)
 
-        with m.Else():
-            m.d.sync_100 += self.debug[7].eq(0)
+        # with m.Else():
+        #     m.d.sync_100 += debug_data.eq(0)
+        #     m.d.sync_100 += debug_data_enable.eq(0)
 
 
         m.d.comb += self.tx.eq(request_packet.tx.replicate(self.number_of_encoders))
         m.d.comb += self.tx_enable.eq(request_packet.tx_enable.replicate(self.number_of_encoders))
 
+        # system regs
         with m.If(self.bram_write_enable & (self.bram_address == self.rm.trigger.address_offset)):
             m.d.sync_100 += trigger.eq(1)
         with m.Else():
@@ -164,13 +179,52 @@ class Yaskawa_Encoders(Component):
             m.d.sync_100 += request_packet.request_packet_data.eq(self.bram_write_data)
 
 
+        # encoder regs
+
+        encoder_address_lsb = int(math.log2(self.rm.encoder.alignment)) # TODO: add otion to get these directly from the register map
+        encoder_address_msb = int(math.log2(self.rm.encoder.count)) + encoder_address_lsb + 1
+
+        for index, e in enumerate(self.encoders):
+
+            if index == 0:
+                m.d.sync_100 += self.debug[3].eq(e.done)
+                m.d.sync_100 += self.debug[4].eq(e.crc_valid)
+                m.d.sync_100 += self.debug[5].eq(e.no_response)
+                m.d.sync_100 += self.debug[6].eq(e.battery_fail)
+            
+            with m.If(self.bram_address[encoder_address_lsb:encoder_address_msb] == index<<encoder_address_lsb):  # selected the encoder
+                with m.Switch(self.bram_address[0:encoder_address_lsb]):
+                    with m.Case(self.rm.encoder.multiturn_count.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.multi_turn)
+                    with m.Case(self.rm.encoder.singleturn_count.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.single_turn<<16)
+                    with m.Case(self.rm.encoder.commutation_count.address_offset):     # no actual commutation count, so just use single turn
+                        m.d.sync_100 += self.bram_read_data.eq(e.single_turn)
+                        if i == 0:
+                            m.d.sync_100 += self.debug[2].eq(1)
+                    with m.Case(self.rm.encoder.timestamp_slow.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.timestamp_slow)
+                    with m.Case(self.rm.encoder.timestamp_fast.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.timestamp_fast)
+                    with m.Case(self.rm.encoder.status.address_offset):
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.battery_fail.starting_bit].eq(e.battery_fail)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.no_response.starting_bit].eq(e.no_response)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.crc_fail.starting_bit].eq(~e.crc_valid)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.done.starting_bit].eq(e.done)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
+                    with m.Default():
+                        m.d.sync_100 += self.bram_read_data.eq(0)
+                        if i == 0:
+                            m.d.sync_100 += self.debug[2].eq(0)
+                    
+                
         return m
     
 
 class Request_Packet(Component):
     def __init__(self):
         super().__init__({
-            "request_packet_data": In(16, init=0xFFFF),
+            "request_packet_data": In(16),
             "trigger": In(1),
             "tx": Out(1),
             "tx_enable": Out(1),
@@ -186,7 +240,7 @@ class Request_Packet(Component):
 
         trigger = Signal()
         #m.d.comb += trigger.eq(self.trigger)
-        m.submodules += FFSynchronizer(i=self.trigger, o=trigger, o_domain="sync_200")
+        m.submodules += FFSynchronizer(i=self.trigger, o=trigger, o_domain="sync_200", stages=4)
 
         done = Signal()
         m.d.comb += self.done.eq(done)
@@ -297,24 +351,31 @@ class Receive_Packet(Component):
             "rx": In(1),
             "start": In(1),
             "done": Out(1),
+            "no_response": Out(1),
             "raw_data": Out(112),
-            "crc_valid": Out(1)
+            "crc_valid": Out(1),
+            "single_turn": Out(16),
+            "multi_turn": Out(16),
+            "battery_fail": Out(1),
+            "timestamp_slow": Out(8),
+            "timestamp_fast": Out(16),
+            "unindexed": Out(1),
         })
 
     def elaborate(self, platform):
         m = Module()
 
+        # CRC
+        m.submodules.crc16_rx = txCRC = DomainRenamer("sync_200")(CRC16_X25(1).create())
+
         done = Signal()
         m.d.comb += self.done.eq(done)
-        #m.submodules += FFSynchronizer(i=done, o=self.done, o_domain="sync_100")
 
         start = Signal()
-        #m.d.comb += start.eq(self.start)
         m.submodules += FFSynchronizer(i=self.start, o=start, o_domain="sync_200")
 
         raw_data = Signal(112)
         m.d.comb += self.raw_data.eq(raw_data)
-        #m.submodules += FFSynchronizer(i=raw_data, o=self.raw_data, o_domain="sync_100")
 
         bit_time = 250e-9   # 250ns
 
@@ -337,6 +398,8 @@ class Receive_Packet(Component):
         last_8_bits = Signal(8)
         receive = Signal()
         save = Signal()
+        crc_reached = Signal()
+        crc_match = Signal()
 
         falling_edge = Signal()
         rising_edge = Signal()
@@ -353,8 +416,16 @@ class Receive_Packet(Component):
         with m.Else():
             m.d.sync_200 += falling_edge.eq(0)
 
+        with m.If(txCRC.start):
+            m.d.sync_200 += txCRC.start.eq(0)
+
+        with m.If(txCRC.valid):
+            m.d.sync_200 += txCRC.valid.eq(0)
+
         with m.If(~rising_edge & (~falling_edge) & (timer != timeout_bit_time_count)):
             m.d.sync_200 += timer.eq(timer + 1)
+
+        m.d.comb += txCRC.data.eq(~self.rx)
 
         with m.If(receive):
             with m.If((falling_edge | rising_edge) & half_bit_reached):
@@ -366,6 +437,9 @@ class Receive_Packet(Component):
                     m.d.sync_200 += raw_data.bit_select(current_bit_cnt, 1).eq(~self.rx)
                     with m.If(last_8_bits[0:5] != 0b11111):
                         m.d.sync_200 += current_bit_cnt.eq(current_bit_cnt + 1)
+                        m.d.sync_200 += txCRC.valid.eq(~crc_reached)
+                    with m.If(current_bit_cnt == len(raw_data)-17):
+                        m.d.sync_200 += crc_reached.eq(1)
 
         with m.FSM(init="idle", domain="sync_200"):
             with m.State("idle"):
@@ -373,6 +447,10 @@ class Receive_Packet(Component):
                     m.d.sync_200 += current_bit_cnt.eq(0)
                     m.d.sync_200 += raw_data.eq(0)
                     m.d.sync_200 += done.eq(0)
+                    m.d.sync_200 += txCRC.start.eq(1)
+                    m.d.sync_200 += crc_reached.eq(0)
+                    m.d.sync_200 += self.no_response.eq(1)
+                    m.d.sync_100 += self.crc_valid.eq(0)
                     m.next = "start_sync"
 
             with m.State("start_sync"):
@@ -381,6 +459,7 @@ class Receive_Packet(Component):
                     m.d.sync_200 += half_bit_reached.eq(0)
                     m.d.sync_200 += timeout_bit_reached.eq(0)
                     m.d.sync_200 += receive.eq(1)
+                    m.d.sync_200 += self.no_response.eq(0)
                     m.next = "start_flag"
             
             with m.State("start_flag"):
@@ -393,17 +472,32 @@ class Receive_Packet(Component):
             with m.State("receive_data"):
                 with m.If(current_bit_cnt == len(raw_data)):
                     m.d.sync_200 += save.eq(0)
+                    
                     m.next = "end_flag"
                 with m.If(timeout_bit_reached):
                     m.next = "idle"
 
             with m.State("end_flag"):
+                with m.If(txCRC.crc == raw_data[96:112]):
+                    m.d.sync_100 += crc_match.eq(1)
                 with m.If(last_8_bits == flag):
                     m.d.sync_200 += done.eq(1)
                     m.next = "idle"
                 with m.If(timeout_bit_reached):
                     m.next = "idle"
 
+        with m.If(crc_match):
+            m.d.sync_100 += crc_match.eq(0)
+            m.d.sync_100 += self.crc_valid.eq(1)
+            m.d.sync_100 += [
+                self.single_turn.eq(raw_data[60:76]),
+                self.multi_turn.eq(raw_data[76:92]),
+                self.battery_fail.eq(raw_data[2]),
+                self.timestamp_slow.eq(raw_data[16:24]),
+                self.timestamp_fast.eq(raw_data[24:40]),
+                self.unindexed.eq(raw_data[0])  # pretty sure this is correct, but don't have a way to reset it
+            ]
+            m.d.sync_200 += raw_data[96:112].eq(0)
 
         return m
 
@@ -414,13 +508,14 @@ dut = Yaskawa_Encoders(6)
 async def bench(ctx):
     ctx.set(dut.rx, 1)
 
-    for c in range(2):
+    for c in range(1):
 
         ctx.set(dut.bram_address, dut.rm.request_packet.address_offset)
         ctx.set(dut.bram_write_data, 0b0111111001111110)
         ctx.set(dut.bram_write_enable, 1)
         await ctx.tick("sync_100")
         ctx.set(dut.bram_address, dut.rm.trigger.address_offset)
+        ctx.set(dut.bram_write_enable, 1)
         await ctx.tick("sync_100")
         ctx.set(dut.bram_write_enable, 0)
 
@@ -441,7 +536,13 @@ async def bench(ctx):
                     clk = 1
                 await ctx.tick("sync_200").repeat(25)
 
-        await ctx.tick("sync_100").repeat(4000)
+        await ctx.tick("sync_100").repeat(4000*2)
+
+        # read the data
+        ctx.set(dut.bram_address, 2)
+        await ctx.tick("sync_100").repeat(10)
+        print("Single turn: ", ctx.get(dut.bram_read_data))
+
 
         result = ctx.get(dut.encoders[0].raw_data)
         result = f"{result:0112b}"

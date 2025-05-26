@@ -218,7 +218,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[0].eq(self.slotIn[pins.PIN_10P])
             m.d.comb += self.slotOutEnable[pins.PIN_10N].eq(1)
         with m.Elif(self.rs485_mode_enable[0]):
-            m.d.comb += self.slotOutEnable[pins.PIN_10P].eq(self.rs485_tx_enable[0])
+            m.d.comb += self.slotOutEnable[pins.PIN_10P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_10P].eq(self.rs485_tx_enable[0])
+            m.d.comb += self.slotOutEnable[pins.PIN_10N].eq(self.rs485_tx_enable[0])
             with m.If(self.rs485_tx_enable[0]):
                 m.d.comb += self.slotOut[pins.PIN_10N].eq(self.rs485_tx[0])
             with m.Else():
@@ -242,7 +244,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[2].eq(self.slotIn[pins.PIN_9P])
             m.d.comb += self.slotOutEnable[pins.PIN_9N].eq(1)
         with m.Elif(self.rs485_mode_enable[2]):
-            m.d.comb += self.slotOutEnable[pins.PIN_9P].eq(self.rs485_tx_enable[2])
+            m.d.comb += self.slotOutEnable[pins.PIN_9P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_9P].eq(self.rs485_tx_enable[2])
+            m.d.comb += self.slotOutEnable[pins.PIN_9N].eq(self.rs485_tx_enable[2])
             with m.If(self.rs485_tx_enable[2]):
                 m.d.comb += self.slotOut[pins.PIN_9N].eq(self.rs485_tx[2])
             with m.Else():
@@ -253,7 +257,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[3].eq(self.slotIn[pins.PIN_4P])
             m.d.comb += self.slotOutEnable[pins.PIN_4N].eq(1)
         with m.Elif(self.rs485_mode_enable[3]):
-            m.d.comb += self.slotOutEnable[pins.PIN_4P].eq(self.rs485_tx_enable[3])
+            m.d.comb += self.slotOutEnable[pins.PIN_4P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_4P].eq(self.rs485_tx_enable[3])
+            m.d.comb += self.slotOutEnable[pins.PIN_4N].eq(self.rs485_tx_enable[3])
             with m.If(self.rs485_tx_enable[3]):
                 m.d.comb += self.slotOut[pins.PIN_4N].eq(self.rs485_tx[3])
             with m.Else():
@@ -264,7 +270,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[4].eq(self.slotIn[pins.PIN_8P])
             m.d.comb += self.slotOutEnable[pins.PIN_8N].eq(1)
         with m.Elif(self.rs485_mode_enable[4]):
-            m.d.comb += self.slotOutEnable[pins.PIN_8P].eq(self.rs485_tx_enable[4])
+            m.d.comb += self.slotOutEnable[pins.PIN_8P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_8P].eq(self.rs485_tx_enable[4])
+            m.d.comb += self.slotOutEnable[pins.PIN_8N].eq(self.rs485_tx_enable[4])
             with m.If(self.rs485_tx_enable[4]):
                 m.d.comb += self.slotOut[pins.PIN_8N].eq(self.rs485_tx[4])
             with m.Else():
@@ -275,7 +283,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[5].eq(self.slotIn[pins.PIN_3P])
             m.d.comb += self.slotOutEnable[pins.PIN_3N].eq(1)
         with m.Elif(self.rs485_mode_enable[5]):
-            m.d.comb += self.slotOutEnable[pins.PIN_3P].eq(self.rs485_tx_enable[5])
+            m.d.comb += self.slotOutEnable[pins.PIN_3P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_3P].eq(self.rs485_tx_enable[5])
+            m.d.comb += self.slotOutEnable[pins.PIN_3N].eq(self.rs485_tx_enable[5])
             with m.If(self.rs485_tx_enable[5]):
                 m.d.comb += self.slotOut[pins.PIN_3N].eq(self.rs485_tx[5])
             with m.Else():
@@ -286,7 +296,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[6].eq(self.slotIn[pins.PIN_7P])
             m.d.comb += self.slotOutEnable[pins.PIN_7N].eq(1)
         with m.Elif(self.rs485_mode_enable[6]):
-            m.d.comb += self.slotOutEnable[pins.PIN_7P].eq(self.rs485_tx_enable[6])
+            m.d.comb += self.slotOutEnable[pins.PIN_7P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_7P].eq(self.rs485_tx_enable[6])
+            m.d.comb += self.slotOutEnable[pins.PIN_7N].eq(self.rs485_tx_enable[6])
             with m.If(self.rs485_tx_enable[6]):
                 m.d.comb += self.slotOut[pins.PIN_7N].eq(self.rs485_tx[6])
             with m.Else():
@@ -297,7 +309,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[7].eq(self.slotIn[pins.PIN_2P])
             m.d.comb += self.slotOutEnable[pins.PIN_2N].eq(1)
         with m.Elif(self.rs485_mode_enable[7]):
-            m.d.comb += self.slotOutEnable[pins.PIN_2P].eq(self.rs485_tx_enable[7])
+            m.d.comb += self.slotOutEnable[pins.PIN_2P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_2P].eq(self.rs485_tx_enable[7])
+            m.d.comb += self.slotOutEnable[pins.PIN_2N].eq(self.rs485_tx_enable[7])
             with m.If(self.rs485_tx_enable[7]):
                 m.d.comb += self.slotOut[pins.PIN_2N].eq(self.rs485_tx[7])
             with m.Else():
@@ -308,7 +322,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[8].eq(self.slotIn[pins.PIN_6P])
             m.d.comb += self.slotOutEnable[pins.PIN_6N].eq(1)
         with m.Elif(self.rs485_mode_enable[8]):
-            m.d.comb += self.slotOutEnable[pins.PIN_6P].eq(self.rs485_tx_enable[8])
+            m.d.comb += self.slotOutEnable[pins.PIN_6P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_6P].eq(self.rs485_tx_enable[8])
+            m.d.comb += self.slotOutEnable[pins.PIN_6N].eq(self.rs485_tx_enable[8])
             with m.If(self.rs485_tx_enable[8]):
                 m.d.comb += self.slotOut[pins.PIN_6N].eq(self.rs485_tx[8])
             with m.Else():
@@ -319,7 +335,9 @@ class serial_interface_card(wiring.Component):
             m.d.comb += self.rs422_rx[9].eq(self.slotIn[pins.PIN_1P])
             m.d.comb += self.slotOutEnable[pins.PIN_1N].eq(1)
         with m.Elif(self.rs485_mode_enable[9]):
-            m.d.comb += self.slotOutEnable[pins.PIN_1P].eq(self.rs485_tx_enable[9])
+            m.d.comb += self.slotOutEnable[pins.PIN_1P].eq(1)
+            m.d.comb += self.slotOut[pins.PIN_1P].eq(self.rs485_tx_enable[9])
+            m.d.comb += self.slotOutEnable[pins.PIN_1N].eq(self.rs485_tx_enable[9])
             with m.If(self.rs485_tx_enable[9]):
                 m.d.comb += self.slotOut[pins.PIN_1N].eq(self.rs485_tx[9])
             with m.Else():
