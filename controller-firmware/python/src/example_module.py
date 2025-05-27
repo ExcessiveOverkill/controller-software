@@ -59,12 +59,12 @@ class Example_Module(Component):
         # All physical registers are 32 bits wide, but actual data may be less than that
 
         # individual registers
-        self.rm.add(Register("example_register_0", rw="rw", type="signed", width=32, desc="Example register description 0"))
+        self.rm.add(Register("example_register_0", rw="r", type="signed", width=32, desc="Example register description 0"))
         self.rm.add(Register("example_register_1", rw="w", type="unsigned", width=16, desc="Example register description 1"))
         self.rm.add(Register("example_register_2", rw="r", type="unsigned", width=5, desc="Example register description 2"))
 
         # array of registers
-        self.rm.add(Register("example_register_array", rw="rw", type="signed", width=32, desc="Example register array description", bank_size=32))
+        self.rm.add(Register("example_register_array", rw="w", type="signed", width=32, desc="Example register array description", bank_size=32))
         # 32 registers in the array, registers may be of any type or size, but will still take 32 consecutive addresses
 
         # packeted registers
@@ -90,7 +90,7 @@ class Example_Module(Component):
 
         # you may add as many registers as you like to a group, including arrays and packed registers
         # TODO: do groups of groups work?
-        example_group.add(Register("group_register_0", rw="rw", type="unsigned", width=16, desc="Group register 0"))
+        example_group.add(Register("group_register_0", rw="r", type="unsigned", width=16, desc="Group register 0"))
         example_group.add(Register("group_register_1", rw="r", type="unsigned", width=16, desc="Group register 1"))
         example_group.add(Register("group_register_2", rw="w", type="unsigned", width=16, desc="Group register 2"))
     
@@ -111,6 +111,8 @@ class Example_Module(Component):
         """
 
         m = Module()
+
+        m.d.sync_100 += self.debug.eq(0)
 
         # no logic is shown in this example
         # see the amaranth documentation for more information on how to create these.
@@ -180,9 +182,14 @@ async def bench(ctx):
     # run your own tests here
     # check the amaranth documentation for more information on how to create a testbench
 
+    pass
+
 
 
 if __name__ == "__main__":
+
+    #dut.rm.exportJSON("example_module.json")  # just for viewing, not required to be done
+
     sim = Simulator(dut)
 
     #sim.add_clock(1/200e6, domain="sync_200")  # no need to add if we aren't using it
@@ -192,10 +199,190 @@ if __name__ == "__main__":
     
 
     # add the testbench
-    sim.add_sync_process(bench)
+    sim.add_testbench(bench)
 
     # run the simulation
     with sim.write_vcd("example_module.vcd"):
         sim.run()
 
     # you can now open the generated VCD file in a waveform viewer
+
+
+# JSON export register map for reference
+"""
+{
+    "name": "example_module",
+    "compatible_drivers": [
+        "example_module"
+    ],
+    "driver_settings": {
+        "number_of_instances": 2,
+        "version": "1.0.0"
+    },
+    "base_group": {
+        "name": "base_group",
+        "address_offset": 0,
+        "description": "Base group for all registers",
+        "alignment": 65536,
+        "count": 1,
+        "groups": {
+            "example_group": {
+                "name": "example_group",
+                "address_offset": 0,
+                "description": "Group of registers example",
+                "alignment": 4,
+                "count": 4,
+                "groups": {},
+                "registers": {
+                    "group_register_0": {
+                        "name": "group_register_0",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "Group register 0",
+                        "width": 16,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "group_register_1": {
+                        "name": "group_register_1",
+                        "address_offset": 1,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "Group register 1",
+                        "width": 16,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "group_register_2": {
+                        "name": "group_register_2",
+                        "address_offset": 2,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "Group register 2",
+                        "width": 16,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "w"
+                    }
+                }
+            }
+        },
+        "registers": {
+            "example_register_0": {
+                "name": "example_register_0",
+                "address_offset": 16,
+                "type": "signed",
+                "bank_size": 1,
+                "description": "Example register description 0",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "r"
+            },
+            "example_register_1": {
+                "name": "example_register_1",
+                "address_offset": 17,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "Example register description 1",
+                "width": 16,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "w"
+            },
+            "example_register_2": {
+                "name": "example_register_2",
+                "address_offset": 18,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "Example register description 2",
+                "width": 5,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "r"
+            },
+            "example_register_array": {
+                "name": "example_register_array",
+                "address_offset": 19,
+                "type": "signed",
+                "bank_size": 32,
+                "description": "Example register array description",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {},
+                "rw": "w"
+            },
+            "example_packed_register": {
+                "name": "example_packed_register",
+                "address_offset": 51,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "Encoder status",
+                "width": 32,
+                "starting_bit": 0,
+                "sub_registers": {
+                    "small_flag_0": {
+                        "name": "small_flag_0",
+                        "address_offset": 51,
+                        "type": "bool",
+                        "bank_size": 1,
+                        "description": "single bit",
+                        "width": 1,
+                        "starting_bit": 0,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "small_flag_1": {
+                        "name": "small_flag_1",
+                        "address_offset": 51,
+                        "type": "bool",
+                        "bank_size": 1,
+                        "description": "single bit",
+                        "width": 1,
+                        "starting_bit": 1,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "small_flag_2": {
+                        "name": "small_flag_2",
+                        "address_offset": 51,
+                        "type": "bool",
+                        "bank_size": 1,
+                        "description": "single bit",
+                        "width": 1,
+                        "starting_bit": 2,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "small_value_0": {
+                        "name": "small_value_0",
+                        "address_offset": 51,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "small value",
+                        "width": 8,
+                        "starting_bit": 3,
+                        "sub_registers": {},
+                        "rw": "r"
+                    },
+                    "small_value_1": {
+                        "name": "small_value_1",
+                        "address_offset": 51,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "another small value",
+                        "width": 8,
+                        "starting_bit": 11,
+                        "sub_registers": {},
+                        "rw": "r"
+                    }
+                },
+                "rw": "r"
+            }
+        }
+    }
+}
+"""
