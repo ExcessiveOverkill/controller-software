@@ -1190,7 +1190,7 @@ if __name__ == "__main__":
         # check drive S exists for vivado project
         if not os.path.exists("S:/Vivado"):
             print(f"{bcolors.FAIL}Drive S subst path does not exist, please run 'create subst path vivado' task from vs code{bcolors.ENDC}")
-            exit(1)
+            exit()
 
 
         top = Controller(nodes, sim)
