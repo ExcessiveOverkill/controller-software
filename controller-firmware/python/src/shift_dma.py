@@ -8,7 +8,8 @@ from testing_block import test_block
 from enum import IntEnum
 import csv, random
 import datetime
-from em_serial_controller import EM_Serial_Controller
+#from em_serial_controller import EM_Serial_Controller
+from sandbox.shift_dma_compiler import ll_compiler, copy_instruction, high_level_instruction
 
 
 class shift_dma_node(wiring.Component):
@@ -168,6 +169,8 @@ class shift_dma_controller(wiring.Component):
             "start": In(1),
             "busy": Out(1),
 
+            "timer_count": Out(32),
+
             "instruction_memory_address": Out(16),
             "instruction_memory_read_data": In(64),
 
@@ -181,6 +184,7 @@ class shift_dma_controller(wiring.Component):
         END = 0     # end of program
         NOP = 1     # no operation
         COPY = 2    # copy data from source to destination
+        WAIT = 3    # wait for a specified amount of time
        
     def elaborate(self, platform):
         m = Module()
@@ -192,6 +196,17 @@ class shift_dma_controller(wiring.Component):
         self.source_address = Signal(16)
         self.destination_address = Signal(16)
         self.instruction = Signal(4)
+
+        self.timer = Signal(range(int(100e6 / 100)))  # 100 Hz timer
+        m.d.comb += self.timer_count.eq(self.timer)
+        self.timer_compare_value = Signal(self.timer.shape())
+        self.timer_compare_passed = Signal(1)
+
+        with m.If(self.busy):
+            m.d.sync_100 += self.timer.eq(self.timer + 1)
+
+        m.d.comb += self.timer_compare_passed.eq(self.timer >= self.timer_compare_value)
+
 
         self.opening_available = Signal(1)   # if there is an opening available to add a new instruction to the loop
         
@@ -214,11 +229,59 @@ class shift_dma_controller(wiring.Component):
         #self.current_instruction = self.instruction_memory_address
         self.current_instruction = Signal(16)
 
-        with m.If(self.opening_available | (self.instruction != self.Instruction.COPY)):    # this should be true as long the current instruction is not blocked
-        #with m.If(self.opening_available):
-            m.d.comb += self.instruction_memory_address.eq(self.current_instruction)
+        # with m.If(self.opening_available | (self.instruction != self.Instruction.COPY)):    # this should be true as long the current instruction is not blocked
+        # #with m.If(self.opening_available):
+        #     m.d.comb += self.instruction_memory_address.eq(self.current_instruction)
+        # with m.Else():
+        #     m.d.comb += self.instruction_memory_address.eq(self.current_instruction-1)
+
+
+        # This section ensures that each time the "increment_instruction" signal is set, the percieved current instruction is incremented in 1 cycle
+
+        self.increment_instruction = Signal(1)
+
+        self.reset_instruction_memory = Signal(1)
+
+        self.previous_instruction_data = Signal(64)
+        self.current_instruction_data = Signal(64)
+        self.instruction_data = Signal(64)
+        self.use_previous_instruction_data = Signal(1)
+        self.use_previous_instruction_data_last = Signal(1)
+
+        m.d.comb += self.instruction_memory_address.eq(self.current_instruction)
+
+        m.d.sync_100 += self.use_previous_instruction_data_last.eq(self.use_previous_instruction_data)
+
+        with m.If(self.increment_instruction):
+            m.d.sync_100 += self.current_instruction.eq(self.current_instruction + 1)
+            m.d.sync_100 += self.use_previous_instruction_data.eq(1)
+                
         with m.Else():
-            m.d.comb += self.instruction_memory_address.eq(self.current_instruction-1)
+            m.d.sync_100 += self.use_previous_instruction_data.eq(0)
+
+        with m.If(self.use_previous_instruction_data):
+            m.d.sync_100 += self.previous_instruction_data.eq(self.instruction_memory_read_data)
+            m.d.comb += self.instruction_data.eq(self.instruction_memory_read_data)
+        with m.Else():
+            m.d.comb += self.instruction_data.eq(self.previous_instruction_data)
+
+        with m.FSM(name="instruction_mem_reset_fsm", domain="sync_100") as fsm:
+            with m.State("idle"):
+                with m.If(self.reset_instruction_memory):
+                    m.d.sync_100 += self.current_instruction.eq(0)
+                    m.next = "reset_to_zero"
+    
+            with m.State("reset_to_zero"):
+                m.next = "read_instruction_zero_data"
+            
+            with m.State("read_instruction_zero_data"):
+                m.d.comb += self.increment_instruction.eq(1)
+                m.next = "read_wait"
+
+            with m.State("read_wait"):
+                m.d.sync_100 += self.reset_instruction_memory.eq(0)
+                m.next = "idle"
+
 
         # create data memory
         # divided into 2 blocks to allow for simultaneous read and write from the axi bus
@@ -234,11 +297,14 @@ class shift_dma_controller(wiring.Component):
         
 
         # connect memory interfaces
-        m.d.comb += self.source_node.eq(self.instruction_memory_read_data[0:8])
-        m.d.comb += self.destination_node.eq(self.instruction_memory_read_data[8:16])
-        m.d.comb += self.source_address.eq(self.instruction_memory_read_data[16:32])
-        m.d.comb += self.destination_address.eq(self.instruction_memory_read_data[32:48])
-        m.d.comb += self.instruction.eq(self.instruction_memory_read_data[48:52])
+        m.d.comb += self.instruction.eq(self.instruction_data[48:52])
+
+        m.d.comb += self.source_node.eq(self.instruction_data[0:8])
+        m.d.comb += self.destination_node.eq(self.instruction_data[8:16])
+        m.d.comb += self.source_address.eq(self.instruction_data[16:32])
+        m.d.comb += self.destination_address.eq(self.instruction_data[32:48])
+        
+        m.d.comb += self.timer_compare_value.eq(self.instruction_data[0:24])
 
         m.d.comb += self.data_memory_address.eq(self.dma_node.bram_address)
         m.d.comb += self.data_memory_address.eq(self.dma_node.bram_address)
@@ -268,7 +334,7 @@ class shift_dma_controller(wiring.Component):
             m.d.sync_100 += self.dma_node.write_complete_input.eq(self.write_complete_input)
         
 
-        with m.If(((self.instruction != self.Instruction.END) & (self.current_instruction != self.instruction_memory_depth-1)) & (self.start | self.busy)):
+        with m.If(((self.instruction != self.Instruction.END) & (self.current_instruction != self.instruction_memory_depth-1)) & (self.busy | self.reset_instruction_memory)):
             m.d.sync_100 += self.busy.eq(1)
 
             with m.If((self.instruction == self.Instruction.COPY)):
@@ -283,12 +349,25 @@ class shift_dma_controller(wiring.Component):
                     m.d.sync_100 += self.dma_node.write_complete_input.eq(0)
                     
                     # increment the current instruction pointer
-                    m.d.sync_100 += self.current_instruction.eq(self.current_instruction + 1)
+                    m.d.comb += self.increment_instruction.eq(1)
 
 
             with m.Elif(self.instruction == self.Instruction.NOP): 
                 # increment the current instruction pointer
-                m.d.sync_100 += self.current_instruction.eq(self.current_instruction + 1)
+                m.d.comb += self.increment_instruction.eq(1)
+                with m.If(self.opening_available):
+                    # reset the data to all zero with complete flags set, this will end up doing nothing
+                    m.d.sync_100 += self.dma_node.read_node_address_input.eq(0)
+                    m.d.sync_100 += self.dma_node.write_node_address_input.eq(0)
+                    m.d.sync_100 += self.dma_node.read_bram_address_input.eq(0)
+                    m.d.sync_100 += self.dma_node.write_bram_address_input.eq(0)
+                    m.d.sync_100 += self.dma_node.data_input.eq(0)
+                    m.d.sync_100 += self.dma_node.read_complete_input.eq(1)
+                    m.d.sync_100 += self.dma_node.write_complete_input.eq(1)
+
+            with m.Elif(self.instruction == self.Instruction.WAIT):
+                with m.If(self.timer_compare_passed):
+                    m.d.comb += self.increment_instruction.eq(1)
                 with m.If(self.opening_available):
                     # reset the data to all zero with complete flags set, this will end up doing nothing
                     m.d.sync_100 += self.dma_node.read_node_address_input.eq(0)
@@ -302,7 +381,7 @@ class shift_dma_controller(wiring.Component):
 
             with m.Else(): # this should never occur as it means an unknown instruction, but we will just treat it as a NOP to prevent the system from hanging
                 # increment the current instruction pointer
-                m.d.sync_100 += self.current_instruction.eq(self.current_instruction + 1)
+                m.d.comb += self.increment_instruction.eq(1)
                 with m.If(self.opening_available):
                     # reset the data to all zero with complete flags set, this will end up doing nothing
                     m.d.sync_100 += self.dma_node.read_node_address_input.eq(0)
@@ -316,7 +395,8 @@ class shift_dma_controller(wiring.Component):
         with m.Else():
             m.d.sync_100 += self.busy.eq(0)
             with m.If(self.start):
-                m.d.sync_100 += self.current_instruction.eq(0)
+                m.d.sync_100 += self.reset_instruction_memory.eq(1)
+                m.d.sync_100 += self.timer.eq(0)
 
             with m.If(self.opening_available):
                 # reset the data to all zero with complete flags set, this will end up doing nothing
@@ -362,8 +442,8 @@ class test_bench(wiring.Component):
         m.submodules.instruction_memory = self.instruction_memory
         m.submodules.data_memory = self.data_memory
 
-        self.serial_controller = EM_Serial_Controller(64, 16)
-        m.submodules.serial_controller = self.serial_controller
+        #self.serial_controller = EM_Serial_Controller(64, 16)
+        #m.submodules.serial_controller = self.serial_controller
 
         instruction_read_port = self.instruction_memory.read_port(domain="sync_100")
         data_read_port = self.data_memory.read_port(domain="sync_100")
@@ -419,9 +499,9 @@ class test_bench(wiring.Component):
 
 
         # testing for serial controller
-        m.d.comb += self.serial_controller.bram_address.eq(node.bram_address)
-        m.d.comb += self.serial_controller.bram_write_data.eq(node.bram_write_data)
-        m.d.comb += self.serial_controller.bram_write_enable.eq(node.bram_write_enable)
+        #m.d.comb += self.serial_controller.bram_address.eq(node.bram_address)
+        #m.d.comb += self.serial_controller.bram_write_data.eq(node.bram_write_data)
+        #m.d.comb += self.serial_controller.bram_write_enable.eq(node.bram_write_enable)
 
         return m
     
@@ -753,59 +833,26 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-good = [   # works
+c = ll_compiler()
+
+c.add_instruction(high_level_instruction(copy_instruction(0, 1, 0, 0), 20, 20, "write"))
+c.add_instruction(high_level_instruction(copy_instruction(0, 2, 1, 1), 20, 20, "write"))
+
+
+c.compile()
+
+c.visualize()
+
+test_instructions = c.export()
+
+test_instructions = [
     562950020530432,
-    562954315563264,
-    562962905563392,
-    562949953552385,
-    562954248650753,
-    562958543355906,
-    562962838388738,
-    562967133421570,
-    562971428454402,
-    562950020727808,
-    562975723290628,
-    563774654514176,
-    563778949547008,
-    563783244579840,
-    562980026580996,
-    562984321613828,
-    562988616646660,
-    281474976710656,
-    580546502067200,
-    562993171660804,
-    580542207165440
-]
-
-bad = [   # doesn't work
-    562950020530432,
-    562954315563264,
-    562962905563392,
-    562949953552385,
-    562954248650753,
-    562958543355906,
-    562962838388738,
-    562967133421570,
-    562971428454402,
-    562950020727808,
-    562975723290628,
-    563774654514176,
-    563778949547008,
-    563783244579840,
-    562980026580996,
-    562984321613828,
-    562988616646660,
-    281474976710656,
-    
-    281474976710656,    # this is the issue
-    
-    580546502067200,
-    562993171660804,
-    580542207165440
-]
-
-
-test_instructions = bad
+562954315563264,
+562962905563392,
+562949953552385,
+562954248650753,
+844424930131989,
+0]
 
 async def test_bench_2(ctx):
     instruction_step = 0
@@ -836,7 +883,10 @@ async def test_bench_2(ctx):
 
     results = []
     completion_status = []
-    for n in range(len(test_instructions)*4):
+    #for n in range(len(test_instructions)*4):
+    max_cycles = 200
+    end_cycles = node_count*5
+    while(max_cycles > 0 and end_cycles > 0):
         await ctx.tick("sync_100")
 
         # check which instructions have completed
@@ -895,6 +945,11 @@ async def test_bench_2(ctx):
         #     for j in i:
         #         line.append(j)
         # results.append(line)
+        #print(max_cycles, end_cycles)
+        max_cycles -= 1
+        if(not ctx.get(dut.busy)):
+            end_cycles -= 1
+
 
     #print(results[0])
     # with open('results.csv', 'w', newline='') as csvfile:

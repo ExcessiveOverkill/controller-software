@@ -2,16 +2,24 @@
 #include <memory> // For smart pointers
 #include <string>
 #include "json.hpp"
+#include "node_core.h"
+
 
 using json = nlohmann::json;
 
-#pragma once
 #include "shared_mem.h"
+
+
+#ifndef BASE_API_H
+#define BASE_API_H
+
 
 enum api_call_id_t {    // list of all possible API calls
     DEFAULT,
     MACHINE_STATE,
-    PRINT_UINT32
+    PRINT_UINT32,
+    PRINT_FLOAT,
+    CONFIGURE_NODE
 };
 
 // Base_API class
@@ -44,6 +52,12 @@ public:
     uint32_t api_call_id = 0;
     uint32_t data_start_index = 0;
     uint32_t data_size = 0;
+
+    Node_Core* node_core = nullptr;
+
+    std::string json_data_string = "";
+    json json_data;
+    bool json_parsed = true;
 
     Base_API();
 
@@ -97,3 +111,5 @@ public:
     uint32_t set_shared_memory(shared_mem shared_mem_obj);
     
 };
+
+#endif

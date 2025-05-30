@@ -6,6 +6,8 @@
 
 #include "machine_state.h"
 #include "print_uint32.h"
+#include "print_float.h"
+#include "configure_node.h"
 
 using json = nlohmann::json;
 

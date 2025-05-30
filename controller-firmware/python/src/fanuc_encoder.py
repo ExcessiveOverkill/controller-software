@@ -7,6 +7,8 @@ from registers2 import *
 
 from sandbox.fanuc_encoder_sim import rs422_sim
 
+import math
+
 
 
 class Fanuc_Encoders(Component):
@@ -24,8 +26,6 @@ class Fanuc_Encoders(Component):
             "tx" : Out(self.number_of_encoders),
             "tx_enable" : Out(self.number_of_encoders),
             "rx" : In(self.number_of_encoders),
-
-            "trigger": In(1),
 
             "bram_address": In(16),
             "bram_write_data": In(32),
@@ -51,6 +51,8 @@ class Fanuc_Encoders(Component):
             Register("done", type="bool", desc="Done"),
         ]))
 
+        self.rm.add(Register("trigger", rw="w", type="bool", desc="Trigger encoder capture"))
+
         self.rm.add(self.encoder_group)
         self.rm.generate()
 
@@ -62,62 +64,52 @@ class Fanuc_Encoders(Component):
 
         m.submodules.request_pulse = request_pulse = Request_Pulse()
 
-        m.submodules += FFSynchronizer(i=self.trigger, o=request_pulse.trigger, o_domain="sync_100")
         m.submodules += FFSynchronizer(i=self.rx, o=self.synced_rx, o_domain="sync_100")
         
         m.d.comb += self.tx_enable.eq(0xffffffff)   # enable all transmitters
         m.d.comb += self.tx.eq(request_pulse.req.replicate(self.number_of_encoders))   # request pulse to all transmitters
 
-        receiver = Fanuc_rs422_Receiver()
-        m.submodules += receiver
+        for i in range(self.number_of_encoders):
+            receiver = Fanuc_rs422_Receiver()
+            m.submodules[f"receiver_{i}"] = receiver
+            self.encoders.append(receiver)
 
-        m.d.comb += [
-            receiver.rx.eq(self.synced_rx[0]),
-            receiver.trigger.eq(request_pulse.trigger),
-            self.debug.eq(self.bram_address),
-        ]
-
-        with m.Switch(self.bram_address[0:4]):
-            with m.Case(0):
-                m.d.sync_100 += self.bram_read_data.eq(receiver.multiturn_count)
-            with m.Case(1):
-                m.d.sync_100 += self.bram_read_data.eq(receiver.singleturn_count << 16)
-            with m.Case(2):
-                m.d.sync_100 += self.bram_read_data.eq(receiver.commutation_count << 6)
-            with m.Case(3):
-                m.d.sync_100 += self.bram_read_data.eq(receiver.battery_fail | (receiver.unindexed << 1) | (receiver.no_response << 2) | (receiver.crc_fail << 3) | (receiver.done << 4))
-            with m.Default():
-                m.d.sync_100 += self.bram_read_data.eq(0)
+            m.d.comb += receiver.rx.eq(self.synced_rx[i])
+            m.d.comb += receiver.trigger.eq(request_pulse.trigger)
 
 
-        # with m.Switch(self.bram_address[4:8]):  # up to 32 encoders, with up to 16 data addresses each
-        #     for i in range(self.number_of_encoders):
-        #         receiver = Fanuc_rs422_Receiver()
-        #         m.submodules[f"encoder_{i}"] = receiver
-        #         self.encoders.append(receiver)
+        # system regs
+        with m.If(self.bram_write_enable & (self.bram_address == self.rm.trigger.address_offset)):
+            m.d.sync_100 += request_pulse.trigger.eq(1)
+        with m.Else():
+            m.d.sync_100 += request_pulse.trigger.eq(0)
 
-        #         m.d.comb += [
-        #             receiver.rx.eq(self.synced_rx[i]),
-        #             receiver.trigger.eq(request_pulse.trigger),
-        #         ]
 
-        #         if i == 0:
-        #             m.d.comb += [
-        #                 self.debug.eq(receiver.commutation_count),
-        #             ]
+        # encoder regs
 
-        #         with m.Case(i):
-        #             with m.Switch(self.bram_address[0:4]):
-        #                 with m.Case(0):
-        #                     m.d.sync_100 += self.bram_read_data.eq(receiver.multiturn_count)
-        #                 with m.Case(1):
-        #                     m.d.sync_100 += self.bram_read_data.eq(receiver.singleturn_count)
-        #                 with m.Case(2):
-        #                     m.d.sync_100 += self.bram_read_data.eq(receiver.commutation_count)
-        #                 with m.Case(3):
-        #                     m.d.sync_100 += self.bram_read_data.eq(receiver.battery_fail | (receiver.unindexed << 1) | (receiver.no_response << 2) | (receiver.crc_fail << 3) | (receiver.done << 4))
-        #                 with m.Default():
-        #                     m.d.sync_100 += self.bram_read_data.eq(0)
+        encoder_address_lsb = int(math.log2(self.rm.encoder.alignment)) # TODO: add otion to get these directly from the register map
+        encoder_address_msb = int(math.log2(self.rm.encoder.count)) + encoder_address_lsb + 1
+
+        for index, e in enumerate(self.encoders):
+            
+            with m.If(self.bram_address[encoder_address_lsb:encoder_address_msb] == index<<encoder_address_lsb):  # selected the encoder
+                # TODO: add a way to create these switches automatically from the register map
+                with m.Switch(self.bram_address[0:encoder_address_lsb]):
+                    with m.Case(self.rm.encoder.multiturn_count.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.multiturn_count)
+                    with m.Case(self.rm.encoder.singleturn_count.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.singleturn_count<<16)
+                    with m.Case(self.rm.encoder.commutation_count.address_offset):
+                        m.d.sync_100 += self.bram_read_data.eq(e.commutation_count<<6)
+                    with m.Case(self.rm.encoder.status.address_offset):
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.battery_fail.starting_bit].eq(e.battery_fail)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.no_response.starting_bit].eq(e.no_response)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.crc_fail.starting_bit].eq(e.crc_fail)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.done.starting_bit].eq(e.done)
+                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
+                    with m.Default():
+                        m.d.sync_100 += self.bram_read_data.eq(0) 
+
 
         return m
 

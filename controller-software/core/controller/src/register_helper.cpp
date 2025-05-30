@@ -18,6 +18,7 @@ Register::Register(json* json_data, const std::string register_name, uint16_t re
     pl_data.bit_mask = (1 << pl_data.width) - 1;    // mask is not shifted to the correct position, it is just the correct width
 
     full_name = prefix_name + "." + pl_data.name + ":" + std::to_string(pl_data.index);
+    pl_data.full_name = full_name;
 }
 
 Register::~Register(){
@@ -38,16 +39,8 @@ void Address_Map_Loader::setup(std::string name, json* config, fpga_mem* base_me
 
     json data = (*config)[module_name]["node"];
 
-    base_group = new Group(&data, "base_group", 1, 0, "");
-    base_group->full_name = module_name + ":" + std::to_string(module_index);    // override the base group name to just be the module name
-}
-
-Register* Address_Map_Loader::get_register_by_full_name(std::string full_name){
-    // get a register by the full name
-    
-    // TODO: implement
-    
-    return nullptr;
+    base_group = new Group(&data, "base_group", 0, 0, "");
+    base_group->full_name = "fpga." + module_name + ":" + std::to_string(module_index);    // override the base group name to just be the module name
 }
 
 uint8_t Address_Map_Loader::get_node_index(){
@@ -227,6 +220,9 @@ Group::Group(json* json_data, const std::string group_name, uint16_t index, uint
     this->json_data = new json((*json_data)[group_name]);
 
     get_group_data(group_name);
+    if(index >= group_data.count){
+        throw std::runtime_error("Index out of range");
+    }
     group_data.index = index;
     group_data.absolute_address = parent_absolute_address + group_data.address_offset + (group_data.alignment * index);
 
@@ -273,6 +269,7 @@ Register* Register::get_register(std::string register_name){
     reg->is_sub_register = true;
     reg->ps_data.software_data_ptr = ps_data.software_data_ptr;
     reg->ps_data.hardware_data_ptr = ps_data.hardware_data_ptr;
+    sub_register_var_ptrs.push_back((void**)&(reg->ps_data.software_data_ptr));
     return reg;
 }
 template Register* Register::get_register<uint32_t>(std::string register_name);
@@ -494,4 +491,110 @@ bool Register::set_bit(bool value, uint8_t index){
     *(ps_data.software_data_ptr) &= ~((pl_data.bit_mask & (1<<index)) << pl_data.starting_bit);
     *(ps_data.software_data_ptr) |= (value << (pl_data.starting_bit + index));
     return value;
+}
+
+uint32_t get_register_from_full_name(std::string full_name, json* config, fpga_mem* base_mem, Register** reg_){
+    // create a register object from the full name
+
+    if(full_name.substr(0, 5) != "fpga."){
+        std::cerr << "Invalid name for register" << std::endl;
+        return 1;
+    }
+
+    uint32_t str_index = full_name.find('.') + 1;   // start right after "fpga."
+    
+    struct object_data{
+        std::string name;
+        uint16_t index;
+    };
+
+    std::vector<object_data> objects;
+    for(uint32_t i = 0; i < 32; i++){   // max 32 object deep name
+        object_data obj;
+        obj.name = full_name.substr(str_index, full_name.find(':', str_index) - str_index);
+        str_index = full_name.find(':', str_index) + 1;
+        std::string t = full_name.substr(str_index, full_name.find('.', str_index) - str_index);
+        obj.index = std::stoi(t);
+        str_index = full_name.find('.', str_index) + 1;
+        objects.push_back(obj);
+
+        if(str_index == 0){ // no more objects
+            break;
+        }
+    }
+
+    Address_Map_Loader loader;
+    loader.setup(objects.front().name, config, base_mem);
+
+    objects.erase(objects.begin());
+
+
+    // load based on the rest of the objects here
+
+    Register* reg = nullptr;
+    Group* group = nullptr;
+
+    // TODO: free group objects after use
+
+    for(auto obj : objects){
+        try{
+            if(group != nullptr){
+                reg = group->get_register(obj.name, obj.index);
+            }
+            else{
+                reg = loader.get_register(obj.name, obj.index);
+            }
+        }
+        catch(const std::runtime_error& e){
+            try{
+                if(group != nullptr){
+                    group = group->get_group(obj.name, obj.index);
+                }
+                else{
+                    group = loader.get_group(obj.name, obj.index);
+                }
+            }
+            catch(const std::runtime_error& e){
+                std::cerr << "Error: failed to get register or group from full name" << std::endl;
+                return 1;
+            }
+        }
+    }
+
+    reg->pl_data.node_index = loader.get_node_index();
+    *reg_ = reg;
+
+    return 0;
+}
+
+// TODO: remove all old stuff in register_help to sync from within drivers
+
+uint32_t sync_with_ps(Register* reg, fpga_mem* base_mem){
+    // sync the register with the PS, only needed for parent registers (not sub-registers)
+
+    if(reg->is_sub_register){
+        throw std::runtime_error("Sync with PS can only be called on parent registers");
+    }
+
+    if(reg->pl_data.read){
+        reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PL_PS_ptr) + base_mem->software_PL_PS_size / 4; // /4 to convert to 32 bit words
+        reg->ps_data.hardware_data_ptr = base_mem->hardware_PL_PS_mem_offset + base_mem->hardware_PL_PS_size;
+        std::cout << "FPGA reg " << reg->full_name << " synced using PL->PS mem " << base_mem->hardware_PL_PS_size*4 << std::endl;
+        base_mem->software_PL_PS_size += 4;  // increment by 4 bytes
+        base_mem->hardware_PL_PS_size += 1;  // increment by 1 32 bit word
+    }
+    else if(reg->pl_data.write){
+        reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PS_PL_ptr) + base_mem->software_PS_PL_size / 4; // /4 to convert to 32 bit words
+        reg->ps_data.hardware_data_ptr = base_mem->hardware_PS_PL_mem_offset + base_mem->hardware_PS_PL_size;
+        std::cout << "FPGA reg " << reg->full_name << " synced using PS->PL mem " << base_mem->hardware_PS_PL_size*4 << std::endl;
+        base_mem->software_PS_PL_size += 4;  // increment by 4 bytes
+        base_mem->hardware_PS_PL_size += 1;  // increment by 1 32 bit word
+    }
+    else{
+        throw std::runtime_error("Register must be read or write");
+    }
+
+    
+    
+    return 0;
 }

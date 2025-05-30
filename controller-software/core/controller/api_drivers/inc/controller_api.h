@@ -3,9 +3,12 @@
 #include <thread>
 #include <condition_variable>
 #include <chrono>
+#include "json.hpp"
 
 #pragma once
 #include "api_objects.h"
+
+using json = nlohmann::json;
 
 class controller_api {
     private:
@@ -18,19 +21,30 @@ class controller_api {
 
         uint32_t get_last_web_to_controller_call();
 
-        std::atomic<bool>* pause = nullptr;
+        
+        static std::mutex data_mutex;
+        static std::condition_variable data_ready;
+        static std::string* json_to_parse;
+        static json* parsed_json;
+        static bool* json_parsed;
+        static std::atomic<bool> parsing_complete;
+        static void json_parser_thread();
+
+        void setup_json_parser();
+
+        Node_Core* node_core = nullptr;
         
     public:
-        static std::mutex controller_api_mtx;
-
         controller_api();
+
+        void setup(Node_Core* node_core_);
 
         uint32_t get_new_call();
 
         uint32_t run_calls();
 
-        void set_pause_flag(std::atomic<bool>* pause_);
-
         ~controller_api();
 };
+
+
 

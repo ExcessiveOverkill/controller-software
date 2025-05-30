@@ -1,0 +1,379 @@
+{
+    "info": {
+        "date": "2025-03-13",
+        "time": "12:00:00",
+        "fpga_config": "controller/config/fpga_configs/test",
+        "write_protected": false
+    },
+
+    "user_node_vars":{
+    },
+
+    "node_var_values":{
+    },
+
+    "networks":{
+        "test_network":{
+            "enable":true,
+            "type":"sync",
+            "timeout_usec":10000,
+            "update_cycle_trigger_count": 1,
+
+            "nodes":{
+                "float_cmds":{
+                    "type":"api_cmd_float",
+                    "config":{
+                        "config":[
+                            {
+                                "name": "output_0",
+                                "min": -1.0,
+                                "max": 1.0,
+                                "default_value": 0.0,
+                                "timeout": 0.0
+                            }
+                        ]
+                    
+                    }
+                },
+
+                "converter":{
+                    "type":"convert_io_types",
+                    "config":{
+                        "config":[
+                            {
+                            "name": "fan_speed_cmd",
+                            "input_type": "float",
+                            "output_type": "uint16",
+                            "input_min": 0.0,
+                            "input_max": 1.0,
+                            "output_min": 16384,
+                            "output_max": 65535,
+                            "invert": false
+                            }
+                        ]
+                    }
+                },
+
+                "servo_drive_0":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json",
+                            "async_read_regs":[
+                                {
+                                    "name": "dc_bus_voltage",
+                                    "update_rate_cycles": 50
+                                }
+                            ],
+                            "cyclic_write_regs":[
+                                {
+                                    "name": "fan_speed_cmd",
+                                    "sync_with_node": true,
+                                    "cyclic_index": 3
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "sync_with_node": false,
+                                    "cyclic_index": 5
+                                }
+                            ],
+                            "cyclic_read_regs":[
+                                {
+                                    "name": "fan_speed_measured",
+                                    "sync_with_node": true,
+                                    "cyclic_index": 3
+                                }
+                            ],
+                            "set":[
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 5000
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "commutation_offset",
+                                    "value": 0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 1
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 5000
+                                }
+                            ]
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_1":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 1,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_2":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 2,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_3":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 3,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_4":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 4,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_5":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_6":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 1,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_7":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 2,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "servo_drive_8":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 3,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+                "estop_board":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_1_0.json"
+                        }
+                        
+                    }
+                },
+
+                "mouse":{
+                    "type":"em_serial_device",
+                    "config":{
+                        "enabled": true,
+                        "comm":{
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device":{
+                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                        }
+                        
+                    }
+                },
+
+
+                "serial_devices":{
+                    "type":"get_global_variable",
+                    "config":{
+                        "variables":{
+                            "drive_0": "node_vars.drivers.node_5_em_serial_controller_A.device_0",
+                            "drive_1": "node_vars.drivers.node_5_em_serial_controller_A.device_1",
+                            "drive_2": "node_vars.drivers.node_5_em_serial_controller_A.device_2",
+                            "drive_3": "node_vars.drivers.node_5_em_serial_controller_A.device_3",
+                            "drive_4": "node_vars.drivers.node_5_em_serial_controller_A.device_4",
+                            "drive_5": "node_vars.drivers.node_6_em_serial_controller_B.device_0",
+                            "drive_6": "node_vars.drivers.node_6_em_serial_controller_B.device_1",
+                            "drive_7": "node_vars.drivers.node_6_em_serial_controller_B.device_2",
+                            "drive_8": "node_vars.drivers.node_6_em_serial_controller_B.device_3",
+                            "estop_board_0": "node_vars.drivers.node_7_em_serial_controller_C.device_0",
+                            "mouse_0": "node_vars.drivers.node_8_em_serial_controller_D.device_0"
+                        }
+                    }
+                }
+            },
+
+            "connections":{
+                "0":{
+                    "src_node":"float_cmds",
+                    "src_port":"output_0",
+                    "dst_node":"converter",
+                    "dst_port":"fan_speed_cmd"
+                },
+                "1":{
+                    "src_node":"float_cmds",
+                    "src_port":"output_0",
+                    "dst_node":"converter",
+                    "dst_port":"fan_speed_cmd"
+                },
+                "2":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_0",
+                    "dst_node":"servo_drive_0",
+                    "dst_port":"em_device"
+                },
+                "3":{
+                    "src_node":"converter",
+                    "src_port":"fan_speed_cmd",
+                    "dst_node":"servo_drive_0",
+                    "dst_port":"fan_speed_cmd"
+                },
+                "4":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_1",
+                    "dst_node":"servo_drive_1",
+                    "dst_port":"em_device"
+                },
+                "5":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_2",
+                    "dst_node":"servo_drive_2",
+                    "dst_port":"em_device"
+                },
+                "6":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_3",
+                    "dst_node":"servo_drive_3",
+                    "dst_port":"em_device"
+                },
+                "7":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_4",
+                    "dst_node":"servo_drive_4",
+                    "dst_port":"em_device"
+                },
+                "8":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_5",
+                    "dst_node":"servo_drive_5",
+                    "dst_port":"em_device"
+                },
+                "9":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_6",
+                    "dst_node":"servo_drive_6",
+                    "dst_port":"em_device"
+                },
+                "10":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_7",
+                    "dst_node":"servo_drive_7",
+                    "dst_port":"em_device"
+                },
+                "11":{
+                    "src_node":"serial_devices",
+                    "src_port":"drive_8",
+                    "dst_node":"servo_drive_8",
+                    "dst_port":"em_device"
+                },
+                "12":{
+                    "src_node":"serial_devices",
+                    "src_port":"estop_board_0",
+                    "dst_node":"estop_board",
+                    "dst_port":"em_device"
+                },
+                "13":{
+                    "src_node":"serial_devices",
+                    "src_port":"mouse_0",
+                    "dst_node":"mouse",
+                    "dst_port":"em_device"
+                }
+                
+            }
+        }
+    }
+}

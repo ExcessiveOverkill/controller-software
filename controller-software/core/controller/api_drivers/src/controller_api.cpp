@@ -1,37 +1,87 @@
 #include "controller_api.h"
 
 
-controller_api::controller_api(){
+controller_api::controller_api() {    
+}
+
+void controller_api::setup(Node_Core* node_core_) {
+    node_core = node_core_;
+    default_call_obj.node_core = node_core;
+
     if(shared_mem_obj.controller_create_shared_mem() !=0 ){
         std::cerr << "Error creating shared memory" << std::endl;
     }
 
     default_call_obj.set_shared_memory(shared_mem_obj);
+
+    setup_json_parser();
 }
+
+void controller_api::setup_json_parser() {
+    // json parser thread that will run in the background, this keeps slow json parsing from blocking the main thread
+
+    std::thread json_parser(json_parser_thread);
+
+    // set thread priority
+    sched_param sch;
+    int policy;
+    pthread_getschedparam(json_parser.native_handle(), &policy, &sch);
+    sch.sched_priority = 20;
+    if (pthread_setschedparam(json_parser.native_handle(), SCHED_RR, &sch)) {
+        std::cerr << "Failed to set Thread scheduling : " << std::strerror(errno) << std::endl;
+    }
+
+    json_parser.detach();
+
+}
+
+void controller_api::json_parser_thread() {
+    while (true) {
+        std::unique_lock<std::mutex> lock(controller_api::data_mutex);
+        data_ready.wait(lock, [] { return controller_api::parsed_json != nullptr && controller_api::json_to_parse != nullptr && controller_api::json_parsed != nullptr; });
+        lock.unlock();
+
+        if(controller_api::json_to_parse == nullptr || controller_api::parsed_json == nullptr || controller_api::json_parsed == nullptr){
+            continue;
+        }
+
+        // slow parsing operation
+        *parsed_json = json::parse(*json_to_parse);
+
+        *json_parsed = true;
+        json_to_parse = nullptr;
+        parsed_json = nullptr;
+        json_parsed = nullptr;
+        
+        parsing_complete.store(true, std::memory_order_release);
+    }
+}
+
+std::mutex controller_api::data_mutex;
+std::condition_variable controller_api::data_ready;
+std::string* controller_api::json_to_parse = nullptr;
+json* controller_api::parsed_json = nullptr;
+bool* controller_api::json_parsed = nullptr;
+std::atomic<bool> controller_api::parsing_complete{false};
 
 controller_api::~controller_api(){
     shared_mem_obj.unmap_shared_mem();
     shared_mem_obj.close_shared_mem();
 }
 
-void controller_api::set_pause_flag(std::atomic<bool>* pause_){
-    pause = pause_;
-}
-
 
 uint32_t controller_api::get_new_call() {
     // read call from shared memory and create new call object
 
-    if(pause->load()){
-        return 256; // stop update triggered
-    }
-
     if(get_next_api_call_id_from_shared_mem() == 0){
-        std::cout << "new call received" << std::endl;
+        //std::cout << "new call received" << std::endl;
         if(get_new_call_object_from_call_id(&calls, &api_call_id) == 1){
             std::cerr << "Error creating new call object, unknown call ID" << std::endl;
             return 2;
         };
+
+        calls.back()->node_core = node_core;
+
         uint32_t ret = get_last_web_to_controller_call();
 
         if (ret == 1) {
@@ -63,8 +113,14 @@ uint32_t controller_api::run_calls() {
     
     for (auto it = calls.begin(); it != calls.end();) {
 
-        if(pause->load()){
-            return 256; // stop update triggered
+        if(!(*it)->json_parsed && (*it)->json_data_string != ""){
+            {
+                std::lock_guard<std::mutex> lock(controller_api::data_mutex);
+                controller_api::json_to_parse = &(*it)->json_data_string;
+                controller_api::parsed_json = &(*it)->json_data;
+                controller_api::json_parsed = &(*it)->json_parsed;
+            }
+            controller_api::data_ready.notify_one();
         }
 
         uint32_t ret = (*it)->run();  // Run the call
@@ -84,7 +140,6 @@ uint32_t controller_api::run_calls() {
         }
 
         ++it;
-        //const std::lock_guard<std::mutex> unlock(controller_api_mtx);
     }
 
     return 0;
@@ -145,5 +200,3 @@ uint32_t controller_api::get_last_web_to_controller_call() {
 
     return 0;
 }
-
-std::mutex controller_api::controller_api_mtx;

@@ -78,7 +78,7 @@ class print_uint32: public Base_API {
         unsigned int run() override {
             // run the API call
 
-            std::cout << "value: " << value << "\n";
+            std::cout << "value: " << value << std::endl;
 
             return 0;
         }
