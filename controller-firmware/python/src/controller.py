@@ -9,7 +9,7 @@ from fanuc_encoder import Fanuc_Encoders
 from global_timer import Global_Timers
 from em_serial_controller import EM_Serial_Controller
 from yaskawa_encoders import Yaskawa_Encoders
-
+import subprocess, os
 
 
 class Controller(wiring.Component):
@@ -741,10 +741,23 @@ class Controller(wiring.Component):
         with m.Else():
             m.d.sync_25 += self.cycle_timer.eq(self.cycle_timer - 1)
 
+        # with m.If(self.cycle_timer == 0):
+            # m.d.comb += self.debug_pins[3].eq(1)
+
+        m.d.comb += [
+            # self.debug_pins[4].eq(self.shift_dma.start),
+            # self.debug_pins[5].eq(self.shift_dma.busy),
+            # self.debug_pins[6].eq(self.axi_transfer_start),
+            # self.debug_pins[7].eq(self.axi_transfer_busy),
+            self.memory_update_running.eq(self.axi_transfer_busy),
+            self.memory_update_done.eq(~self.axi_transfer_busy),
+            self.dma_cycle_running.eq(self.shift_dma.busy),
+            self.dma_cycle_done.eq(~self.shift_dma.busy),
+        ]
 
         with m.FSM(init="idle", domain="sync_25"):
             with m.State("idle"):
-                m.d.sync_100 += self.pl_ps_interrupts[0].eq(0)
+                #m.d.sync_100 += self.pl_ps_interrupts[0].eq(0)
                 with m.If(self.cycle_timer == 0):
                     with m.If(self.cycle_timer_config != 0):    # writing zero to the timer will permanently stop the system (must be done before FPGA reconfiguration)
                         with m.If(self.watchdog_counter != 0):  # dma allowed to run
@@ -763,30 +776,30 @@ class Controller(wiring.Component):
             with m.State("start_dma"):
                 m.d.sync_100 += self.shift_dma.start.eq(1)
                 
-                m.d.sync_100 += self.memory_update_running.eq(0)
-                m.d.sync_100 += self.memory_update_done.eq(0)
-                m.d.sync_100 += self.dma_cycle_done.eq(0)
-                m.d.sync_100 += self.dma_cycle_running.eq(1)
+                #m.d.sync_100 += self.memory_update_running.eq(0)
+                #m.d.sync_100 += self.memory_update_done.eq(0)
+                #m.d.sync_100 += self.dma_cycle_done.eq(0)
+                #m.d.sync_100 += self.dma_cycle_running.eq(1)
                 m.next = "run_dma"
             
             with m.State("run_dma"):
                 m.d.sync_100 += self.shift_dma.start.eq(0)
                 with m.If(~self.shift_dma.busy):
-                    m.d.sync_100 += self.dma_cycle_done.eq(1)
-                    m.d.sync_100 += self.dma_cycle_running.eq(0)
+                    #m.d.sync_100 += self.dma_cycle_done.eq(1)
+                    #m.d.sync_100 += self.dma_cycle_running.eq(0)
                     m.next = "start_axi_transfer"
 
             with m.State("start_axi_transfer"):
                 m.d.sync_100 += self.axi_transfer_start.eq(1)
-                m.d.sync_100 += self.memory_update_running.eq(1)
+                #m.d.sync_100 += self.memory_update_running.eq(1)
                 m.next = "wait_axi_transfer"
 
             with m.State("wait_axi_transfer"):
                 m.d.sync_100 += self.axi_transfer_start.eq(0)
                 with m.If(~self.axi_transfer_busy):
-                    m.d.sync_100 += self.memory_update_running.eq(0)
-                    m.d.sync_100 += self.memory_update_done.eq(1)
-                    m.d.sync_100 += self.pl_ps_interrupts[0].eq(1)
+                    #m.d.sync_100 += self.memory_update_running.eq(0)
+                    #m.d.sync_100 += self.memory_update_done.eq(1)
+                    #m.d.sync_100 += self.pl_ps_interrupts[0].eq(1)
                     m.next = "idle"
 
 
@@ -896,69 +909,99 @@ class Controller(wiring.Component):
             node_address += 1
 
 
-        # temporary hack to hardcode serial card to slot IO
-        card = m.submodules["serial_card"]
+        # temporary hack to hardcode serial cards to slot IO
+        card_B = m.submodules["serial_card_B"]
         m.d.comb += [
-            card.slotIn.eq(self.slot_B_in),
-            self.slot_B_out.eq(card.slotOut),
-            self.slot_B_out_enable.eq(card.slotOutEnable),
-
-            #self.debug_pins[6].eq(self.slot_B_out[20]),
-            #self.debug_pins[7].eq(self.slot_B_out[21]),
+            card_B.slotIn.eq(self.slot_B_in),
+            self.slot_B_out.eq(card_B.slotOut),
+            self.slot_B_out_enable.eq(card_B.slotOutEnable),
+        ]
+        card_C = m.submodules["serial_card_C"]
+        m.d.comb += [
+            card_C.slotIn.eq(self.slot_C_in),
+            self.slot_C_out.eq(card_C.slotOut),
+            self.slot_C_out_enable.eq(card_C.slotOutEnable),
         ]
 
+        # fanuc encoders on ports 9 and 10
         encoders = m.submodules["fanuc_encoders"]
         m.d.comb += [
-            encoders.rx[0].eq(card.rs422_rx[0]),
-            card.rs422_tx[0].eq(encoders.tx[0]),
+            encoders.rx[0].eq(card_C.rs422_rx[8]),
+            card_C.rs422_tx[8].eq(encoders.tx[0]),
+            encoders.rx[1].eq(card_C.rs422_rx[9]),
+            card_C.rs422_tx[9].eq(encoders.tx[1]),
+
             #self.debug_pins[0].eq(encoders.tx[0]),
             #self.debug_pins[1].eq(encoders.rx[0]),
         ]
 
-        yaskawa_encoders = m.submodules["yaskawa_encoders"]
-        m.d.comb += [
-            yaskawa_encoders.rx[0].eq(card.rs485_rx[1]),
-            card.rs485_tx[1].eq(yaskawa_encoders.tx[0]),
-            card.rs485_tx_enable[1].eq(yaskawa_encoders.tx_enable[0]),
-            # self.debug_pins.eq(yaskawa_encoders.debug),
-            # self.debug_pins[0].eq(self.slot_B_out[8]),
-            # self.debug_pins[1].eq(self.slot_B_out_enable[8]),
-            # self.debug_pins[2].eq(self.slot_B_in[8]),
-            # self.debug_pins[3].eq(self.slot_B_out[9]),
-            # self.debug_pins[4].eq(self.slot_B_out_enable[9]),
-            # self.debug_pins[5].eq(self.slot_B_in[9])
-        ]
 
-        # timers = m.submodules["global_timers"]
+        # yaskawa encoders on ports 1-6
+        yaskawa_encoders = m.submodules["yaskawa_encoders"]
+        for encoder_index in range(6):
+            m.d.comb += yaskawa_encoders.rx[encoder_index].eq(card_C.rs485_rx[encoder_index])
+            m.d.comb += card_C.rs485_tx[encoder_index].eq(yaskawa_encoders.tx[encoder_index])
+            m.d.comb += card_C.rs485_tx_enable[encoder_index].eq(yaskawa_encoders.tx_enable[encoder_index])
+
+        #m.d.comb += self.debug_pins.eq(yaskawa_encoders.debug)
+
         # m.d.comb += [
-        #     timers.trigger.eq(self.cycle_timer == 0),
-        #     encoders.trigger.eq(timers.timer_pulse[0]),
-        #     #self.debug_pins[0].eq(encoders.rx[0]),
-        #     #self.debug_pins[1].eq(encoders.bram_read_data[0]),
-        #     #self.debug_pins.eq(encoders.bram_read_data),
+        #     self.debug_pins[0].eq(yaskawa_encoders.tx[0]),
+        #     self.debug_pins[1].eq(yaskawa_encoders.tx_enable[0]),
+        #     self.debug_pins[2].eq(yaskawa_encoders.rx[0]),
+        #     self.debug_pins[3].eq(self.slot_C_out[18]),
+        #     self.debug_pins[4].eq(self.slot_C_out_enable[18]),
+        #     self.debug_pins[5].eq(self.slot_C_out[19]),
+        #     self.debug_pins[6].eq(self.slot_C_out_enable[19]),
+
         # ]
 
-        serial_controller = m.submodules["em_serial_controller"]
-        m.d.comb += [
-            serial_controller.rx.eq(card.rs422_rx[9]),
-            card.rs422_tx[9].eq(serial_controller.tx),
+        serial_controller_A = m.submodules["em_serial_controller_A"]
+        serial_controller_B = m.submodules["em_serial_controller_B"]
+        serial_controller_C = m.submodules["em_serial_controller_C"]
+        serial_controller_D = m.submodules["em_serial_controller_D"]
 
-            self.debug_pins[0].eq(serial_controller.tx),
-            self.debug_pins[1].eq(serial_controller.rx),
+        m.d.comb += [
+            # drives A
+            serial_controller_A.rx.eq(card_B.rs422_rx[1]),
+            card_B.rs422_tx[1].eq(serial_controller_A.tx),
+
+            # drives B
+            serial_controller_B.rx.eq(card_B.rs422_rx[9]),
+            card_B.rs422_tx[9].eq(serial_controller_B.tx),
+
+            # ESTOP board
+            serial_controller_C.rx.eq(card_B.rs422_rx[8]),
+            card_B.rs422_tx[8].eq(serial_controller_C.tx),
+
+            # 6d mouse
+            serial_controller_D.rx.eq(card_B.rs422_rx[0]),
+            card_B.rs422_tx[0].eq(serial_controller_D.tx),
+
+
+            self.debug_pins[0].eq(serial_controller_A.tx),
+            self.debug_pins[1].eq(serial_controller_A.rx),
+            self.debug_pins[2].eq(serial_controller_B.tx),
+            self.debug_pins[3].eq(serial_controller_B.rx),
+            self.debug_pins[4].eq(serial_controller_C.tx),
+            self.debug_pins[5].eq(serial_controller_C.rx),
+            self.debug_pins[6].eq(serial_controller_D.tx),
+            self.debug_pins[7].eq(serial_controller_D.rx),
         ]
 
         #m.d.comb += self.debug_pins[0:6].eq(self.shift_dma.timer_count)
 
-        with m.If((serial_controller.bram_address == 128+3) & (serial_controller.bram_write_enable == 0)):
-            m.d.comb += self.debug_pins[2].eq(1)
-        m.d.comb += self.debug_pins[3].eq(serial_controller.bram_read_data[0])
-        m.d.comb += self.debug_pins[4].eq(serial_controller.bram_read_data[1])
-        m.d.comb += self.debug_pins[5].eq(serial_controller.bram_read_data[2])
-        m.d.comb += self.debug_pins[6].eq(serial_controller.bram_read_data[3])
-        m.d.comb += self.debug_pins[7].eq(serial_controller.bram_read_data[4])
+        # m.d.comb += self.debug_pins[0].eq(serial_controller_C.tx)
+        # m.d.comb += self.debug_pins[1].eq(serial_controller_C.rx)
+        # m.d.comb += self.debug_pins[2].eq(serial_controller_C.debugPins_fsm[0])
+        # m.d.comb += self.debug_pins[3].eq(serial_controller_C.debugPins_fsm[1])
+        # m.d.comb += self.debug_pins[4].eq(serial_controller_C.debugPins_fsm[2])
+        # m.d.comb += self.debug_pins[5].eq(serial_controller_C.debugPins_fsm[3])
+        # m.d.comb += self.debug_pins[6].eq(serial_controller_C.debugPins_fsm[4])
 
-
-        #m.d.comb += self.debug_pins[2:].eq(serial_controller.debugPins)
+        # m.d.comb += self.debug_pins[2].eq(serial_controller_A.rx_invalid_crc_fault)
+        # m.d.comb += self.debug_pins[3].eq(serial_controller_A.rx_not_finished_fault)
+        # m.d.comb += self.debug_pins[4].eq(serial_controller_A.rx_no_response_fault)
 
         # with m.If((self.shift_dma.read_node_address_input == 4) & (self.shift_dma.read_bram_address_input == 0x1)): # read dev 0 status
         #     m.d.comb += self.debug_pins[2].eq(1)
@@ -1014,12 +1057,17 @@ def create_instruction(source_node, destination_node, source_address, destinatio
 
 sim = 0
 
+print(f"{bcolors.OKGREEN}=== GENERATING MODULES ==={bcolors.ENDC}")
 nodes = {
-    "serial_card" : serial_interface_card(),
-    "fanuc_encoders" : Fanuc_Encoders(6),
+    "serial_card_B" : serial_interface_card(),
+    "serial_card_C" : serial_interface_card(),
+    "fanuc_encoders" : Fanuc_Encoders(2),
     "yaskawa_encoders" : Yaskawa_Encoders(6),
     #"global_timers" : Global_Timers(),
-    "em_serial_controller" : EM_Serial_Controller(max_packet_size=64, max_number_of_devices=16),
+    "em_serial_controller_A" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=5),
+    "em_serial_controller_B" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=4),
+    "em_serial_controller_C" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=2),
+    "em_serial_controller_D" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=2),
 }
 
 
@@ -1109,6 +1157,17 @@ async def controller_test(ctx):
     return
 
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 
 if __name__ == "__main__":
 
@@ -1127,8 +1186,58 @@ if __name__ == "__main__":
             sim.run()
 
     if (not sim):  # export
+
+        # check drive S exists for vivado project
+        if not os.path.exists("S:/Vivado"):
+            print(f"{bcolors.FAIL}Drive S subst path does not exist, please run 'create subst path vivado' task from vs code{bcolors.ENDC}")
+            exit()
+
+
         top = Controller(nodes, sim)
 
+        # TODO: automatically run vivado from here to generate the bitstream file
+        print(f"\n\n{bcolors.OKGREEN}=== GENERATING VERILOG FILE ==={bcolors.ENDC}")
         from amaranth.back import verilog
         with open("controller-firmware/Vivado/autogen_sources/controller.v", "w") as f:
             f.write(verilog.convert(top, name="Controller"))
+
+
+        print(f"\n\n{bcolors.OKGREEN}=== SYSTHESIZING AND GENERATING BITSTREAM ==={bcolors.ENDC}")
+        print(f"{bcolors.WARNING}=== THIS MAY TAKE A WHILE ==={bcolors.ENDC}")
+        print(f"{bcolors.WARNING}=== check build.log for any issues ==={bcolors.ENDC}")
+
+        # run vivado from here to generate the bitstream file
+
+        vivado_settings = r"C:\Xilinx\Vivado\2023.1\settings64.bat"
+        tcl_script       = "S:/Vivado/build.tcl"
+
+        # Build a single command line for cmd.exe
+        cmd_line = (
+            f'call "{vivado_settings}" && '
+            f'vivado -mode batch -nojournal -log build.log -source "{tcl_script}"'
+        )
+
+        proc = subprocess.Popen(
+            cmd_line,
+            shell=True,               # needed to run .bat and use &&
+            stdout=subprocess.PIPE,   # capture both streams
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,            # line buffered
+        )
+
+        # Print each line as it arrives:
+        for line in proc.stdout:
+            print(line, end="")   # already includes newline
+
+        ret = proc.wait()
+        if ret:
+            raise subprocess.CalledProcessError(ret, cmd_line)
+        
+        print(f"\n\n{bcolors.OKGREEN}=== vivado build log in build.log ==={bcolors.ENDC}")
+        print(f"{bcolors.OKGREEN}=== bitfile.bit.bin generated ==={bcolors.ENDC}")
+        print(f"{bcolors.OKGREEN}=== fpga_config.json generated ==={bcolors.ENDC}")
+        print(f"\n{bcolors.OKGREEN}=== DONE ==={bcolors.ENDC}")
+        
+        
+        
