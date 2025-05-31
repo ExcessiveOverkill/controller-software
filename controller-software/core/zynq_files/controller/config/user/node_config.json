@@ -265,13 +265,12 @@
                                 {
                                     "name": "commutation_command",
                                     "sync_with_node": false,
-                                    "cyclic_index": 3
-                                }
-                            ],
-                            "async_write_regs":[
+                                    "cyclic_index": 4
+                                },
                                 {
                                     "name": "current_command_q",
-                                    "update_rate_cycles": 5
+                                    "sync_with_node": true,
+                                    "cyclic_index": 3
                                 }
                             ],
                             "set":[
@@ -357,7 +356,23 @@
                                 },
                                 {
                                     "name": "requested_state",
-                                    "value": 3
+                                    "value": 0
+                                },
+                                {
+                                    "name": "enable_power",
+                                    "value": 1
+                                },
+                                {
+                                    "name": "enable_brakes",
+                                    "value": 1
+                                },
+                                {
+                                    "name": "brake_1_required_inputs",
+                                    "value": 0
+                                },
+                                {
+                                    "name": "precharge_done",
+                                    "value": 0
                                 }
                             ]
                         }
