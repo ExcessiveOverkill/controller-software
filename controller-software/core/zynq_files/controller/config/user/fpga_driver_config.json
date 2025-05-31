@@ -37,24 +37,24 @@
         "baud_rate": 12.5e6,
         "devices": {
             "0": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "1": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "2": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "3": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "4": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             }
         }
     },
@@ -63,20 +63,20 @@
         "baud_rate": 12.5e6,
         "devices": {
             "0": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "1": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "2": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             },
             "3": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             }
         }
     },
@@ -85,8 +85,8 @@
         "baud_rate": 12.5e6,
         "devices": {
             "0": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             }
         }
     },
@@ -95,8 +95,8 @@
         "baud_rate": 12.5e6,
         "devices": {
             "0": {
-                "cyclic_read_node_vars":2,
-                "cyclic_write_node_vars":2
+                "cyclic_read_node_vars":0,
+                "cyclic_write_node_vars":0
             }
         }
     }

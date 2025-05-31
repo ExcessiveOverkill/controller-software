@@ -60,7 +60,7 @@ uint32_t fpga_instructions::copy::load_from_json(json* json_data){
     "destination": "full.destination.name",
     "time_reference_cycle": -1,
     "time_reference_instruction": -1,
-    "time_reference_instruction_edge": "write",
+    "time_reference_instruction_edge": "write", // what edge of the dependent reference instruction copy we're basing our timing on
     "execution_window_earliest": 0,
     "execution_window_latest": 0,
     "edge": "write",
@@ -818,7 +818,7 @@ uint32_t fpga_instructions::update_dynamic_instructions(){
 
         if(index == -1){
             condensed_instructions[data.condensed_instruction_index] = create_instruction_NOP();    // do nothing
-            return 0;
+            continue;
         }
 
         uint32_t addr = instruction->dynamic_reg_starting_address + index;

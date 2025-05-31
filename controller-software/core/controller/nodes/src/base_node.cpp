@@ -26,7 +26,7 @@ uint32_t base_node::connect_input(std::string input_name, std::shared_ptr<base_n
     }
 
     if (inputs[input_name].set_input_data(output_pointer) != 0){
-        std::cerr << "Error: setting input data" << std::endl;
+        std::cerr << "Error: setting input data on " << input_name << std::endl;
         return 3;   // error setting input data
     }
 

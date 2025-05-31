@@ -123,8 +123,7 @@ uint32_t Node_Core::load(std::string file){
     
     user_node_vars: {    // create global variables not already created by fpga drivers
         "var_name": {
-            type: "uint32",
-            data: 0
+            type: "uint32"
         }
     },
 
@@ -185,7 +184,12 @@ uint32_t Node_Core::load(std::string file){
 
     // create user global variables
     for(auto& var : j["user_node_vars"].items()){
-        if(create_global_variable(var.key(), var.value()["type"].get<io_type>())){
+        io_type type = get_io_type(var.value()["type"].get<std::string>());
+        if(type == io_type::UNDEFINED){
+            std::cerr << "Error: invalid type for global variable: " << var.value()["type"].get<std::string>() << std::endl;
+            return 1;
+        }
+        if(create_global_variable(var.key(), type)){
             std::cerr << "Error: failed to create global variable" << std::endl;
             return 1;
         }
@@ -194,10 +198,17 @@ uint32_t Node_Core::load(std::string file){
     // set global variable values
     for(auto& var : j["node_var_values"].items()){
         
+        if(global_variables.find(var.key()) == global_variables.end()){
+            std::cerr << "Error: global variable not found: " << var.key() << std::endl;
+            return 1;
+        }
+
+        // TODO: add more types
+
         switch(get_global_variable_type(var.key())){
             case io_type::UINT32:
                 {
-                    uint32_t value = var.value()["value"].get<uint32_t>();
+                    uint32_t value = var.value().get<uint32_t>();
                     if(set_global_variable_value(var.key(), &value)){
                         std::cerr << "Error: failed to set global variable value" << std::endl;
                         return 1;
@@ -206,7 +217,16 @@ uint32_t Node_Core::load(std::string file){
                 break;
             case io_type::INT32:
                 {
-                    int32_t value = var.value()["value"].get<int32_t>();
+                    int32_t value = var.value().get<int32_t>();
+                    if(set_global_variable_value(var.key(), &value)){
+                        std::cerr << "Error: failed to set global variable value" << std::endl;
+                        return 1;
+                    }
+                }
+                break;
+            case io_type::FLOAT:
+                {
+                    float value = var.value().get<float>();
                     if(set_global_variable_value(var.key(), &value)){
                         std::cerr << "Error: failed to set global variable value" << std::endl;
                         return 1;
@@ -215,7 +235,7 @@ uint32_t Node_Core::load(std::string file){
                 break;
             case io_type::DOUBLE:
                 {
-                    double value = var.value()["value"].get<double>();
+                    double value = var.value().get<double>();
                     if(set_global_variable_value(var.key(), &value)){
                         std::cerr << "Error: failed to set global variable value" << std::endl;
                         return 1;
@@ -224,7 +244,7 @@ uint32_t Node_Core::load(std::string file){
                 break;
             case io_type::BOOL:
                 {
-                    bool value = var.value()["value"].get<bool>();
+                    bool value = var.value().get<bool>();
                     if(set_global_variable_value(var.key(), &value)){
                         std::cerr << "Error: failed to set global variable value" << std::endl;
                         return 1;
@@ -403,7 +423,7 @@ uint32_t Node_Core::get_global_variable_data_ptr(std::string name, void** data){
     // gets the data pointer for the global variable with the given name
 
     if(global_variables.find(name) == global_variables.end()){
-        std::cerr << "Error: global variable name not found" << std::endl;
+        std::cerr << "Error: global variable name not found: " << name << std::endl;
         return 1;
     }
 
@@ -417,7 +437,7 @@ uint32_t Node_Core::set_global_variable_data_ptr(std::string name, void* data){
     // this will modify all pointers to the current data to use the new data pointer
 
     if(global_variables.find(name) == global_variables.end()){
-        std::cerr << "Error: global variable name not found" << std::endl;
+        std::cerr << "Error: global variable name not found: " << name << std::endl;
         return 1;
     }
 
@@ -430,7 +450,7 @@ uint32_t Node_Core::set_global_variable_value(std::string name, void* value){
     // sets the value for the global variable with the given name
 
     if(global_variables.find(name) == global_variables.end()){
-        std::cerr << "Error: global variable name not found" << std::endl;
+        std::cerr << "Error: global variable name not found: " << name << std::endl;
         return 1;
     }
     return global_variables[name]->set_value(value);
@@ -440,7 +460,7 @@ io_type Node_Core::get_global_variable_type(std::string name){
     // gets the type of the global variable with the given name
 
     if(global_variables.find(name) == global_variables.end()){
-        std::cerr << "Error: global variable name not found" << std::endl;
+        std::cerr << "Error: global variable name not found: " << name << std::endl;
         return io_type::UNDEFINED;
     }
 
@@ -451,7 +471,7 @@ uint32_t Node_Core::delete_global_variable(std::string name){
     // deletes a global variable with the given name
 
     if(global_variables.find(name) == global_variables.end()){
-        std::cerr << "Error: global variable name not found" << std::endl;
+        std::cerr << "Error: global variable name not found: " << name << std::endl;
         return 1;
     }
 
@@ -470,7 +490,7 @@ uint32_t Node_Core::rename_global_variable(std::string old_name, std::string new
     // renames the global variable with the given old name to the new name
 
     if(global_variables.find(old_name) == global_variables.end()){
-        std::cerr << "Error: global variable name not found" << std::endl;
+        std::cerr << "Error: global variable name not found: " << old_name << std::endl;
         return 1;
     }
 

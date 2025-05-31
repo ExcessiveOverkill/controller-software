@@ -32,6 +32,22 @@
             "problemMatcher": []
         },
         {
+            "label": "Copy Temp Files from Zynq",
+            "type": "shell",
+            "command": "scp",
+            "args": [
+                "-rp",
+                "zynq:/home/em-os/controller/config/temp/",
+                "${workspaceFolder}/temp/",
+            ],
+            "dependsOn": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Copy web interface Files to local zynq folder",
             "type": "shell",
             "command": "rsync",

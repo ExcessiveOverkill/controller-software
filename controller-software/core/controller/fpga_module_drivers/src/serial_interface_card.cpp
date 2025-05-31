@@ -2,25 +2,6 @@
 
 static Driver_Registrar<serial_interface_card> registrar("serial_interface_card");
 
-// uint32_t serial_interface_card::load_config(json* config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr){
-//     this->node_core = node_core;
-//     this->fpga_instr = fpga_instr;
-//     this->config = config;
-
-//     loader.setup(module_name, config, &base_mem);
-
-//     node_address = loader.get_node_index();
-
-//     node_var_prefix = "node_vars.drivers." + module_name;
-
-//     if(custom_load_config() != 0){
-//         std::cerr << "Failed to load custom config" << std::endl;
-//         return 1;
-//     }
-
-//     return 0;
-// }
-
 
 uint32_t serial_interface_card::custom_load_config(json* user_driver_config){
 
@@ -132,6 +113,11 @@ uint32_t serial_interface_card::custom_load_config(json* user_driver_config){
     #define CONFIG_PORT_0 0x6
     #define CONFIG_PORT_1 0x7
 
+    // configure IO expander ports
+    io_expander_data[0].configuration = 0x0; // all outputs
+    io_expander_data[1].configuration = 0x0; // all outputs
+    io_expander_data[2].configuration = 0b00111000 << 8; // all outputs except for status inputs
+
     // setup i2c transfers that will continuously run
     i2c_transfer transfer;
 
@@ -141,13 +127,13 @@ uint32_t serial_interface_card::custom_load_config(json* user_driver_config){
     transfer.data_length = 2;
 
     transfer.device_address = TOP_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[0].configuration);
+    transfer.out_data = &io_expander_data[0].configuration;
     i2c_transfers.push_back(transfer);
     transfer.device_address = MIDDLE_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[1].configuration);
+    transfer.out_data = &io_expander_data[1].configuration;
     i2c_transfers.push_back(transfer);
     transfer.device_address = BOTTOM_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[2].configuration);
+    transfer.out_data = &io_expander_data[2].configuration;
     i2c_transfers.push_back(transfer);
 
     // write to output ports for all devices/ports
@@ -156,27 +142,21 @@ uint32_t serial_interface_card::custom_load_config(json* user_driver_config){
     transfer.data_length = 2;
 
     transfer.device_address = TOP_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[0].outputs);
+    transfer.out_data = &io_expander_data[0].outputs;
     i2c_transfers.push_back(transfer);
     transfer.device_address = MIDDLE_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[1].outputs);
+    transfer.out_data = &io_expander_data[1].outputs;
     i2c_transfers.push_back(transfer);
     transfer.device_address = BOTTOM_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[2].outputs);
+    transfer.out_data = &io_expander_data[2].outputs;
     i2c_transfers.push_back(transfer);
 
     // read from input port for last port of last device
     transfer.read = true;
     transfer.reg_address = INPUT_PORT_1;
     transfer.data_length = 1;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[2].inputs);
+    transfer.in_data = &io_expander_data[2].inputs;
     i2c_transfers.push_back(transfer);
-
-
-    // configure IO expander ports
-    io_expander_data[0].configuration = 0x0; // all outputs
-    io_expander_data[1].configuration = 0x0; // all outputs
-    io_expander_data[2].configuration = 0b00111000 << 8; // all outputs except for status inputs
 
 
 
@@ -314,7 +294,8 @@ uint32_t serial_interface_card::run(){
         }
     }
 
-    io_expander_data[2].outputs = ((~led_states & 0b111) << 8) | (power_out_enable << 14);
+    io_expander_data[2].outputs &= 0xFF;
+    io_expander_data[2].outputs |= ((~led_states & 0b111) << 8) | (power_out_enable << 14);
 
     // update power ok signals
     power_out_5v5_1_ok = io_expander_data[2].inputs >> 13 & 0b1;
@@ -337,10 +318,10 @@ void serial_interface_card::run_i2c_transfers(){
     if(regs2.i2c_status_error->get_value()){ // error bit set
         i2c_consecutive_error_count++;
     }
-    else{
+    else{   // successful transfer
 
         if(i2c_transfers[last_i2c_transfer].read){  // if a read was just completed, save the data from the rx register
-            *i2c_transfers[last_i2c_transfer].data = regs2.i2c_data_rx->get_value();
+            *i2c_transfers[last_i2c_transfer].in_data = regs2.i2c_data_rx->get_value();
         }
 
         last_i2c_transfer++;
@@ -360,7 +341,7 @@ void serial_interface_card::run_i2c_transfers(){
 
     
     if(!transfer.read){ // if its a write, copy the data to the tx register
-        regs2.i2c_data_tx->set_value(*transfer.data);
+        regs2.i2c_data_tx->set_value(*transfer.out_data);
     }
 
 }
@@ -371,7 +352,7 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
         return 1;
     }
 
-    // configs are in the order: 3, 1, 2, 4
+    // configs are in the order: 3, 1, 2, 4 (LSB first)
     #define RS485_CONFIG 0b0001
     #define RS422_CONFIG 0b1110
     #define BOTH_INPUTS_CONFIG 0b0010
@@ -394,19 +375,19 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
     case 1:
     case 2:
     case 3:
-        io_expander_data[0].configuration = (io_expander_data[0].configuration & ~(0xf << 4*(3-port))) | (config << 4*(3-port));
+        io_expander_data[0].outputs = (io_expander_data[0].outputs & ~(0xf << 4*(3-port))) | (config << 4*(3-port));
         break;
 
     case 4:
     case 5:
     case 6:
     case 7:
-        io_expander_data[1].configuration = (io_expander_data[1].configuration & ~(0xf << 4*(7-port))) | (config << 4*(7-port));
+        io_expander_data[1].outputs = (io_expander_data[1].outputs & ~(0xf << 4*(7-port))) | (config << 4*(7-port));
         break;
 
     case 8:
     case 9:
-        io_expander_data[2].configuration = (io_expander_data[2].configuration & ~(0xf << 4*(9-port))) | (config << 4*(9-port));
+        io_expander_data[2].outputs = (io_expander_data[2].outputs & ~(0xf << 4*(9-port))) | (config << 4*(9-port));
         break;
     
     default:

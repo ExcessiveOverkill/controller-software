@@ -20,8 +20,8 @@ class em_serial_device: public base_node{
             //execution_number = -1;
 
             inputs.emplace("em_device", input(io_type::EM_SERIAL_DEVICE, nullptr));    // connection to em serial device FPGA driver
-            outputs.emplace("device_error", output(io_type::BOOL, &device_error, &execution_number));    // error from the device
-            outputs.emplace("device_warning", output(io_type::BOOL, &device_warning, &execution_number));    // warning from the device
+            //outputs.emplace("device_error", output(io_type::BOOL, &device_error, &execution_number));    // error from the device
+            //outputs.emplace("device_warning", output(io_type::BOOL, &device_warning, &execution_number));    // warning from the device
             outputs.emplace("communication_error", output(io_type::BOOL, &communication_error, &execution_number));    // communication error (timeout)
         }
 
@@ -814,7 +814,6 @@ class em_serial_device: public base_node{
             uint16_t message_time_lower_address = 0;
             uint16_t message_time_upper_address = 0;
             uint16_t dummy_reg_address = 0;
-            uint16_t status_reg_address = 0;
             uint16_t firmware_write_address = 0;
             uint16_t firmware_data_0 = 0;
             uint16_t firmware_data_1 = 0;
@@ -1077,13 +1076,6 @@ class em_serial_device: public base_node{
             dev_desc.firmware_data_5 = dev_desc.registers["firmware_update_data_5"].index;
             dev_desc.firmware_data_6 = dev_desc.registers["firmware_update_data_6"].index;
             dev_desc.firmware_data_7 = dev_desc.registers["firmware_update_data_7"].index;
-
-            // set status register address
-            // Status bits, 0: IDLE, 1: RUNNING, 2: FAULT, 3: WARNING
-            if(dev_desc.registers.find("status") == dev_desc.registers.end()){
-                throw std::runtime_error("Error: missing required status register in device descriptor");
-            }
-            dev_desc.status_reg_address = dev_desc.registers["status"].index;
 
             dev_desc.loaded = true;
 
