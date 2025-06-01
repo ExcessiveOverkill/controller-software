@@ -1,8 +1,12 @@
-install cross-platform compilers: sudo apt install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+install cross-platform compilers:
+sudo apt install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
 
 install build tools: 
 sudo apt update
 sudo apt install build-essential ninja-build
+
+install cmake
+sudo apt install cmake
 
 install debugger:
 sudo apt install gdb-multiarch
@@ -14,7 +18,7 @@ save them in the core/.ssh folder
 copy ssh key to zynq:
 ssh-copy-id -i .ssh/zynq em-os@192.168.1.243
 
-(remove past configs if zynq has been re-imaged)
+(remove past configs if zynq has been re-imaged, don't do this if you have other keys saved, just remove the zynq one)
 rm -r /home/excessive/.ssh
 
 create ssh config:
@@ -33,7 +37,7 @@ add config:
 Host zynq
     HostName 192.168.1.243    
     User em-os
-    IdentityFile /home/excessive/controller-software/controller-software/core/.ssh/zynq
+    IdentityFile /home/excessive/controller-software/controller-software/core/.ssh/zynq (replace with actual path to the keys)
     Port 22
 
 build project to copy files to zynq

@@ -104,9 +104,7 @@
 	"extensions": {
 		"recommendations": [
 			"ms-vscode.cmake-tools",
-			"twxs.cmake",
-			"ms-vscode.cpptools-extension-pack",
-			"phu1237.live-reload"
+			"ms-vscode.cpptools-extension-pack"
 		]
 	}
 }
