@@ -1,7 +1,7 @@
 [DEBUG] Using xsct from : /home/excessive/petalinux/tools/xsct/bin/xsct
 [DEBUG] Using conf/mconf from : /home/excessive/petalinux/components/yocto/buildtools/sysroots/x86_64-petalinux-linux/usr/bin/mconf
 [INFO] Silentconfig project
-[DEBUG] Running CMD: yes "" | env KCONFIG_CONFIG=/home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/config conf /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/configs/Kconfig
+[DEBUG] Running CMD: yes "" | env KCONFIG_CONFIG=/home/excessive/github/controller-software/em-os/project-spec/configs/config conf /home/excessive/github/controller-software/em-os/project-spec/configs/configs/Kconfig
 [DEBUG] *
 * PetaLinux System Configuration
 *
@@ -221,10 +221,10 @@ Enable Buildtools Extended (YOCTO_BUILDTOOLS_EXTENDED) [N/y/?]
 *
 user layer 0 (USER_LAYER_0) [] 
 #
-# configuration written to /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/config
+# configuration written to /home/excessive/github/controller-software/em-os/project-spec/configs/config
 #
 [INFO] Silentconfig rootfs
-[DEBUG] Running CMD: yes "" | env KCONFIG_CONFIG=/home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/rootfs_config conf /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/rootfsconfigs/Kconfig
+[DEBUG] Running CMD: yes "" | env KCONFIG_CONFIG=/home/excessive/github/controller-software/em-os/project-spec/configs/rootfs_config conf /home/excessive/github/controller-software/em-os/project-spec/configs/rootfsconfigs/Kconfig
 [DEBUG] *
 * Configuration
 *
@@ -3567,8 +3567,6 @@ Init-manager
 choice[1-2]: *
 * user packages 
 *
-gpio-demo (gpio-demo) [N/y/?] 
-peekpoke (peekpoke) [N/y/?] 
 *
 * PetaLinux RootFS Settings
 *
@@ -3577,5 +3575,5 @@ Create new Groups (CREATE_NEW_GROUPS) [aie;]
 Add Users to Groups (ADD_USERS_TO_GROUPS) [em-os:audio,video,aie,input;] 
 Add Users to Sudo users (ADD_USERS_TO_SUDOERS) [em-os] 
 #
-# configuration written to /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/rootfs_config
+# configuration written to /home/excessive/github/controller-software/em-os/project-spec/configs/rootfs_config
 #

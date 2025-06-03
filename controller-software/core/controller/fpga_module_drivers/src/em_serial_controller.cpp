@@ -736,8 +736,8 @@ uint32_t em_serial_controller::em_serial_device::run_sequential_cmds(){
         regs.cyclic_writes[1]->set_value(0);
         regs.cyclic_writes[2]->set_value(0);
 
-        consecutive_unknown_packet_errors = 0;
-        consecutive_packet_errors = 0;
+        //consecutive_unknown_packet_errors = 0;
+        //consecutive_packet_errors = 0;
 
         current_sequential_cmd_index = 0;
 

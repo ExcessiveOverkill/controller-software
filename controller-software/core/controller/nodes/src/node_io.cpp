@@ -80,7 +80,7 @@ uint32_t input::set_input_data(output* source){
     }
 
     else if(source->type != type){
-        std::cerr << "Error: type mismatch" << std::endl;
+        std::cerr << "Error: type mismatch: " << get_io_type_string(source->type) <<  " -> " << get_io_type_string(type) << std::endl;
         ret = 2;   // type mismatch
     }
 

@@ -10,7 +10,8 @@
 
 #include "serial_interface_card.h"
 //#include "global_timers.h"
-//#include "fanuc_encoders.h"
+#include "fanuc_encoders.h"
+#include "yaskawa_encoders.h"
 #include "em_serial_controller.h"
 
 

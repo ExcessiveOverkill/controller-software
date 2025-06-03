@@ -8981,7 +8981,7 @@ config Init-manager-sysvinit
 endchoice
 endmenu
 
-source /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/rootfsconfigs/Kconfig.user
+source /home/excessive/github/controller-software/em-os/project-spec/configs/rootfsconfigs/Kconfig.user
 
 menu "PetaLinux RootFS Settings"
 config ADD_EXTRA_USERS

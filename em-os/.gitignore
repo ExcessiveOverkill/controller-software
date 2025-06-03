@@ -11,3 +11,4 @@ pre-built/linux/
 *.xil
 /components/plnx_workspace
 /components/yocto
+*.old

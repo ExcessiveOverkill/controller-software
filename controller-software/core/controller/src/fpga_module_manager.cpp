@@ -123,6 +123,8 @@ uint32_t fpga_module_manager::initialize_fpga(){
 uint32_t fpga_module_manager::load_drivers(std::string driver_config_file){
     // load and configure drivers based on json config file
 
+    drivers.reserve(32);
+
     // Read driver config JSON file
     json driver_config;
     std::ifstream file(driver_config_file);

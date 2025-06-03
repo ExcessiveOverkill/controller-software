@@ -35,6 +35,10 @@ void Address_Map_Loader::setup(std::string name, json* config, fpga_mem* base_me
     this->config = config;
     this->base_mem = base_mem;
 
+    if(!(*config).contains(module_name)){
+        throw std::runtime_error("Module not found: " + module_name);
+    }
+
     node_index = (*config)[module_name]["node_address"].get<uint8_t>();
 
     json data = (*config)[module_name]["node"];
@@ -579,14 +583,14 @@ uint32_t sync_with_ps(Register* reg, fpga_mem* base_mem){
     if(reg->pl_data.read){
         reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PL_PS_ptr) + base_mem->software_PL_PS_size / 4; // /4 to convert to 32 bit words
         reg->ps_data.hardware_data_ptr = base_mem->hardware_PL_PS_mem_offset + base_mem->hardware_PL_PS_size;
-        std::cout << "FPGA reg " << reg->full_name << " synced using PL->PS mem " << base_mem->hardware_PL_PS_size*4 << std::endl;
+        //std::cout << "FPGA reg " << reg->full_name << " synced using PL->PS mem " << base_mem->hardware_PL_PS_size*4 << std::endl;
         base_mem->software_PL_PS_size += 4;  // increment by 4 bytes
         base_mem->hardware_PL_PS_size += 1;  // increment by 1 32 bit word
     }
     else if(reg->pl_data.write){
         reg->ps_data.software_data_ptr = reinterpret_cast<uint32_t*>(base_mem->software_PS_PL_ptr) + base_mem->software_PS_PL_size / 4; // /4 to convert to 32 bit words
         reg->ps_data.hardware_data_ptr = base_mem->hardware_PS_PL_mem_offset + base_mem->hardware_PS_PL_size;
-        std::cout << "FPGA reg " << reg->full_name << " synced using PS->PL mem " << base_mem->hardware_PS_PL_size*4 << std::endl;
+        //std::cout << "FPGA reg " << reg->full_name << " synced using PS->PL mem " << base_mem->hardware_PS_PL_size*4 << std::endl;
         base_mem->software_PS_PL_size += 4;  // increment by 4 bytes
         base_mem->hardware_PS_PL_size += 1;  // increment by 1 32 bit word
     }

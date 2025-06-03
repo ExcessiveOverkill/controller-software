@@ -69,6 +69,22 @@ static io_type get_io_type(std::string type){
     }
 }
 
+static std::string get_io_type_string(io_type type){
+    switch(type){
+        case io_type::UINT8: return "uint8";
+        case io_type::INT8: return "int8";
+        case io_type::UINT16: return "uint16";
+        case io_type::INT16: return "int16";
+        case io_type::UINT32: return "uint32";
+        case io_type::INT32: return "int32";
+        case io_type::DOUBLE: return "double";
+        case io_type::BOOL: return "bool";
+        case io_type::FLOAT: return "float";
+        case io_type::EM_SERIAL_DEVICE: return "em_serial_device";
+        default: return "undefined";
+    }
+}
+
 class output{
     public:
         io_type type = UNDEFINED;

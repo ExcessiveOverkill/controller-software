@@ -597,9 +597,20 @@
                                 "sub_registers": {},
                                 "rw": "r"
                             },
-                            "unknown1": {
-                                "name": "unknown1",
+                            "commutation_count": {
+                                "name": "commutation_count",
                                 "address_offset": 2,
+                                "type": "unsigned",
+                                "bank_size": 1,
+                                "description": "Absolute commutation count",
+                                "width": 16,
+                                "starting_bit": 0,
+                                "sub_registers": {},
+                                "rw": "r"
+                            },
+                            "timestamp_slow": {
+                                "name": "timestamp_slow",
+                                "address_offset": 3,
                                 "type": "unsigned",
                                 "bank_size": 1,
                                 "description": "",
@@ -608,19 +619,8 @@
                                 "sub_registers": {},
                                 "rw": "r"
                             },
-                            "unknown2": {
-                                "name": "unknown2",
-                                "address_offset": 3,
-                                "type": "unsigned",
-                                "bank_size": 1,
-                                "description": "",
-                                "width": 16,
-                                "starting_bit": 0,
-                                "sub_registers": {},
-                                "rw": "r"
-                            },
-                            "unknown3": {
-                                "name": "unknown3",
+                            "timestamp_fast": {
+                                "name": "timestamp_fast",
                                 "address_offset": 4,
                                 "type": "unsigned",
                                 "bank_size": 1,
@@ -655,7 +655,7 @@
                                         "address_offset": 5,
                                         "type": "bool",
                                         "bank_size": 1,
-                                        "description": "Unindexed",
+                                        "description": "Unindexed (currently unsupported)",
                                         "width": 1,
                                         "starting_bit": 1,
                                         "sub_registers": {},

@@ -24,6 +24,8 @@ class convert_io_types: public base_node {
 
             bool invert = false;
 
+            bool scale_mode = true; // if true, scale input to output range, if false, just copy input value to output
+
             void* out_value_ptr = nullptr;
 
         };
@@ -89,26 +91,35 @@ class convert_io_types: public base_node {
                         break;
                 }
 
-                // clamp to input range
-                if(in_value < c.input_min){
-                    in_value = c.input_min;
-                }
-                if(in_value > c.input_max){
-                    in_value = c.input_max;
-                }
+                double out_value;
 
-                // scale to output range
-                double out_value = (in_value - c.input_min) / (c.input_max - c.input_min) * (c.output_max - c.output_min) + c.output_min;
-                if(c.invert){
-                    out_value = c.output_max - out_value;
+                // if scale_mode is false, just copy the input value to the output
+                if(!c.scale_mode){
+                    out_value = in_value;  // no scaling, just copy
                 }
+                else{
 
-                // clamp to output range (just in case)
-                if(out_value < c.output_min){
-                    out_value = c.output_min;
-                }
-                if(out_value > c.output_max){
-                    out_value = c.output_max;
+                    // clamp to input range
+                    if(in_value < c.input_min){
+                        in_value = c.input_min;
+                    }
+                    if(in_value > c.input_max){
+                        in_value = c.input_max;
+                    }
+
+                    // scale to output range
+                    out_value = (in_value - c.input_min) / (c.input_max - c.input_min) * (c.output_max - c.output_min) + c.output_min;
+                    if(c.invert){
+                        out_value = c.output_max - out_value + c.output_min; // invert the output value
+                    }
+
+                    // clamp to output range (just in case)
+                    if(out_value < c.output_min){
+                        out_value = c.output_min;
+                    }
+                    if(out_value > c.output_max){
+                        out_value = c.output_max;
+                    }
                 }
 
                 // set output value
@@ -164,6 +175,10 @@ class convert_io_types: public base_node {
                         "output_min": 0.0,
                         "output_max": 1.0,
                         "invert": false,
+                        "mode": "scale" // "scale" or "direct", 
+                                        // "scale" will scale the input to the output range,
+                                        // "direct" will just copy the input value to the output
+                                        // input/output min/max will be ignored in "direct" mode
                     }
                 ],
 
@@ -173,11 +188,50 @@ class convert_io_types: public base_node {
             for (auto& o : (*json)["config"]) {
                 converter c;
                 c.name = o["name"];
-                c.input_min = o["input_min"];
-                c.input_max = o["input_max"];
-                c.output_min = o["output_min"];
-                c.output_max = o["output_max"];
-                c.invert = o["invert"];
+
+                bool min_max_defined = true;
+                if(o.find("input_min") == o.end() || 
+                   o.find("input_max") == o.end() || 
+                   o.find("output_min") == o.end() || 
+                   o.find("output_max") == o.end()){
+                    min_max_defined = false;
+                }
+                else{
+                    c.input_min = o["input_min"];
+                    c.input_max = o["input_max"];
+                    c.output_min = o["output_min"];
+                    c.output_max = o["output_max"];
+
+                    if(c.input_max <= c.input_min){
+                    std::cerr << "Error: input_max must be greater than input_min" << std::endl;
+                    return 1;
+                    }
+                    if(c.output_max <= c.output_min){
+                        std::cerr << "Error: output_max must be greater than output_min" << std::endl;
+                        return 1;
+                    }
+                }
+
+                std::string mode = o["mode"];
+                if(mode != "scale" && mode != "direct"){
+                    std::cerr << "Error: invalid mode specified, must be 'scale' or 'direct'" << std::endl;
+                    return 1;
+                }
+                if(mode == "direct"){
+                    c.scale_mode = false;
+                    if(min_max_defined){
+                        std::cerr << "Warning: input/output min/max will be ignored in 'direct' mode" << std::endl;
+                    }
+                }
+                else{
+                    c.scale_mode = true;
+                    if(!min_max_defined){
+                        std::cerr << "Error: input/output min/max must be defined in 'scale' mode" << std::endl;
+                        return 1;
+                    }
+                    c.invert = o["invert"];
+                }
+
 
                 io_type input_type = get_io_type(o["input_type"].get<std::string>());
                 io_type output_type = get_io_type(o["output_type"].get<std::string>());
@@ -190,16 +244,6 @@ class convert_io_types: public base_node {
                 }
                 if(outputs.find(c.name) != outputs.end()){
                     std::cerr << "Error: output name already exists" << std::endl;
-                    return 1;
-                }
-
-
-                if(c.input_max <= c.input_min){
-                    std::cerr << "Error: input_max must be greater than input_min" << std::endl;
-                    return 1;
-                }
-                if(c.output_max <= c.output_min){
-                    std::cerr << "Error: output_max must be greater than output_min" << std::endl;
                     return 1;
                 }
 

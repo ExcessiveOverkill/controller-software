@@ -1,5 +1,4 @@
 #include "fpga_module_driver_factory.h"
-//#include "register_helper.h"
 
 
 #pragma once
@@ -32,7 +31,8 @@ private:
     struct i2c_transfer{
         uint8_t device_address = 0;
         uint8_t reg_address = 0;
-        uint32_t* data = nullptr;
+        const uint16_t* out_data = nullptr;
+        uint16_t* in_data = nullptr;
         uint8_t data_length = 0;
         bool read = false;
     };

@@ -100,5 +100,11 @@
 			"ranges": "cpp",
 			"semaphore": "cpp"
 		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.cmake-tools",
+			"ms-vscode.cpptools-extension-pack"
+		]
 	}
 }
