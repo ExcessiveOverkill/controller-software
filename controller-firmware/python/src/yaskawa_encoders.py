@@ -184,38 +184,43 @@ class Yaskawa_Encoders(Component):
         encoder_address_lsb = int(math.log2(self.rm.encoder.alignment)) # TODO: add otion to get these directly from the register map
         encoder_address_msb = int(math.log2(self.rm.encoder.count)) + encoder_address_lsb + 1
 
-        for index, e in enumerate(self.encoders):
+        selected_encoder = Signal(range(self.number_of_encoders))
+        m.d.comb += selected_encoder.eq(self.bram_address[encoder_address_lsb:encoder_address_msb])
 
-            if index == 0:
-                m.d.sync_100 += self.debug[3].eq(e.done)
-                m.d.sync_100 += self.debug[4].eq(e.crc_valid)
-                m.d.sync_100 += self.debug[5].eq(e.no_response)
-                m.d.sync_100 += self.debug[6].eq(e.battery_fail)
-            
-            with m.If(self.bram_address[encoder_address_lsb:encoder_address_msb] == index<<encoder_address_lsb):  # selected the encoder
-                with m.Switch(self.bram_address[0:encoder_address_lsb]):
-                    with m.Case(self.rm.encoder.multiturn_count.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.multi_turn)
-                    with m.Case(self.rm.encoder.singleturn_count.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.single_turn<<16)
-                    with m.Case(self.rm.encoder.commutation_count.address_offset):     # no actual commutation count, so just use single turn
-                        m.d.sync_100 += self.bram_read_data.eq(e.single_turn)
-                        if i == 0:
-                            m.d.sync_100 += self.debug[2].eq(1)
-                    with m.Case(self.rm.encoder.timestamp_slow.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.timestamp_slow)
-                    with m.Case(self.rm.encoder.timestamp_fast.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.timestamp_fast)
-                    with m.Case(self.rm.encoder.status.address_offset):
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.battery_fail.starting_bit].eq(e.battery_fail)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.no_response.starting_bit].eq(e.no_response)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.crc_fail.starting_bit].eq(~e.crc_valid)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.done.starting_bit].eq(e.done)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
-                    with m.Default():
-                        m.d.sync_100 += self.bram_read_data.eq(0)
-                        if i == 0:
-                            m.d.sync_100 += self.debug[2].eq(0)
+        with m.Switch(selected_encoder):
+
+            for index, e in enumerate(self.encoders):
+
+                if index == 0:
+                    m.d.sync_100 += self.debug[3].eq(e.done)
+                    m.d.sync_100 += self.debug[4].eq(e.crc_valid)
+                    m.d.sync_100 += self.debug[5].eq(e.no_response)
+                    m.d.sync_100 += self.debug[6].eq(e.battery_fail)
+                
+                with m.Case(index):  # selected the encoder
+                    with m.Switch(self.bram_address[0:encoder_address_lsb]):
+                        with m.Case(self.rm.encoder.multiturn_count.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.multi_turn)
+                        with m.Case(self.rm.encoder.singleturn_count.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.single_turn<<16)
+                        with m.Case(self.rm.encoder.commutation_count.address_offset):     # no actual commutation count, so just use single turn
+                            m.d.sync_100 += self.bram_read_data.eq(e.single_turn)
+                            if i == 0:
+                                m.d.sync_100 += self.debug[2].eq(1)
+                        with m.Case(self.rm.encoder.timestamp_slow.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.timestamp_slow)
+                        with m.Case(self.rm.encoder.timestamp_fast.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.timestamp_fast)
+                        with m.Case(self.rm.encoder.status.address_offset):
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.battery_fail.starting_bit].eq(e.battery_fail)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.no_response.starting_bit].eq(e.no_response)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.crc_fail.starting_bit].eq(~e.crc_valid)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.done.starting_bit].eq(e.done)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
+                        with m.Default():
+                            m.d.sync_100 += self.bram_read_data.eq(0)
+                            if i == 0:
+                                m.d.sync_100 += self.debug[2].eq(0)
                     
                 
         return m
@@ -529,7 +534,8 @@ async def bench(ctx):
 
             for i in range(2):
                 level = (int(d) or clk) and not (int(d) and clk)
-                ctx.set(dut.rx, level)
+                for j in range(6):
+                    ctx.set(dut.rx[j], level)
                 if clk:
                     clk = 0
                 else:
@@ -538,10 +544,21 @@ async def bench(ctx):
 
         await ctx.tick("sync_100").repeat(4000*2)
 
-        # read the data
-        ctx.set(dut.bram_address, 2)
-        await ctx.tick("sync_100").repeat(10)
-        print("Single turn: ", ctx.get(dut.bram_read_data))
+        # force the encoders to have some different values
+        for index, e in enumerate(dut.encoders):
+            ctx.set(e.multi_turn, index)
+            ctx.set(e.single_turn, index * 100)
+
+
+        for c in range(6):
+            # read the data
+            ctx.set(dut.bram_address, dut.rm.encoder.multiturn_count.address_offset + c*8)  # multiturn for each encoder
+            await ctx.tick("sync_100").repeat(2)
+            print(f"Multi turn {c}: ", ctx.get(dut.bram_read_data))
+
+            ctx.set(dut.bram_address, dut.rm.encoder.singleturn_count.address_offset + c*8)  # singleturn for each encoder
+            await ctx.tick("sync_100").repeat(2)
+            print(f"Single turn {c}: ", ctx.get(dut.bram_read_data)>>16)    # right shift to get the actual 16 bit value
 
 
         result = ctx.get(dut.encoders[0].raw_data)
