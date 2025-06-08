@@ -305,10 +305,59 @@ uint32_t Node_Core::load(std::string file){
             std::cerr << "Error: failed to configure network" << std::endl;
             return 1;
         }
+    }
 
+    // rebuild execution order for all networks
+    if(rebuild_overall_execution_order() != 0){
+        std::cerr << "Error: failed to rebuild overall execution order" << std::endl;
+        return 1;
     }
 
     
+    return 0;
+}
+
+uint32_t Node_Core::rebuild_overall_execution_order(){
+    // rebuilds the execution order for the networks themselves
+
+    uint32_t network_count = networks.size();
+
+    network_execution_order.clear();
+
+    uint32_t highest_execution_order = 0;
+
+    for(auto& net : networks){
+        auto n = net.second;
+        highest_execution_order = std::max(highest_execution_order, n->get_execution_order());
+    }
+
+    if(network_count < highest_execution_order){
+        std::cerr << "Error: network count is less than highest execution order, this should never happen" << std::endl;
+        return 1;
+    }
+
+    // TODO: handle cases where someone set the execution order to a way higher value than needed
+    // (don't just reserve a massive vector)
+
+    network_execution_order.reserve(highest_execution_order);
+
+    // fill the vector with nullptrs
+    for(uint32_t i = 0; i < highest_execution_order+1; i++){
+        network_execution_order.push_back(nullptr);
+    }
+
+    // now fill the vector with the networks in the correct order
+    for(auto& net : networks){
+        auto n = net.second;
+        uint32_t order = n->get_execution_order();
+
+        if(network_execution_order[order] != nullptr){
+            std::cerr << "Error: network execution order already taken" << std::endl;
+            return 2;
+        }
+        network_execution_order[order] = n;
+    }
+
     return 0;
 }
 
@@ -521,8 +570,8 @@ uint32_t Node_Core::create_network(std::string name){
 
     networks[name] = std::make_shared<node_network>(&global_variables);
 
-    network_execution_order.push_back(networks[name]);
-    networks[name]->set_execution_order(network_execution_order.size()-1);
+    networks[name]->set_execution_order(0);
+    // need to rebuild the overall execution order after creating a new network for it to actually run
 
     std::cout << "Created network: " << name << std::endl;
 
@@ -558,7 +607,7 @@ uint32_t Node_Core::delete_network(std::string name){
         return 1;
     }
 
-    network_execution_order[networks[name]->get_execution_order()] = nullptr;
+    network_execution_order[networks[name]->get_execution_order()] = nullptr;   // note this leaves an empty spot in the vector (ok)
     networks.erase(name);
 
     std::cout << "Deleted network: " << name << std::endl;
@@ -665,33 +714,17 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         }
         else{
             uint32_t exec_num = data->at("execution_order").get<uint32_t>();
+            networks[name]->set_execution_order(exec_num);
 
-            // TODO: implement this properly
-
-            if(exec_num >= network_execution_order.size()){
-                std::cerr << "Error: execution_order is out of range" << std::endl;
-            }
-
-            else{
-                // update execution order vector
-                if(network_execution_order[exec_num] == nullptr){  // execution number is available
-                    network_execution_order[exec_num] = networks[name];
-                    // update selected network
-                    networks[name]->set_execution_order(exec_num);
-                }
-                else{   // number is taken
-                    std::cerr << "Error: execution order number is already taken" << std::endl;
-                }
-            }
+            // just configure the network, the actual network_execution_order vector will be updated after all networks are configured
         }
         //data->erase("execution_order");
     }
-
-
-    // if (!data->empty()) {
-    //     std::cerr << "Error: unknown configuration parameters in JSON data" << std::endl;
-    //     return 3;
-    // }
+    else{
+        // execution oder must be set
+        std::cerr << "Error: execution_order is required in network" << std::endl;
+        return 3;
+    }
 
     return 0;
 }

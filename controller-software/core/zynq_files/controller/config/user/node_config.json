@@ -22,6 +22,7 @@
             "type":"sync",
             "timeout_usec":10000,
             "update_cycle_trigger_count": 1,
+            "execution_order": 0,
 
             "nodes":{
                 "float_cmds":{
@@ -67,10 +68,10 @@
                             "name": "pos",
                             "input_type": "int32",
                             "output_type": "double",
-                            "input_min": -20480,
-                            "input_max": 20480,
-                            "output_min": -10.0,
-                            "output_max": 10.0,
+                            "input_min": -2048,
+                            "input_max": 2048,
+                            "output_min": -30.0,
+                            "output_max": 30.0,
                             "invert": false,
                             "mode": "scale"
                             }
@@ -86,12 +87,19 @@
                             "name": "torque",
                             "input_type": "float",
                             "output_type": "int32",
-                            "input_min": -0.89,
-                            "input_max": 0.89,
-                            "output_min": -890,
-                            "output_max": 890,
+                            "input_min": -4.0,
+                            "input_max": 4.0,
+                            "output_min": -4000,
+                            "output_max": 4000,
                             "invert": true,
                             "mode": "scale"
+                            },
+                            {
+                            "name": "torque2",
+                            "input_type": "float",
+                            "output_type": "double",
+                            "invert": true,
+                            "mode": "direct"
                             }
                         ]
                     }
@@ -215,7 +223,7 @@
                             "timeout_tries": 20
                         },
                         "device":{
-                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json"
                         }
                         
                     }
@@ -230,7 +238,7 @@
                             "timeout_tries": 20
                         },
                         "device":{
-                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json"
                         }
                         
                     }
@@ -245,7 +253,7 @@
                             "timeout_tries": 20
                         },
                         "device":{
-                            "device_descriptor": "controller/config/em_devices/device_0_0.json"
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json"
                         }
                         
                     }
@@ -276,27 +284,27 @@
                             "set":[
                             {
                                 "name": "current_limit_q",
-                                "value": 860
+                                "value": 6000
                             },
                             {
                                 "name": "current_limit_d",
-                                "value": 100
+                                "value": 300
                             },
                             {
                                 "name": "commutation_offset",
-                                "value": 595
+                                "value": 486
                             },
                             {
                                 "name": "commutation_scale",
-                                "value": 3
+                                "value": 5
                             },
                             {
                                 "name": "calibration_current",
-                                "value": 500
+                                "value": 4000
                             },
                             {
                                 "name": "phase_resistance",
-                                "value": 11.0
+                                "value": 1.67
                             },
                             {
                                 "name": "current_loop_p_gain",
@@ -372,7 +380,7 @@
                                 },
                                 {
                                     "name": "precharge_done",
-                                    "value": 0
+                                    "value": 1
                                 }
                             ]
                         }
@@ -417,7 +425,7 @@
                             "drive_8": "node_vars.drivers.node_6_em_serial_controller_B.device_3",
                             "estop_board_0": "node_vars.drivers.node_7_em_serial_controller_C.device_0",
                             "mouse_0": "node_vars.drivers.node_8_em_serial_controller_D.device_0",
-                            "encoder_8_total_turns": "total_turns"
+                            "encoder_0_total_turns": "yaskawa_encoders:0.total_turns"
                         }
                     }
                 },
@@ -470,11 +478,11 @@
                     "config":{
                         "config":
                             {
-                                "Kp": 0.05,
+                                "Kp": 0.5,
                                 "Ki": 0.005,
-                                "i_limit": 0.8,
-                                "output_min": -0.8,
-                                "output_max": 0.8
+                                "i_limit": 4.0,
+                                "output_min": -4.0,
+                                "output_max": 4.0
                             }
                     }
                 },
@@ -484,14 +492,23 @@
                     "config":{
                         "config":
                             {
-                                "Kp": 5.0,
+                                "Kp": 15.0,
                                 "Ki": 0.0,
                                 "i_limit": 0.0,
-                                "output_min": -1.0,
-                                "output_max": 1.0
+                                "output_min": -8.0,
+                                "output_max": 8.0
                             }
                     }
+                },
+
+                "cmd_torque_0":{
+                    "type":"double_print_cout",
+                    "config":{
+                        "name": "Commanded Torque 0",
+                        "update_rate_cycles": 1000
+                    }
                 }
+
             },
 
             "connections":{
@@ -593,13 +610,13 @@
                 },
                 "17":{
                     "src_node":"serial_devices",
-                    "src_port":"encoder_8_total_turns",
+                    "src_port":"encoder_0_total_turns",
                     "dst_node":"vel_estimate",
                     "dst_port":"position"
                 },
                 "18":{
                     "src_node":"serial_devices",
-                    "src_port":"encoder_8_total_turns",
+                    "src_port":"encoder_0_total_turns",
                     "dst_node":"pos_error",
                     "dst_port":"A"
                 },
@@ -626,8 +643,69 @@
                     "src_port":"pos_error",
                     "dst_node":"pos_loop",
                     "dst_port":"error"
+                },
+                "23":{
+                    "src_node":"vel_loop",
+                    "src_port":"output",
+                    "dst_node":"torque_to_ma",
+                    "dst_port":"torque2"
+                },
+                "24":{
+                    "src_node":"torque_to_ma",
+                    "src_port":"torque2",
+                    "dst_node":"cmd_torque_0",
+                    "dst_port":"input"
                 }
             }
+        },
+        "print_network":{
+            "enable":true,
+            "type":"sync",
+            "timeout_msec":10000,
+            "update_cycle_trigger_count": 500,
+            "execution_order": 1,
+
+            "nodes":{
+                "encoder_0_turns":{
+                    "type":"double_print_cout",
+                    "config":{
+                        "name": "Encoder 0 Total Turns"
+                    }
+                },
+
+                "encoder_5_turns":{
+                    "type":"double_print_cout",
+                    "config":{
+                        "name": "Encoder 5 Total Turns"
+                    }
+                },
+
+                "vars":{
+                    "type":"get_global_variable",
+                    "config":{
+                        "variables":{
+                            "encoder_0_total_turns": "yaskawa_encoders:0.total_turns",
+                            "encoder_5_total_turns": "yaskawa_encoders:5.total_turns"
+                        }
+                    }
+                }
+            },
+
+            "connections":{
+                "0":{
+                    "src_node":"vars",
+                    "src_port":"encoder_0_total_turns",
+                    "dst_node":"encoder_0_turns",
+                    "dst_port":"input"
+                },
+                "1":{
+                    "src_node":"vars",
+                    "src_port":"encoder_5_total_turns",
+                    "dst_node":"encoder_5_turns",
+                    "dst_port":"input"
+                }
+            }
+
         }
     }
 }
