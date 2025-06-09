@@ -2,10 +2,6 @@
 
 #pragma once
 
-/*
-PI controller
-*/
-
 class pi_controller: public base_node {
     private:
 
@@ -63,10 +59,10 @@ class pi_controller: public base_node {
 
         pi_controller(){
 
-            inputs.emplace("error", input(io_type::FLOAT, nullptr));
+            inputs.emplace("input", input(io_type::FLOAT, nullptr));
             outputs.emplace("output", output(io_type::FLOAT, &(ctrl.output), &execution_number));
 
-            error = &inputs["error"];
+            error = &inputs["input"];
         }
 
         uint32_t run() override {
@@ -93,7 +89,6 @@ class pi_controller: public base_node {
                     "output_min": -100.0,
                     "output_max": 100.0
                 }
-
             }
             
             */

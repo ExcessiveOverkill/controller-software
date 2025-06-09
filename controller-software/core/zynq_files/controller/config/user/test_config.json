@@ -2,7 +2,7 @@
     "info": {
         "date": "2025-06-07",
         "time": "19:40:42.875177470",
-        "fpga_config": "",
+        "fpga_config": "controller/config/fpga_configs/test",
         "write_protected": false
     },
     "set_node_vars": [],

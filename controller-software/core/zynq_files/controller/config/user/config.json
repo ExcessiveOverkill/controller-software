@@ -2,7 +2,7 @@
     "fpga_config_path": "controller/config/fpga_configs/test",
     "fpga_instructions_file": "controller/config/user/test_instructions.json",
     "fpga_driver_config_file": "controller/config/user/fpga_driver_config.json",
-    "node_config_file": "controller/config/user/node_config.json",
+    "node_config_file": "controller/config/user/test_config.json",
     "temp_path": "controller/config/temp",
     "software_update_frequency_hz": 1000
 }

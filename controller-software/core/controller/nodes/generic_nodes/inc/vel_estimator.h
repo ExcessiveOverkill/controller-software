@@ -6,7 +6,6 @@ class vel_estimator: public base_node {
     private:
 
         float output_val = 0.0f; // Current velocity estimate
-        float max_vel = 0.0f; // Optional maximum velocity for clamping (0.0 = no clamp)
 
         input* position = nullptr; // Input for position (angle) measurements
 
@@ -57,7 +56,7 @@ class vel_estimator: public base_node {
 
             private:
                 float alpha = .2f;
-                float dt = 0.001f; // Time step in seconds)
+                float dt = 0.001f; // Time step in seconds TODO: get this from the containing network
                 double prev_turns = 0.0f;
                 float v_est;
                 bool initialized = false;
@@ -67,9 +66,9 @@ class vel_estimator: public base_node {
 
     public:
         vel_estimator() {
-            inputs.emplace("position", input(io_type::DOUBLE, nullptr));
-            outputs.emplace("velocity", output(io_type::FLOAT, &output_val, &execution_number));
-            position = &inputs["position"];
+            inputs.emplace("input", input(io_type::DOUBLE, nullptr));
+            outputs.emplace("output", output(io_type::FLOAT, &output_val, &execution_number));
+            position = &inputs["input"];
         }
 
         uint32_t configure_settings(json* data) override {
@@ -81,10 +80,7 @@ class vel_estimator: public base_node {
                 "config":
                 {
                     "alpha": 0.2,   // smoothing factor (0.0 = no smoothing, 1.0 = no change)
-                    "max_vel": 0.0, // clamping (0.0 = no clamp)
-                    "dt": 0.001 // time step in seconds (default: 0.001)
                 }
-
             }
             
             */
@@ -99,27 +95,11 @@ class vel_estimator: public base_node {
             if(config.find("alpha") != config.end()){
                 estimator.setAlpha(config["alpha"]);
             }
-            if(config.find("max_vel") != config.end()){
-                max_vel = config["max_vel"];
-            }
-            if(config.find("dt") != config.end()){
-                float dt = config["dt"];
-                if(dt > 0.0f) {
-                    estimator.setDt(dt); // Update time step
-                } else {
-                    std::cerr << "Error: dt must be positive" << std::endl;
-                    return 1;
-                }
-            }
             return 0;
         }
 
         uint32_t run() override {
             float vel = estimator.update(*reinterpret_cast<double*>(position->data_pointer));
-            if(max_vel > 0.0f) {
-                // Clamp velocity if max_vel is set
-                vel = std::clamp(vel, -max_vel, max_vel);
-            }
             output_val = vel;
             return 0;
         }
