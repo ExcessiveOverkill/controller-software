@@ -79,6 +79,8 @@ class Node_Core {
         uint32_t configure_network(std::string name, json* data);
 
         uint32_t rebuild_execution_order(std::string name);
+
+        uint32_t rebuild_overall_execution_order();
         
 };
 

@@ -196,7 +196,7 @@ class global_variable {
 
         ~global_variable(){
             if(is_in_use()){
-                std::cerr << "Error: global variable was still in use when deleted." << std::endl;
+                //std::cerr << "Error: global variable was still in use when deleted." << std::endl;
             }
 
             if(!external_data){

@@ -16,15 +16,6 @@ private:
     Register* trigger = nullptr;
     Register* req_packet = nullptr;
 
-    Register* multiturn_count = nullptr;
-    Register* singleturn_count = nullptr;
-    Register* commutation_count = nullptr;
-    Register* crc_error = nullptr;
-    Register* no_response = nullptr;
-    Register* unindexed = nullptr;
-    Register* battery_fail = nullptr;
-    Register* done = nullptr;
-
     const uint64_t singleturn_res = 1ULL << 32;
     const uint64_t multiturn_res = 1ULL << 16; // only 16 bits for multiturn count
     const uint64_t half_multiturn_count = multiturn_res >> 1;
@@ -44,12 +35,18 @@ private:
         double total_turns = 0.0; // calculated from multiturn and singleturn counts
         bool turn_wrap = false; // flag if multiturn count is ambiguous
 
+        Register* multiturn_count_reg = nullptr;
+        Register* singleturn_count_reg = nullptr;
+        Register* commutation_count_reg = nullptr;
+        Register* crc_error_reg = nullptr;
+        Register* no_response_reg = nullptr;
+        Register* unindexed_reg = nullptr;
+        Register* battery_fail_reg = nullptr;
+        Register* done_reg = nullptr;
+
     };
 
     void convert_turns(encoder_data* data);
-
-    encoder_data data;
-
     std::vector<encoder_data> encoders;
 
 };

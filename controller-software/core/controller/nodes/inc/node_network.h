@@ -3,22 +3,8 @@
 #include <ctime>
 #include <cerrno>
 
-//#include "logic_not.h"
-//#include "bool_constant.h"
-//#include "logic_and.h"
-//#include "bool_print_cout.h"
-//#include "nothing_delay.h"
-
 #ifndef NODE_NETWORK_H
 #define NODE_NETWORK_H
-
-//#include "print_float.h"
-
-// #include "api_cmd_float.h"
-// #include "convert_float_to_bool.h"
-// #include "set_global_variable.h"
-// #include "em_serial_device.h"
-// #include "float_print_cout.h"
 
 #include "node_factory.h"
 #include "base_node.h"
