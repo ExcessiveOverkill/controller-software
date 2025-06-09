@@ -6,7 +6,7 @@ from em_serial_port import EM_Serial_Port
 from registers2 import *
 import numpy as np
 
-
+# TODO: fix issue which previous back packets affecting fututre packets
 class EM_Serial_Controller(Component):
     """
     Specific serial interface for managing communication with our own devices at high speeds
@@ -96,7 +96,7 @@ class EM_Serial_Controller(Component):
         self.rx_not_finished_fault = Signal()
         self.rx_no_response_fault = Signal()
 
-        self.debugPins = Signal(5)
+        self.debugPins = Signal(8)
         self.debugPins_fsm = Signal(5)
         
 
@@ -109,10 +109,12 @@ class EM_Serial_Controller(Component):
         m.d.comb += self.serialPort.rx.eq(self.rx)
         m.d.comb += self.tx.eq(self.serialPort.tx)
 
+        m.d.comb += self.debugPins.eq(self.serialPort.debugPins)
+
         if(self.debug):
             m.submodules.debug_drive_serial_port = self.debugSerialPort
             m.d.comb += self.debugSerialPort.rx.eq(self.serialPort.tx)
-            m.d.comb += self.serialPort.rx.eq(self.debugSerialPort.tx)
+            # m.d.comb += self.serialPort.rx.eq(self.debugSerialPort.tx)
             #m.d.comb += self.serialPort.rx.eq(1)
 
         self.address_ToSerialPort = self.serialPort.bram_address
@@ -374,7 +376,7 @@ class EM_Serial_Controller(Component):
                     # m.d.sync_100 += self.last_enabled_device_index.eq(self.current_enabled_device_index)
                     m.d.sync_100 += self.current_enabled_device_index.eq(self.current_device_index)
 
-                    m.d.comb += self.debugPins[0].eq(1)
+                    # m.d.comb += self.debugPins[0].eq(1)
 
                     # read configuration
                     m.d.sync_100 += [
@@ -766,9 +768,9 @@ async def serialBench(ctx):
     print(regs.devices.alignment)
 
     # enable devices
-    #ctx.set(dut.memory.data[dev0 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 0: enable, cyclic mode, and 4 byte packet size
-    #ctx.set(dut.memory.data[dev1 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 1: enable, cyclic mode, and 4 byte packet size
-    #ctx.set(dut.memory.data[dev2 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 2: enable, cyclic mode, and 4 byte packet size
+    ctx.set(dut.memory.data[dev0 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 0: enable, cyclic mode, and 4 byte packet size
+    ctx.set(dut.memory.data[dev1 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 1: enable, cyclic mode, and 4 byte packet size
+    # ctx.set(dut.memory.data[dev2 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 2: enable, cyclic mode, and 4 byte packet size
 
     # config address and sequential registers
     ctx.set(dut.memory.data[dev0 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
@@ -836,7 +838,7 @@ async def serialBench(ctx):
     ctx.set(dut.bram_write_enable, False)
 
     
-    for i in range(0):
+    for i in range(1):
 
         # start RX on test device
         # trigger rx and set rx/tx packet sizes (RX: 3, TX: 4)
@@ -852,31 +854,38 @@ async def serialBench(ctx):
         ctx.set(dut.debugSerialPort.bram_write_enable, False)
 
 
-        # wait for test device to begin receiving packet
-        x=0
-        while(not ctx.get(dut.debugSerialPort.rxBusy)):
-            x+=1
-            await ctx.tick("sync_100")
-            if(x>1500):
-                print("test device did not start receiving packet within timeout")
-                return
-        print("test device started receiving packet")
+        # # wait for test device to begin receiving packet
+        # x=0
+        # while(not ctx.get(dut.debugSerialPort.rxBusy)):
+        #     x+=1
+        #     await ctx.tick("sync_100")
+        #     if(x>1500):
+        #         print("test device did not start receiving packet within timeout")
+        #         return
+        # print("test device started receiving packet")
 
-        # wait for test device to finish receiving packet
-        x=0
-        while(ctx.get(dut.debugSerialPort.rxBusy)):
-            x+=1
-            await ctx.tick("sync_100")
-            if(x>1500):
-                print("test device did not finish receiving packet within timeout")
-                return
-        print("test device finished receiving packet")
+        # # wait for test device to finish receiving packet
+        # x=0
+        # while(ctx.get(dut.debugSerialPort.rxBusy)):
+        #     x+=1
+        #     await ctx.tick("sync_100")
+        #     if(x>1500):
+        #         print("test device did not finish receiving packet within timeout")
+        #         return
+        # print("test device finished receiving packet")
 
         #assert ctx.get(dut.debugSerialPort.rxCRCvalid)
         if not ctx.get(dut.debugSerialPort.rxCRCvalid):
             print("CRC invalid")
 
-        await ctx.tick("sync_100").repeat(500)  # delay between rx and tx
+        ctx.set(dut.rx, 1)
+
+        await ctx.tick("sync_100").repeat(1800)  # delay between rx and tx
+
+        ctx.set(dut.rx, 0)
+        await ctx.tick("sync_100").repeat(500)
+        ctx.set(dut.rx, 1)
+
 
         # start TX on test device
         # trigger tx and set rx/tx packet sizes (RX: 3, TX: 4)
@@ -892,9 +901,13 @@ async def serialBench(ctx):
         await ctx.tick("sync_100")
         ctx.set(dut.debugSerialPort.bram_write_enable, False)
 
+        for i in range(1500):
+            ctx.set(dut.rx, ctx.get(dut.debugSerialPort.tx))
+            await ctx.tick("sync_100")
+
         await ctx.tick("sync_100").repeat(10)
 
-    await ctx.tick("sync_100").repeat(14000)
+    await ctx.tick("sync_100").repeat(1400)
 
     print(ctx.get(dut.memory.data[dev0 + 1]))
     # print(ctx.get(dut.memory.data[dev1 + 1]))

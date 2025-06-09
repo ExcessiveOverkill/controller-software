@@ -11,7 +11,11 @@ GEAR_MOTOR_COUNT_PER_REV = 57.0/13.0 * 1000.0 * 4.0
 PORT            = 'COM11'
 BAUDRATE        = 115200
 COUNTS_PER_REV  = [GEAR_MOTOR_COUNT_PER_REV * 14, GEAR_MOTOR_COUNT_PER_REV * 11.56, GEAR_MOTOR_COUNT_PER_REV * 11.56, 2048, -2048, 2048]
-HOME_POSITIONS   = [0, 0, 0, 0, 0, 0] # home positions for each joint in radians
+HOME_POSITIONS_CNTS   = [53000, -42000, -56300, -49, 455, -1024] # home positions for each joint in counts
+
+
+
+HOME_POSITIONS = np.array(HOME_POSITIONS_CNTS) / np.array(COUNTS_PER_REV) * 2 * np.pi
 
 DH_PARAMS = [                    # (alpha, a,    d,     theta_offset)
     (    0,   0.0,  0.3,       0),
@@ -96,7 +100,11 @@ def update(frame):
         return (line, *text_annotations)
 
     counts = np.array(pkt)
-    print(counts, btn)
+    # print(counts, btn)
+
+    # apply home offsets
+    counts = counts - HOME_POSITIONS_CNTS
+
     # convert counts → radians
     angles = (counts / np.array(COUNTS_PER_REV)) * 2*np.pi
 

@@ -943,7 +943,7 @@ class Controller(wiring.Component):
             m.d.comb += card_C.rs485_tx[encoder_index].eq(yaskawa_encoders.tx[encoder_index])
             m.d.comb += card_C.rs485_tx_enable[encoder_index].eq(yaskawa_encoders.tx_enable[encoder_index])
 
-        #m.d.comb += self.debug_pins.eq(yaskawa_encoders.debug)
+        # m.d.comb += self.debug_pins.eq(yaskawa_encoders.debug)
 
         # m.d.comb += [
         #     self.debug_pins[0].eq(yaskawa_encoders.tx[0]),
@@ -987,6 +987,10 @@ class Controller(wiring.Component):
             self.debug_pins[5].eq(serial_controller_C.rx),
             self.debug_pins[6].eq(serial_controller_D.tx),
             self.debug_pins[7].eq(serial_controller_D.rx),
+
+            # self.debug_pins[0:6].eq(serial_controller_B.debugPins[0:5]),
+            # self.debug_pins[6].eq(serial_controller_B.tx),
+            # self.debug_pins[7].eq(serial_controller_B.rx),
         ]
 
         #m.d.comb += self.debug_pins[0:6].eq(self.shift_dma.timer_count)
@@ -1057,12 +1061,21 @@ def create_instruction(source_node, destination_node, source_address, destinatio
 
 sim = 0
 
+s = [
+    {"mode": "17bit"},
+    {"mode": "17bit"},
+    {"mode": "17bit"},
+    {"mode": "16bit"},
+    {"mode": "16bit"},
+    {"mode": "16bit"}
+]
+
 print(f"{bcolors.OKGREEN}=== GENERATING MODULES ==={bcolors.ENDC}")
 nodes = {
     "serial_card_B" : serial_interface_card(),
     "serial_card_C" : serial_interface_card(),
     "fanuc_encoders" : Fanuc_Encoders(2),
-    "yaskawa_encoders" : Yaskawa_Encoders(6),
+    "yaskawa_encoders" : Yaskawa_Encoders(6, s),
     #"global_timers" : Global_Timers(),
     "em_serial_controller_A" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=5),
     "em_serial_controller_B" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=4),
@@ -1198,7 +1211,10 @@ if __name__ == "__main__":
         # TODO: automatically run vivado from here to generate the bitstream file
         print(f"\n\n{bcolors.OKGREEN}=== GENERATING VERILOG FILE ==={bcolors.ENDC}")
         from amaranth.back import verilog
-        with open("controller-firmware/Vivado/autogen_sources/controller.v", "w") as f:
+        import os
+        output_dir = "controller-firmware/Vivado/autogen_sources"
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, "controller.v"), "w") as f:
             f.write(verilog.convert(top, name="Controller"))
 
 

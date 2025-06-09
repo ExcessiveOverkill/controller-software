@@ -15,11 +15,13 @@ class Yaskawa_Encoders(Component):
     # Connected using rs485
     # manchester encoded with bit stuffing
 
-    def __init__(self, number_of_encoders: int):
+    def __init__(self, number_of_encoders: int, encoder_settings: list):
 
         assert number_of_encoders > 0 and number_of_encoders <= 32
 
         self.number_of_encoders = number_of_encoders
+
+        self.encoder_settings = encoder_settings
 
         super().__init__({
             "tx" : Out(self.number_of_encoders),
@@ -72,22 +74,43 @@ class Yaskawa_Encoders(Component):
         
         m.submodules.request_packet = request_packet = Request_Packet()
 
+        m.submodules.spi_send_debug = spi_debug = spi_send(data_width=112, data_count=self.number_of_encoders)
+
+        m.d.sync_100 += [
+            self.debug[0].eq(spi_debug.data_enable),
+            self.debug[1].eq(spi_debug.clk),
+            self.debug[2:8].eq(spi_debug.data),
+        ]
 
         trigger = Signal()
         rx_start = Signal()
 
         new_data = Signal(self.number_of_encoders)
-        last_new_data = Signal(self.number_of_encoders)
-        m.d.sync_100 += last_new_data.eq(new_data)
+
+        last_dones = Signal(self.number_of_encoders)
 
 
         for i in range(self.number_of_encoders):
-            receiver = Receive_Packet()
+            receiver = Receive_Packet(self.encoder_settings[i])
             m.submodules[f"receiver_{i}"] = receiver
             self.encoders.append(receiver)
 
             m.d.comb += receiver.rx.eq(self.synced_rx[i])
             m.d.comb += receiver.start.eq(rx_start)
+
+            with m.If(receiver.done & (~last_dones[i])):
+                m.d.sync_100 += new_data[i].eq(1)
+
+            m.d.sync_100 += last_dones[i].eq(receiver.done)
+
+            m.d.sync_100 += spi_debug.__getattribute__(f"raw_data_{i}").eq(receiver.raw_data)
+
+
+        with m.If(new_data.all()):
+            m.d.sync_100 += spi_debug.start.eq(1)
+            m.d.sync_100 += new_data.eq(0)
+        with m.Else():
+            m.d.sync_100 += spi_debug.start.eq(0)
 
             
 
@@ -95,14 +118,14 @@ class Yaskawa_Encoders(Component):
             with m.State("idle"):
                 m.d.sync_100 += rx_start.eq(0)
 
-                for index, i in enumerate(self.encoders):
-                    with m.If(i.done):
-                        m.d.sync_100 += new_data[index].eq(1)
+                # for index, i in enumerate(self.encoders):
+                #     with m.If(i.done):
+                #         m.d.sync_100 += new_data[index].eq(1)
 
 
                 with m.If(trigger):
                     m.d.sync_100 += request_packet.trigger.eq(1)
-                    m.d.sync_100 += new_data.eq(0)
+                    # m.d.sync_100 += new_data.eq(0)
                     m.next = "send_start"
 
             with m.State("send_start"):
@@ -118,52 +141,6 @@ class Yaskawa_Encoders(Component):
             with m.State("receive"):
                 m.d.sync_100 += rx_start.eq(0)
                 m.next = "idle"
-
-
-        
-
-        #m.d.sync_100 += self.debug[0].eq(self.tx_enable[0])
-        m.d.sync_100 += self.debug[0].eq(self.tx[0])
-        m.d.sync_100 += self.debug[1].eq(self.synced_rx[0])
-        #m.d.sync_100 += self.debug[3].eq(request_packet.trigger)
-        #m.d.sync_100 += self.debug[4].eq(self.encoders[0].start)
-        #m.d.sync_100 += self.debug[5].eq(self.encoders[0].done)
-
-
-
-        # debug_timer = Signal(range(25))
-        # debug_cnt = Signal(range(112))
-        
-        # debug_data = Signal()
-        # debug_clk = Signal(reset=1)
-        # debug_data_enable = Signal()
-
-        # m.d.sync_100 += self.debug[5].eq(debug_data_enable)
-        # m.d.sync_100 += self.debug[6].eq(debug_data)
-        # m.d.sync_100 += self.debug[7].eq(debug_clk)
-
-
-        # with m.If((~last_new_data[0]) & new_data[0]):
-        #     m.d.sync_100 += debug_cnt.eq(0)
-        #     m.d.sync_100 += debug_timer.eq(0)
-        #     m.d.sync_100 += debug_clk.eq(1)
-
-        # with m.If((debug_timer == 12) | (debug_timer == 25)):
-        #     m.d.sync_100 += debug_clk.eq(~debug_clk)
-        
-        # with m.If(new_data[0] & (debug_cnt != 113)):
-        #     with m.If(debug_timer == 25):
-        #         m.d.sync_100 += debug_data.eq(self.encoders[0].raw_data.bit_select(debug_cnt, 1))
-        #         m.d.sync_100 += debug_cnt.eq(debug_cnt + 1)
-        #         m.d.sync_100 += debug_timer.eq(0)
-        #         m.d.sync_100 += debug_data_enable.eq(1)
-            
-        #     with m.Else():
-        #         m.d.sync_100 += debug_timer.eq(debug_timer + 1)
-
-        # with m.Else():
-        #     m.d.sync_100 += debug_data.eq(0)
-        #     m.d.sync_100 += debug_data_enable.eq(0)
 
 
         m.d.comb += self.tx.eq(request_packet.tx.replicate(self.number_of_encoders))
@@ -190,23 +167,15 @@ class Yaskawa_Encoders(Component):
         with m.Switch(selected_encoder):
 
             for index, e in enumerate(self.encoders):
-
-                if index == 0:
-                    m.d.sync_100 += self.debug[3].eq(e.done)
-                    m.d.sync_100 += self.debug[4].eq(e.crc_valid)
-                    m.d.sync_100 += self.debug[5].eq(e.no_response)
-                    m.d.sync_100 += self.debug[6].eq(e.battery_fail)
                 
                 with m.Case(index):  # selected the encoder
                     with m.Switch(self.bram_address[0:encoder_address_lsb]):
                         with m.Case(self.rm.encoder.multiturn_count.address_offset):
                             m.d.sync_100 += self.bram_read_data.eq(e.multi_turn)
                         with m.Case(self.rm.encoder.singleturn_count.address_offset):
-                            m.d.sync_100 += self.bram_read_data.eq(e.single_turn<<16)
-                        with m.Case(self.rm.encoder.commutation_count.address_offset):     # no actual commutation count, so just use single turn
                             m.d.sync_100 += self.bram_read_data.eq(e.single_turn)
-                            if i == 0:
-                                m.d.sync_100 += self.debug[2].eq(1)
+                        with m.Case(self.rm.encoder.commutation_count.address_offset):     # no actual commutation count, so just use single turn
+                            m.d.sync_100 += self.bram_read_data.eq(e.single_turn>>16)
                         with m.Case(self.rm.encoder.timestamp_slow.address_offset):
                             m.d.sync_100 += self.bram_read_data.eq(e.timestamp_slow)
                         with m.Case(self.rm.encoder.timestamp_fast.address_offset):
@@ -219,8 +188,6 @@ class Yaskawa_Encoders(Component):
                             m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
                         with m.Default():
                             m.d.sync_100 += self.bram_read_data.eq(0)
-                            if i == 0:
-                                m.d.sync_100 += self.debug[2].eq(0)
                     
                 
         return m
@@ -351,7 +318,8 @@ class Request_Packet(Component):
     
 
 class Receive_Packet(Component):
-    def __init__(self):
+    def __init__(self, settings: dict):
+        self.settings = settings
         super().__init__({
             "rx": In(1),
             "start": In(1),
@@ -359,7 +327,7 @@ class Receive_Packet(Component):
             "no_response": Out(1),
             "raw_data": Out(112),
             "crc_valid": Out(1),
-            "single_turn": Out(16),
+            "single_turn": Out(32), # actual counts left shifted to fill 32 bits
             "multi_turn": Out(16),
             "battery_fail": Out(1),
             "timestamp_slow": Out(8),
@@ -495,20 +463,99 @@ class Receive_Packet(Component):
             m.d.sync_100 += crc_match.eq(0)
             m.d.sync_100 += self.crc_valid.eq(1)
             m.d.sync_100 += [
-                self.single_turn.eq(raw_data[60:76]),
-                self.multi_turn.eq(raw_data[76:92]),
                 self.battery_fail.eq(raw_data[2]),
                 self.timestamp_slow.eq(raw_data[16:24]),
                 self.timestamp_fast.eq(raw_data[24:40]),
                 self.unindexed.eq(raw_data[0])  # pretty sure this is correct, but don't have a way to reset it
             ]
-            m.d.sync_200 += raw_data[96:112].eq(0)
+            if self.settings.get("mode") == "16bit":
+                m.d.sync_100 += self.single_turn.eq(raw_data[60:76]<<16)
+                m.d.sync_100 += self.multi_turn.eq(raw_data[76:92])
+
+            elif self.settings.get("mode") == "17bit":
+                m.d.sync_100 += self.single_turn.eq(raw_data[60:77]<<15)
+                m.d.sync_100 += self.multi_turn.eq(raw_data[77:93])
+
+            else:
+                raise ValueError("Invalid mode in settings, must be '16bit' or '17bit'")
+            
+
+            m.d.sync_200 += raw_data[96:112].eq(0)  # clear the crc so it doesn't get reused
 
         return m
 
+class spi_send(Component):
+    def __init__(self, data_width: int = 112, data_count: int = 6):
+        assert data_width > 0 and data_width > 0
+        self.data_width = data_width
+        self.data_count = data_count
+
+        s = {
+            "start": In(1),
+            "done": Out(1),
+            "clk": Out(1),
+            "data": Out(data_count),
+            "data_enable": Out(1, init=1),  # active low
+        }
+        for i in range(data_count):
+            s[f"raw_data_{i}"] = In(data_width)
+        
+        super().__init__(s)
+
+    def elaborate(self, platform):
+        m = Module()
+
+        
+        bit_count = Signal(range(self.data_width + 1))
+        bit_timer = Signal(8)
+        full_bit_time = 8
+        bit_time_1_4 = full_bit_time // 4
+        bit_time_1_2 = full_bit_time // 2
+        
+        full_data = Array(Signal(self.data_width) for _ in range(self.data_count))
 
 
-dut = Yaskawa_Encoders(6)
+        with m.FSM(init="idle", domain="sync_100") as fsm:
+            with m.State("idle"):
+                with m.If(self.start):
+                    m.d.sync_100 += bit_count.eq(0)
+                    m.d.sync_100 += bit_timer.eq(0)
+                    m.d.sync_100 += self.done.eq(0)
+                    m.d.sync_100 += self.data_enable.eq(0)  # active low
+                    for i in range(self.data_count):    # latch in data
+                        m.d.sync_100 += full_data[i].eq(self.__getattribute__(f"raw_data_{i}"))
+                    m.next = "send"
+
+            with m.State("send"):
+                with m.If(bit_timer == bit_time_1_4):   # set new data
+                    with m.If(bit_count == self.data_width):
+                        m.d.sync_100 += self.done.eq(1)
+                        m.d.sync_100 += self.data_enable.eq(1)  # active low
+                        m.next = "idle"
+                    with m.Else():
+                        for i in range(self.data_count):
+                            m.d.sync_100 += self.data[i].eq(full_data[i].bit_select(bit_count, 1))
+                            m.d.sync_100 += bit_count.eq(bit_count + 1)
+
+                with m.If(bit_timer == bit_time_1_2):   # rising clk
+                    m.d.sync_100 += self.clk.eq(1)
+
+                with m.If(bit_timer == full_bit_time):  # falling clk
+                    m.d.sync_100 += self.clk.eq(0)
+                    m.d.sync_100 += bit_timer.eq(0)     
+                with m.Else():
+                    m.d.sync_100 += bit_timer.eq(bit_timer + 1)
+
+        return m
+s = [
+    {"mode": "17bit"},
+    {"mode": "17bit"},
+    {"mode": "17bit"},
+    {"mode": "16bit"},
+    {"mode": "16bit"},
+    {"mode": "16bit"}
+]
+dut = Yaskawa_Encoders(6, s)
 
 async def bench(ctx):
     ctx.set(dut.rx, 1)

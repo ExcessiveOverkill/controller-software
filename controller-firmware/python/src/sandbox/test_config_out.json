@@ -1,0 +1,76 @@
+{
+    "info": {
+        "date": "2025-06-07",
+        "time": "19:40:42.875177470",
+        "fpga_config": "controller/config/fpga_configs/test",
+        "write_protected": false
+    },
+    "networks": {
+        "serial devices": {
+            "enable": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 0,
+            "connections": {
+                "0": {
+                    "src_node": "get_global_variable_node_vars.drivers.node_7_em_serial_controller_C.device_0",
+                    "src_port": "output",
+                    "dst_node": "estop_board",
+                    "dst_port": "em_device"
+                },
+                "1": {
+                    "src_node": "case_fan_speed",
+                    "src_port": "output",
+                    "dst_node": "estop_board",
+                    "dst_port": ""
+                }
+            },
+            "nodes": {
+                "get_global_variable_node_vars.drivers.node_7_em_serial_controller_C.device_0": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_7_em_serial_controller_C.device_0"
+                        }
+                    }
+                },
+                "estop_board": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": false,
+                        "comm": {
+                            "device_address": 0,
+                            "timeout_tries": 0
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H1_0_F0.json",
+                            "cyclic_write_regs": [],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "fan_cmd_speed",
+                                    "update_rate_cycles": 100
+                                }
+                            ],
+                            "async_read_regs": [
+                                {
+                                    "name": "dms_ok",
+                                    "update_rate_cycles": 100
+                                }
+                            ],
+                            "set": []
+                        }
+                    }
+                },
+                "case_fan_speed": {
+                    "type": "constant",
+                    "config": {
+                        "value": "10000",
+                        "type": "uint16"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -59,6 +59,8 @@ class EM_Serial_Port(Component):
             Register("rx_crc_valid", type="bool", desc="Receive CRC received is valid", start_address=4)
             ]))
         
+        self.debugPins = Signal(8)
+        
         self.rm.generate()
 
     def elaborate(self, platform):
@@ -128,6 +130,12 @@ class EM_Serial_Port(Component):
         self.rxCurrentByte = Signal(2)
         self.rxCurrentWord = Signal(8)
 
+        HIGH_DELAY = int(100e6 * 1e-6)
+        LOW_DELAY = int(100e6 * 3e-6)
+
+        self.delay_cnt = Signal(range(max(HIGH_DELAY, LOW_DELAY) + 1))
+        self.delay_cnt_increment = Signal()
+        self.delay_cnt_reset = Signal()
 
         # handle bram interface
 
@@ -193,6 +201,11 @@ class EM_Serial_Port(Component):
 
         with m.If(self.rxCRC.start == 1):
             m.d.sync_100 += self.rxCRC.start.eq(0)
+
+        with m.If(self.delay_cnt_increment):
+            m.d.sync_100 += self.delay_cnt.eq(self.delay_cnt + 1)
+        with m.If(self.delay_cnt_reset):
+            m.d.sync_100 += self.delay_cnt.eq(0)
 
         with m.FSM(init="idle", domain="sync_100", name="tx_fsm") as fsm:
             with m.State("idle"):
@@ -289,11 +302,13 @@ class EM_Serial_Port(Component):
 
         with m.FSM(init="idle", domain="sync_100", name="rx_fsm") as fsm:
             with m.State("idle"):
+                m.d.comb += self.debugPins.eq(1)  # indicate idle state
                 with m.If(self.rx_start):
                     m.d.sync_100 += self.rx_start.eq(0)
                     m.next = "start"
 
             with m.State("start"):
+                m.d.comb += self.debugPins.eq(2)  # indicate start state
                 m.d.sync_100 += [
                     self.rxDone.eq(0),
                     self.rxCRCvalid.eq(0),
@@ -303,13 +318,46 @@ class EM_Serial_Port(Component):
                     self.updateStatusDataRequest.eq(1),
                     self.rxCRC.start.eq(1),
                 ]
-                m.next = "start_delay"
+                m.next = "wait_rx_high"
+
+            with m.State("wait_rx_high"):
+                m.d.comb += self.debugPins.eq(3)  # indicate waiting for high state
+                with m.If(self.rx_synced == 1):
+                    m.d.comb += self.delay_cnt_increment.eq(1)
+                with m.Else():
+                    m.d.comb += self.delay_cnt_reset.eq(1)
+                
+                with m.If(self.delay_cnt == HIGH_DELAY):
+                    m.d.comb += self.delay_cnt_reset.eq(1)
+                    m.next = "wait_rx_low"
+
+                with m.If(self.rx_start):
+                    m.next = "idle"  # reset if rx start is triggered again
+
+            with m.State("wait_rx_low"):
+                m.d.comb += self.debugPins.eq(4)  # indicate waiting for low state
+                with m.If(self.rx_synced == 0):
+                    m.d.comb += self.delay_cnt_increment.eq(1)
+                with m.Else():
+                    m.d.comb += self.delay_cnt_reset.eq(1)
+
+                with m.If(self.delay_cnt == LOW_DELAY):
+                    m.d.comb += self.delay_cnt_reset.eq(1)
+                    m.next = "start_delay"
+
+                with m.If(self.rx_start):
+                    m.next = "idle"  # reset if rx start is triggered again
             
             with m.State("start_delay"):    # wait for high level on rx line to allow for start bit detection
+                m.d.comb += self.debugPins.eq(5)  # indicate start delay state
                 with m.If(self.rx_synced == 1):
                     m.next = "start_bits_delay"
 
+                with m.If(self.rx_start):
+                    m.next = "idle"  # reset if rx start is triggered again
+
             with m.State("start_bits_delay"):
+                m.d.comb += self.debugPins.eq(6)  # indicate start bits delay state
                 with m.If(self.rx_synced == 0):
                     m.d.sync_100 += self.rxCurrentBit.eq(0)
                     m.d.sync_100 += self.rxTimer.eq(self.bitLength + (self.bitLength // 2) - 1)   # set timer to number of start bits + 1/2 bit
@@ -320,7 +368,11 @@ class EM_Serial_Port(Component):
                 with m.Else():
                     m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
 
+                with m.If(self.rx_start):
+                    m.next = "idle"  # reset if rx start is triggered again
+
             with m.State("receive"):
+                m.d.comb += self.debugPins.eq(7)  # indicate receiving state
                 with m.If(self.rxTimer == 0):
                     m.d.sync_100 += self.rxData.bit_select(self.rxCurrentBit + (self.rxCurrentByte*8), 1).eq(self.rx_synced)    # save rx bit
 
@@ -336,7 +388,11 @@ class EM_Serial_Port(Component):
                 with m.Else():
                     m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
 
+                with m.If(self.rx_start):
+                    m.next = "idle"  # reset if rx start is triggered again
+
             with m.State("stop_bits_delay"):
+                m.d.comb += self.debugPins.eq(8)
                 with m.If(self.rxTimer == 0):
                 
                     with m.If((self.rxCurrentByte == 3) & (self.rxCurrentWord == self.rxPacketSize)):    # packet length + CRC reached
@@ -376,6 +432,9 @@ class EM_Serial_Port(Component):
 
                 with m.Else():
                     m.d.sync_100 += self.rxTimer.eq(self.rxTimer - 1)
+
+                with m.If(self.rx_start):
+                    m.next = "idle"  # reset if rx start is triggered again
 
         return m
 
