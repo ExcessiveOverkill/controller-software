@@ -99,9 +99,7 @@ class logic_gate: public base_node {
             }
 
 
-            auto config = json->find("config");
-
-            std::string gate_type_str = config->at("gate_type").get<std::string>();
+            std::string gate_type_str = json->at("gate_type").get<std::string>();
             type = get_gate_type(gate_type_str);
 
             if(type == gate_type::UNDEFINED){
@@ -109,7 +107,7 @@ class logic_gate: public base_node {
                 return 1;
             }
 
-            input_count = config->at("input_count").get<uint8_t>();
+            input_count = json->at("input_count").get<uint8_t>();
             if(input_count > 32){
                 std::cerr << "Error: input count exceeds maximum of 32 for logic gate node" << std::endl;
                 return 1;

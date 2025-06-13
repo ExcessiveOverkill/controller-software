@@ -72,7 +72,11 @@ class api_input: public base_node {
                 case io_type::FLOAT:
                     *(float*)output_ptr->data_pointer = (float)in_data;
                     break;
+                case io_type::BOOL:
+                    *(bool*)output_ptr->data_pointer = (in_data != 0.0); // convert to bool
+                    break;
                 default:
+                    std::cerr << "Error: invalid output type for api_input node" << std::endl;
                     return 1;   // invalid output type
             }
 
@@ -89,7 +93,7 @@ class api_input: public base_node {
                     "type": "float",
                     "min": -1.0,
                     "max": 1.0,
-                    "default_value": 0.0,
+                    "default": 0.0,
                     "timeout": 0.0
                 },
                 "set": 0.5
@@ -104,10 +108,33 @@ class api_input: public base_node {
                     return 1;
                 }
                 auto c = (*json)["config"];
-                min = c["min"];
-                max = c["max"];
-                default_value = c["default_value"];
-                timeout = c["timeout"];
+                if(c.at("min").is_null()){
+                    min = -INFINITY;
+                }
+                else{
+                    min = c["min"];
+                }
+                if(c.at("max").is_null()){
+                    max = INFINITY;
+                }
+                else{
+                    max = c["max"];
+                }
+                if(c.at("default").is_null()){
+                    default_value = 0.0;
+                }
+                else{
+                    default_value = c["default"];
+                }
+                if(c.at("timeout").is_null()){
+                    timeout = 0.0;
+                }
+                else{
+                    timeout = c["timeout"];
+                }
+                if(timeout < 0.0){
+                    timeout = 0.0; // set to 0 if negative
+                }
                 type = get_io_type(c["type"].get<std::string>());
 
                 if(min > max){
@@ -168,7 +195,21 @@ class api_input: public base_node {
             }
 
             if(json->find("set") != json->end()){    // set mode
-                double value = (*json)["set"];
+                if(!configured){
+                    std::cerr << "Error: api_input node not configured, cannot set value" << std::endl;
+                    return 1;
+                }
+                if(json->at("set").is_null()){
+                    std::cerr << "Error: set value is null" << std::endl;
+                    return 1;
+                }
+                double value;
+                if(type == io_type::BOOL){
+                    value = json->at("set").get<bool>() ? 1.0 : 0.0; // convert bool to double
+                }
+                else{
+                    value = json->at("set").get<double>();
+                }
                 value = std::max(min, std::min(max, value)); // clamp value to min/max
                 in_data = value;
                 last_set_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now().time_since_epoch()).count();

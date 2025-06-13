@@ -258,13 +258,18 @@ uint32_t Node_Core::load(std::string file){
 
     }
 
-    // create and configure networks
+    // create networks
     for(auto& network : j["networks"].items()){
         std::string network_name = network.key();
         if(create_network(network_name)){
             std::cerr << "Error: failed to create network" << std::endl;
             return 1;
         }
+    }
+
+    // configure networks
+    for(auto& network : j["networks"].items()){
+        std::string network_name = network.key();
 
         // add nodes
         for(auto& node : network.value()["nodes"].items()){
@@ -568,7 +573,14 @@ uint32_t Node_Core::create_network(std::string name){
         return 2;
     }
 
+    if(create_global_variable(name + "_enable", io_type::BOOL)){
+        std::cerr << "Error: failed to create enable variable for network" << std::endl;
+        return 3;
+    }
+
     networks[name] = std::make_shared<node_network>(&global_variables);
+
+    get_global_variable_data_ptr(name + "_enable", (void**)&(networks[name]->dynamic_enable));
 
     networks[name]->set_execution_order(0);
     // need to rebuild the overall execution order after creating a new network for it to actually run
@@ -639,7 +651,22 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             networks[name]->set_enable(data->at("enable").get<bool>());
         }
-        //data->erase("enable");
+    }
+
+    if(data->contains("dynamic_enable_starting")){
+        if(!data->at("dynamic_enable_starting").is_boolean()){
+            std::cerr << "Error: enable is not a boolean" << std::endl;
+        }
+        else{
+            bool dynamic_enable = data->at("dynamic_enable_starting").get<bool>();
+            set_global_variable_value(name + "_enable", &dynamic_enable);
+        }
+    }
+    else{
+        // if dynamic_enable_starting is not set, default to true
+        bool dynamic_enable = true;
+        set_global_variable_value(name + "_enable", &dynamic_enable);
+        std::cout << "Dynamic enable starting not set, defaulting to true" << std::endl;
     }
 
     if(data->contains("type")){
@@ -655,7 +682,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             std::cerr << "Error: unknown network type" << std::endl;
         }
-        //data->erase("type");
     }
     
     if(data->contains("timeout_usec")){
@@ -665,7 +691,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             networks[name]->set_timeout_usec(data->at("timeout_usec").get<uint32_t>());
         }
-        //data->erase("timeout_usec");
     }
 
     if(data->contains("timeout_msec")){
@@ -675,7 +700,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             networks[name]->set_timeout_msec(data->at("timeout_msec").get<uint32_t>());
         }
-        //data->erase("timeout_msec");
     }
 
     if(data->contains("timeout_sec")){
@@ -685,7 +709,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             networks[name]->set_timeout_sec(data->at("timeout_sec").get<uint32_t>());
         }
-        //data->erase("timeout_sec");
     }
 
     if(data->contains("update_cycle_trigger_count")){
@@ -695,7 +718,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             networks[name]->set_update_cycle_trigger_count(data->at("update_cycle_trigger_count").get<uint32_t>());
         }
-        //data->erase("update_cycle_trigger_count");
     }
 
     if(data->contains("allowed_async_late_cycles")){
@@ -705,7 +727,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
         else{
             networks[name]->set_async_allowed_late_cycles(data->at("allowed_async_late_cycles").get<uint32_t>());
         }
-        //data->erase("allowed_async_late_cycles");
     }
 
     if(data->contains("execution_order")){
@@ -718,7 +739,6 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
 
             // just configure the network, the actual network_execution_order vector will be updated after all networks are configured
         }
-        //data->erase("execution_order");
     }
     else{
         // execution oder must be set

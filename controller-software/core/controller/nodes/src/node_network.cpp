@@ -8,6 +8,8 @@ void* node_network::sync_run(void* args_){
     for (auto& node : *(args->execution_order_)) {
         if(node->run() !=0){
             std::cerr << "Error running node" << std::endl;
+
+            throw std::runtime_error("Error running node");
             
             // TODO: figure out if we want to just ride through or stop on error
             *args->return_code = 1;
@@ -385,6 +387,10 @@ uint32_t node_network::run(const uint32_t* cycle_count){
     }
     else{
         return 0;   // not time to run
+    }
+
+    if(!*dynamic_enable){
+        return 0;   // network is not enabled, do not run
     }
 
     if(execution_order_update_required){

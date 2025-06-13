@@ -16,7 +16,6 @@ class converter: public base_node {
         bool configured = false;
 
         struct conv{
-            std::string name;
             input* in = nullptr;
             output* out = nullptr;
 
@@ -184,24 +183,18 @@ class converter: public base_node {
                 return 1;
             }
 
-            auto o = json->find("config");
-            if(o == json->end()){
-                std::cerr << "Error: config not found in converter node settings" << std::endl;
-                return 1;
-            }
-
             bool min_max_defined = true;
-            if(o->find("input_min") == o->end() || 
-                o->find("input_max") == o->end() || 
-                o->find("output_min") == o->end() || 
-                o->find("output_max") == o->end()){
+            if(json->find("input_min") == json->end() || 
+                json->find("input_max") == json->end() || 
+                json->find("output_min") == json->end() || 
+                json->find("output_max") == json->end()){
                 min_max_defined = false;
             }
             else{
-                c.input_min = o->at("input_min").get<double>();
-                c.input_max = o->at("input_max").get<double>();
-                c.output_min = o->at("output_min").get<double>();
-                c.output_max = o->at("output_max").get<double>();
+                c.input_min = json->at("input_min").get<double>();
+                c.input_max = json->at("input_max").get<double>();
+                c.output_min = json->at("output_min").get<double>();
+                c.output_max = json->at("output_max").get<double>();
 
                 if(c.input_max <= c.input_min){
                     std::cerr << "Error: input_max must be greater than input_min" << std::endl;
@@ -213,7 +206,7 @@ class converter: public base_node {
                 }
             }
 
-            std::string mode = o->at("mode").get<std::string>();
+            std::string mode = json->at("mode").get<std::string>();
             if(mode != "scale" && mode != "direct"){
                 std::cerr << "Error: invalid mode specified, must be 'scale' or 'direct'" << std::endl;
                 return 1;
@@ -230,23 +223,14 @@ class converter: public base_node {
                     std::cerr << "Error: input/output min/max must be defined in 'scale' mode" << std::endl;
                     return 1;
                 }
-                c.invert = o->at("invert").get<bool>();
+                c.invert = json->at("invert").get<bool>();
             }
 
 
-            io_type input_type = get_io_type(o->at("input_type").get<std::string>());
-            io_type output_type = get_io_type(o->at("output_type").get<std::string>());
+            io_type input_type = get_io_type(json->at("input_type").get<std::string>());
+            io_type output_type = get_io_type(json->at("output_type").get<std::string>());
 
             // some input validation
-
-            if(inputs.find(c.name) != inputs.end()){
-                std::cerr << "Error: input name already exists" << std::endl;
-                return 1;
-            }
-            if(outputs.find(c.name) != outputs.end()){
-                std::cerr << "Error: output name already exists" << std::endl;
-                return 1;
-            }
 
             if(std::find(supported_types.begin(), supported_types.end(), input_type) == supported_types.end()){
                 std::cerr << "Error: unsupported input type for conversion" << std::endl;
@@ -258,14 +242,14 @@ class converter: public base_node {
             }
 
             // create input and output
-            inputs.emplace(c.name, input(input_type, nullptr));
+            inputs.emplace("input", input(input_type, nullptr));
 
             c.out_value_ptr = new uint8_t[io_type_size.at(output_type)];  // create a new place to store the output data
 
-            outputs.emplace(c.name, output(output_type, c.out_value_ptr, &execution_number));
+            outputs.emplace("output", output(output_type, c.out_value_ptr, &execution_number));
 
-            c.in = &inputs[c.name];
-            c.out = &outputs[c.name];
+            c.in = &inputs["input"];
+            c.out = &outputs["output"];
             
             configured = true;
 

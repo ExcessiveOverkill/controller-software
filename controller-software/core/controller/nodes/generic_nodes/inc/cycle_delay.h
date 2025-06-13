@@ -62,10 +62,9 @@ class cycle_delay: public base_node {
                 return 1;
             }
 
-            auto config = json->find("config");
             
-            type = get_io_type(config->at("type").get<std::string>());
-            cycles = config->at("cycles").get<uint16_t>();
+            type = get_io_type(json->at("type").get<std::string>());
+            cycles = json->at("cycles").get<uint16_t>();
             if(type == io_type::UNDEFINED){
                 std::cerr << "Error: cycle_delay node type is undefined" << std::endl;
                 return 1;

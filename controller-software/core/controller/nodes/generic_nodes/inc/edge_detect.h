@@ -3,51 +3,38 @@
 #pragma once
 
 
-class edge_delay: public base_node {
+class edge_detect: public base_node {
     private:
         bool out = false; // output value
         bool falling_edge = false; // true if the edge is falling, false if rising
         input* in = nullptr; // pointer to the input
 
-        // times are in execution cycles
-        uint32_t cycles = 0;
-        uint32_t elapsed_cycles = 0; // cycles since the last edge
+        bool last_in = false;
 
         bool configured = false;
         
     public:
 
-        edge_delay(){
+        edge_detect(){
         }
 
         unsigned int run() override {
 
             bool in_value = *(bool*)(in->data_pointer);
 
-            if(falling_edge){
-                if(in_value){
-                    elapsed_cycles = 0;
-                    out = true;
-                }
-                else if (elapsed_cycles < cycles){
-                    elapsed_cycles++;
+            if(in_value != last_in){
+                // edge detected
+                if(falling_edge){
+                    out = !in_value; // output true if falling edge
                 }
                 else{
-                    out = false;
+                    out = in_value; // output true if rising edge
                 }
             }
-            else{   // rising edge
-                if(!in_value){
-                    elapsed_cycles = 0;
-                    out = false;
-                }
-                else if (elapsed_cycles < cycles){
-                    elapsed_cycles++;
-                }
-                else{
-                    out = true;
-                }
+            else{
+                out = false; // no edge detected
             }
+            last_in = in_value;
             
             return 0;
         }
@@ -60,7 +47,6 @@ class edge_delay: public base_node {
                 "config":{
                     "rising_edge": "true",
                     "falling_edge": "false",
-                    "cycles": 10
                     }
             }
             */
@@ -80,8 +66,6 @@ class edge_delay: public base_node {
                 std::cerr << "Error: edge_delay node configuration missing 'rising_edge' or 'falling_edge'" << std::endl;
                 return 1;
             }
-
-            cycles = json->at("cycles").get<uint32_t>();
 
 
             outputs.emplace("output", output(io_type::BOOL, &out, &execution_number));

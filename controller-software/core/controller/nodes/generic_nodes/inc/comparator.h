@@ -125,24 +125,23 @@ class comparator: public base_node {
                 return 1;
             }
 
-            auto config = json->find("config");
-            io_type type = get_io_type(config->at("type").get<std::string>());
+            type = get_io_type(json->at("type").get<std::string>());
             if(type == io_type::UNDEFINED){
                 std::cerr << "Error: invalid type for comparator node" << std::endl;
                 return 1;
             }
 
-            comp_type = get_comparator_type(config->at("comparator_type").get<std::string>());
+            comp_type = get_comparator_type(json->at("comparator_type").get<std::string>());
             if(comp_type == comparator_type::UNDEFINED){
                 std::cerr << "Error: invalid comparator type for comparator node" << std::endl;
                 return 1;
             }
 
             outputs.emplace("output", output(io_type::BOOL, &out, &execution_number));
-            inputs.emplace("in_0", input(type, nullptr));
-            inputs.emplace("in_1", input(type, nullptr));
-            in_0 = &inputs["in_0"];
-            in_1 = &inputs["in_1"];
+            inputs.emplace("input_0", input(type, nullptr));
+            inputs.emplace("input_1", input(type, nullptr));
+            in_0 = &inputs["input_0"];
+            in_1 = &inputs["input_1"];
 
             configured = true;
             

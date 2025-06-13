@@ -1,0 +1,3020 @@
+{
+    "info": {
+        "date": "2025-06-09",
+        "time": "15:19:37.807698515",
+        "fpga_config": "controller/config/fpga_configs/test",
+        "write_protected": false
+    },
+    "networks": {
+        "estop board": {
+            "enable": true,
+            "dynamic_enable_starting": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 0,
+            "connections": {
+                "0": {
+                    "src_node": "logic_gate_30",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_29",
+                    "dst_port": "input"
+                },
+                "1": {
+                    "src_node": "converter_10",
+                    "src_port": "output",
+                    "dst_node": "estop board",
+                    "dst_port": "enable_power"
+                },
+                "2": {
+                    "src_node": "edge_delay_46",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_42",
+                    "dst_port": "input"
+                },
+                "3": {
+                    "src_node": "edge_delay_36",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_32",
+                    "dst_port": "select_bit_0"
+                },
+                "4": {
+                    "src_node": "edge_delay_36",
+                    "src_port": "output",
+                    "dst_node": "print_37",
+                    "dst_port": "enable"
+                },
+                "5": {
+                    "src_node": "edge_delay_36",
+                    "src_port": "output",
+                    "dst_node": "print_37",
+                    "dst_port": "input"
+                },
+                "6": {
+                    "src_node": "estop board",
+                    "src_port": "precharge_active",
+                    "dst_node": "comparator_39",
+                    "dst_port": "input_0"
+                },
+                "7": {
+                    "src_node": "estop board",
+                    "src_port": "status",
+                    "dst_node": "bitwise_split_28",
+                    "dst_port": "input"
+                },
+                "8": {
+                    "src_node": "comparator_39",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_40",
+                    "dst_port": "input"
+                },
+                "9": {
+                    "src_node": "fan on speed",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_15",
+                    "dst_port": "input"
+                },
+                "10": {
+                    "src_node": "converter_26",
+                    "src_port": "output",
+                    "dst_node": "estop board",
+                    "dst_port": "precharge_done"
+                },
+                "11": {
+                    "src_node": "edge_detect_42",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_45",
+                    "dst_port": "input_enable"
+                },
+                "12": {
+                    "src_node": "get_global_variable_35",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_36",
+                    "dst_port": "input"
+                },
+                "13": {
+                    "src_node": "fault reset",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_32",
+                    "dst_port": "input_1"
+                },
+                "14": {
+                    "src_node": "comparator_17",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_16",
+                    "dst_port": "input"
+                },
+                "15": {
+                    "src_node": "bitwise_split_28",
+                    "src_port": "output_bit_2",
+                    "dst_node": "logic_gate_30",
+                    "dst_port": "input_0"
+                },
+                "16": {
+                    "src_node": "get_global_variable_25",
+                    "src_port": "output",
+                    "dst_node": "converter_26",
+                    "dst_port": "input"
+                },
+                "17": {
+                    "src_node": "get_global_variable_9",
+                    "src_port": "output",
+                    "dst_node": "converter_10",
+                    "dst_port": "input"
+                },
+                "18": {
+                    "src_node": "edge_detect_16",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_15",
+                    "dst_port": "input_enable"
+                },
+                "19": {
+                    "src_node": "get_global_variable_2",
+                    "src_port": "output",
+                    "dst_node": "estop board",
+                    "dst_port": "fan_cmd_speed"
+                },
+                "20": {
+                    "src_node": "get_global_variable_3",
+                    "src_port": "output",
+                    "dst_node": "estop board",
+                    "dst_port": "em_device"
+                },
+                "21": {
+                    "src_node": "comparator_17",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_14",
+                    "dst_port": "input"
+                },
+                "22": {
+                    "src_node": "estop board",
+                    "src_port": "brake_status",
+                    "dst_node": "set_global_variable_7",
+                    "dst_port": "input"
+                },
+                "23": {
+                    "src_node": "multiplexer_32",
+                    "src_port": "output",
+                    "dst_node": "estop board",
+                    "dst_port": "requested_state"
+                },
+                "24": {
+                    "src_node": "estop board",
+                    "src_port": "main_power_active",
+                    "dst_node": "comparator_17",
+                    "dst_port": "input_0"
+                },
+                "25": {
+                    "src_node": "comparator_17",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_46",
+                    "dst_port": "input"
+                },
+                "26": {
+                    "src_node": "fan idle speed",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_45",
+                    "dst_port": "input"
+                },
+                "27": {
+                    "src_node": "get_global_variable_12",
+                    "src_port": "output",
+                    "dst_node": "estop board",
+                    "dst_port": "enable_brakes"
+                },
+                "28": {
+                    "src_node": "run",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_32",
+                    "dst_port": "input_0"
+                }
+            },
+            "nodes": {
+                "estop board": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H1_0_F0.json",
+                            "cyclic_write_regs": [],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                },
+                                {
+                                    "name": "precharge_done",
+                                    "update_rate_cycles": 20
+                                },
+                                {
+                                    "name": "enable_brakes",
+                                    "update_rate_cycles": 20
+                                },
+                                {
+                                    "name": "enable_power",
+                                    "update_rate_cycles": 20
+                                },
+                                {
+                                    "name": "fan_cmd_speed",
+                                    "update_rate_cycles": 1000
+                                }
+                            ],
+                            "async_read_regs": [
+                                {
+                                    "name": "precharge_active",
+                                    "update_rate_cycles": 20
+                                },
+                                {
+                                    "name": "dms_ok",
+                                    "update_rate_cycles": 20
+                                },
+                                {
+                                    "name": "main_power_active",
+                                    "update_rate_cycles": 20
+                                },
+                                {
+                                    "name": "status",
+                                    "update_rate_cycles": 10
+                                },
+                                {
+                                    "name": "brake_status",
+                                    "update_rate_cycles": 20
+                                }
+                            ],
+                            "set": [
+                                {
+                                    "name": "brake_6_required_inputs",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "brake_3_required_inputs",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "brake_4_required_inputs",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "brake_5_required_inputs",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "enable_required_inputs",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "brake_2_required_inputs",
+                                    "value": 0.0
+                                },
+                                {
+                                    "name": "brake_1_required_inputs",
+                                    "value": 0.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "get_global_variable_2": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "case fan speed"
+                        }
+                    }
+                },
+                "get_global_variable_3": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_7_em_serial_controller_C.device_0"
+                        }
+                    }
+                },
+                "set_global_variable_7": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "brake status"
+                        }
+                    }
+                },
+                "get_global_variable_9": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "enable power"
+                        }
+                    }
+                },
+                "converter_10": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "bool",
+                        "output_type": "uint8",
+                        "mode": "direct",
+                        "invert": false
+                    }
+                },
+                "get_global_variable_12": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "brake command"
+                        }
+                    }
+                },
+                "set_global_variable_14": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "power is on"
+                        }
+                    }
+                },
+                "set_global_variable_15": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "case fan speed"
+                        }
+                    }
+                },
+                "edge_detect_16": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false
+                    }
+                },
+                "comparator_17": {
+                    "type": "comparator",
+                    "config": {
+                        "type": "uint8",
+                        "comparator_type": "not_equal"
+                    }
+                },
+                "get_global_variable_25": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "pfc precharge done"
+                        }
+                    }
+                },
+                "converter_26": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "bool",
+                        "output_type": "uint8",
+                        "mode": "direct",
+                        "invert": false
+                    }
+                },
+                "bitwise_split_28": {
+                    "type": "bitwise_split",
+                    "config": {
+                        "type": "uint8"
+                    }
+                },
+                "set_global_variable_29": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "errors active"
+                        }
+                    }
+                },
+                "logic_gate_30": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "not",
+                        "input_count": 1
+                    }
+                },
+                "multiplexer_32": {
+                    "type": "multiplexer",
+                    "config": {
+                        "input_bits": 1,
+                        "type": "uint8"
+                    }
+                },
+                "run": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint8",
+                        "value": 0.0
+                    }
+                },
+                "fault reset": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint8",
+                        "value": 3.0
+                    }
+                },
+                "get_global_variable_35": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "error reset"
+                        }
+                    }
+                },
+                "edge_delay_36": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": false,
+                        "falling_edge": true,
+                        "cycles": 20
+                    }
+                },
+                "print_37": {
+                    "type": "print",
+                    "config": {
+                        "name": "estop board reset",
+                        "type": "bool"
+                    }
+                },
+                "comparator_39": {
+                    "type": "comparator",
+                    "config": {
+                        "type": "uint8",
+                        "comparator_type": "not_equal"
+                    }
+                },
+                "set_global_variable_40": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "pfc precharge active"
+                        }
+                    }
+                },
+                "fan on speed": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint16",
+                        "value": 25000.0
+                    }
+                },
+                "edge_detect_42": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": false,
+                        "falling_edge": true
+                    }
+                },
+                "fan idle speed": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint16",
+                        "value": 15000.0
+                    }
+                },
+                "set_global_variable_45": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "case fan speed"
+                        }
+                    }
+                },
+                "edge_delay_46": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": false,
+                        "falling_edge": true,
+                        "cycles": 5000
+                    }
+                }
+            }
+        },
+        "servo drives": {
+            "enable": true,
+            "dynamic_enable_starting": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 1,
+            "connections": {
+                "0": {
+                    "src_node": "idle",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_17",
+                    "dst_port": "input_1"
+                },
+                "1": {
+                    "src_node": "get_global_variable_2",
+                    "src_port": "output",
+                    "dst_node": "drive 1",
+                    "dst_port": "em_device"
+                },
+                "2": {
+                    "src_node": "logic_gate_24",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_28",
+                    "dst_port": "input_1"
+                },
+                "3": {
+                    "src_node": "converter_51",
+                    "src_port": "output",
+                    "dst_node": "drive 3",
+                    "dst_port": "current_command_q"
+                },
+                "4": {
+                    "src_node": "get_global_variable_4",
+                    "src_port": "output",
+                    "dst_node": "drive 2",
+                    "dst_port": "em_device"
+                },
+                "5": {
+                    "src_node": "run",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_17",
+                    "dst_port": "input_2"
+                },
+                "6": {
+                    "src_node": "get_global_variable_50",
+                    "src_port": "output",
+                    "dst_node": "converter_51",
+                    "dst_port": "input"
+                },
+                "7": {
+                    "src_node": "edge_delay_27",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_25",
+                    "dst_port": "input_1"
+                },
+                "8": {
+                    "src_node": "get_global_variable_6",
+                    "src_port": "output",
+                    "dst_node": "drive 4",
+                    "dst_port": "em_device"
+                },
+                "9": {
+                    "src_node": "edge_delay_27",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_29",
+                    "dst_port": "input_0"
+                },
+                "10": {
+                    "src_node": "edge_delay_27",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_26",
+                    "dst_port": "input_1"
+                },
+                "11": {
+                    "src_node": "get_global_variable_8",
+                    "src_port": "output",
+                    "dst_node": "drive 6",
+                    "dst_port": "em_device"
+                },
+                "12": {
+                    "src_node": "get_global_variable_23",
+                    "src_port": "output",
+                    "dst_node": "converter_34",
+                    "dst_port": "input"
+                },
+                "13": {
+                    "src_node": "get_global_variable_7",
+                    "src_port": "output",
+                    "dst_node": "drive 5",
+                    "dst_port": "em_device"
+                },
+                "14": {
+                    "src_node": "logic_gate_26",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_17",
+                    "dst_port": "select_bit_1"
+                },
+                "15": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 2",
+                    "dst_port": "requested_state"
+                },
+                "16": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 0",
+                    "dst_port": "requested_state"
+                },
+                "17": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 4",
+                    "dst_port": "requested_state"
+                },
+                "18": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 3",
+                    "dst_port": "requested_state"
+                },
+                "19": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 6",
+                    "dst_port": "requested_state"
+                },
+                "20": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 5",
+                    "dst_port": "requested_state"
+                },
+                "21": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 7",
+                    "dst_port": "requested_state"
+                },
+                "22": {
+                    "src_node": "multiplexer_17",
+                    "src_port": "output",
+                    "dst_node": "drive 1",
+                    "dst_port": "requested_state"
+                },
+                "23": {
+                    "src_node": "logic_gate_29",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_28",
+                    "dst_port": "input_0"
+                },
+                "24": {
+                    "src_node": "edge_delay_32",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_24",
+                    "dst_port": "input_0"
+                },
+                "25": {
+                    "src_node": "converter_52",
+                    "src_port": "output",
+                    "dst_node": "drive 5",
+                    "dst_port": "current_command_q"
+                },
+                "26": {
+                    "src_node": "logic_gate_28",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_25",
+                    "dst_port": "input_0"
+                },
+                "27": {
+                    "src_node": "logic_gate_29",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_30",
+                    "dst_port": "input_0"
+                },
+                "28": {
+                    "src_node": "edge_delay_32",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_30",
+                    "dst_port": "input_1"
+                },
+                "29": {
+                    "src_node": "logic_gate_25",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_17",
+                    "dst_port": "select_bit_0"
+                },
+                "30": {
+                    "src_node": "converter_34",
+                    "src_port": "output",
+                    "dst_node": "drive 4",
+                    "dst_port": "current_command_q"
+                },
+                "31": {
+                    "src_node": "get_global_variable_9",
+                    "src_port": "output",
+                    "dst_node": "drive 7",
+                    "dst_port": "em_device"
+                },
+                "32": {
+                    "src_node": "get_global_variable_31",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_32",
+                    "dst_port": "input"
+                },
+                "33": {
+                    "src_node": "get_global_variable_5",
+                    "src_port": "output",
+                    "dst_node": "drive 3",
+                    "dst_port": "em_device"
+                },
+                "34": {
+                    "src_node": "logic_gate_30",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_26",
+                    "dst_port": "input_0"
+                },
+                "35": {
+                    "src_node": "get_global_variable_22",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_27",
+                    "dst_port": "input"
+                },
+                "36": {
+                    "src_node": "get_global_variable_33",
+                    "src_port": "output",
+                    "dst_node": "converter_52",
+                    "dst_port": "input"
+                },
+                "37": {
+                    "src_node": "none",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_17",
+                    "dst_port": "input_0"
+                },
+                "38": {
+                    "src_node": "fault reset",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_17",
+                    "dst_port": "input_3"
+                },
+                "39": {
+                    "src_node": "get_global_variable_1",
+                    "src_port": "output",
+                    "dst_node": "drive 0",
+                    "dst_port": "em_device"
+                }
+            },
+            "nodes": {
+                "drive 0": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 3,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [
+                                {
+                                    "name": "current_command_q",
+                                    "cyclic_index": 3,
+                                    "sync_with_node": true
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "cyclic_index": 4,
+                                    "sync_with_node": false
+                                }
+                            ],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": [
+                                {
+                                    "name": "max_ouput_voltage",
+                                    "value": 200.0
+                                },
+                                {
+                                    "name": "requested_state",
+                                    "value": 4.0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 5.0
+                                },
+                                {
+                                    "name": "current_loop_i_limit",
+                                    "value": 300.0
+                                },
+                                {
+                                    "name": "device_mode",
+                                    "value": 1.0
+                                },
+                                {
+                                    "name": "phase_resistance",
+                                    "value": 1.7
+                                },
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 4000.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_r_res",
+                                    "value": 1024.0
+                                },
+                                {
+                                    "name": "current_loop_p_gain",
+                                    "value": 20.0
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 3000.0
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 500.0
+                                },
+                                {
+                                    "name": "current_loop_i_gain",
+                                    "value": 0.1
+                                },
+                                {
+                                    "name": "foc_commutation_filter_q",
+                                    "value": 100.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "get_global_variable_1": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_6_em_serial_controller_B.device_3"
+                        }
+                    }
+                },
+                "get_global_variable_2": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_6_em_serial_controller_B.device_2"
+                        }
+                    }
+                },
+                "drive 1": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 2,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [
+                                {
+                                    "name": "current_command_q",
+                                    "cyclic_index": 3,
+                                    "sync_with_node": true
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "cyclic_index": 4,
+                                    "sync_with_node": false
+                                }
+                            ],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": [
+                                {
+                                    "name": "calibration_current",
+                                    "value": 5000.0
+                                },
+                                {
+                                    "name": "max_ouput_voltage",
+                                    "value": 200.0
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 500.0
+                                },
+                                {
+                                    "name": "current_loop_i_limit",
+                                    "value": 300.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_r_res",
+                                    "value": 1024.0
+                                },
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 7000.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_q",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "phase_resistance",
+                                    "value": 2.0
+                                },
+                                {
+                                    "name": "device_mode",
+                                    "value": 1.0
+                                },
+                                {
+                                    "name": "current_loop_p_gain",
+                                    "value": 5.0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 5.0
+                                },
+                                {
+                                    "name": "current_loop_i_gain",
+                                    "value": 0.05
+                                },
+                                {
+                                    "name": "requested_state",
+                                    "value": 4.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "get_global_variable_4": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_6_em_serial_controller_B.device_1"
+                        }
+                    }
+                },
+                "get_global_variable_5": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_6_em_serial_controller_B.device_0"
+                        }
+                    }
+                },
+                "get_global_variable_6": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_5_em_serial_controller_A.device_4"
+                        }
+                    }
+                },
+                "get_global_variable_7": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_5_em_serial_controller_A.device_3"
+                        }
+                    }
+                },
+                "get_global_variable_8": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_5_em_serial_controller_A.device_2"
+                        }
+                    }
+                },
+                "get_global_variable_9": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_5_em_serial_controller_A.device_1"
+                        }
+                    }
+                },
+                "drive 2": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 1,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [
+                                {
+                                    "name": "current_command_q",
+                                    "cyclic_index": 3,
+                                    "sync_with_node": true
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "cyclic_index": 4,
+                                    "sync_with_node": false
+                                }
+                            ],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": [
+                                {
+                                    "name": "device_mode",
+                                    "value": 1.0
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 500.0
+                                },
+                                {
+                                    "name": "phase_resistance",
+                                    "value": 1.7
+                                },
+                                {
+                                    "name": "max_ouput_voltage",
+                                    "value": 200.0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 5.0
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 3000.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_r_res",
+                                    "value": 1024.0
+                                },
+                                {
+                                    "name": "current_loop_i_limit",
+                                    "value": 300.0
+                                },
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 4000.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_q",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "current_loop_i_gain",
+                                    "value": 0.1
+                                },
+                                {
+                                    "name": "requested_state",
+                                    "value": 4.0
+                                },
+                                {
+                                    "name": "current_loop_p_gain",
+                                    "value": 20.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "drive 3": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [
+                                {
+                                    "name": "current_command_q",
+                                    "cyclic_index": 3,
+                                    "sync_with_node": true
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "cyclic_index": 4,
+                                    "sync_with_node": false
+                                }
+                            ],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": [
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 3.0
+                                },
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 1500.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_r_res",
+                                    "value": 1024.0
+                                },
+                                {
+                                    "name": "max_ouput_voltage",
+                                    "value": 200.0
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "device_mode",
+                                    "value": 1.0
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 500.0
+                                },
+                                {
+                                    "name": "requested_state",
+                                    "value": 4.0
+                                },
+                                {
+                                    "name": "current_loop_i_limit",
+                                    "value": 300.0
+                                },
+                                {
+                                    "name": "current_loop_i_gain",
+                                    "value": 0.2
+                                },
+                                {
+                                    "name": "phase_resistance",
+                                    "value": 11.0
+                                },
+                                {
+                                    "name": "current_loop_p_gain",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_q",
+                                    "value": 100.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "drive 4": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 4,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [
+                                {
+                                    "name": "current_command_q",
+                                    "cyclic_index": 3,
+                                    "sync_with_node": true
+                                },
+                                {
+                                    "name": "commutation_command",
+                                    "cyclic_index": 4,
+                                    "sync_with_node": false
+                                }
+                            ],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": [
+                                {
+                                    "name": "foc_commutation_filter_r_res",
+                                    "value": 1024.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_q",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "current_loop_i_limit",
+                                    "value": 300.0
+                                },
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 1500.0
+                                },
+                                {
+                                    "name": "current_loop_p_gain",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "max_ouput_voltage",
+                                    "value": 200.0
+                                },
+                                {
+                                    "name": "phase_resistance",
+                                    "value": 11.0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 3.0
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 500.0
+                                },
+                                {
+                                    "name": "device_mode",
+                                    "value": 1.0
+                                },
+                                {
+                                    "name": "requested_state",
+                                    "value": 4.0
+                                },
+                                {
+                                    "name": "current_loop_i_gain",
+                                    "value": 0.2
+                                },
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 100.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "drive 5": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 3,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [
+                                {
+                                    "name": "commutation_command",
+                                    "cyclic_index": 4,
+                                    "sync_with_node": false
+                                },
+                                {
+                                    "name": "current_command_q",
+                                    "cyclic_index": 3,
+                                    "sync_with_node": true
+                                }
+                            ],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": [
+                                {
+                                    "name": "current_limit_d",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "current_loop_i_limit",
+                                    "value": 300.0
+                                },
+                                {
+                                    "name": "current_loop_p_gain",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_q",
+                                    "value": 100.0
+                                },
+                                {
+                                    "name": "max_ouput_voltage",
+                                    "value": 200.0
+                                },
+                                {
+                                    "name": "requested_state",
+                                    "value": 4.0
+                                },
+                                {
+                                    "name": "current_loop_i_gain",
+                                    "value": 0.2
+                                },
+                                {
+                                    "name": "device_mode",
+                                    "value": 1.0
+                                },
+                                {
+                                    "name": "commutation_scale",
+                                    "value": 3.0
+                                },
+                                {
+                                    "name": "phase_resistance",
+                                    "value": 11.0
+                                },
+                                {
+                                    "name": "current_limit_q",
+                                    "value": 1500.0
+                                },
+                                {
+                                    "name": "calibration_current",
+                                    "value": 500.0
+                                },
+                                {
+                                    "name": "foc_commutation_filter_r_res",
+                                    "value": 1024.0
+                                }
+                            ]
+                        }
+                    }
+                },
+                "drive 6": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 2,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": []
+                        }
+                    }
+                },
+                "drive 7": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 1,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [
+                                {
+                                    "name": "requested_state",
+                                    "update_rate_cycles": 10
+                                }
+                            ],
+                            "async_read_regs": [],
+                            "set": []
+                        }
+                    }
+                },
+                "multiplexer_17": {
+                    "type": "multiplexer",
+                    "config": {
+                        "input_bits": 2,
+                        "type": "uint8"
+                    }
+                },
+                "none": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint8",
+                        "value": 0.0
+                    }
+                },
+                "idle": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint8",
+                        "value": 1.0
+                    }
+                },
+                "run": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint8",
+                        "value": 2.0
+                    }
+                },
+                "fault reset": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint8",
+                        "value": 3.0
+                    }
+                },
+                "get_global_variable_22": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "error reset"
+                        }
+                    }
+                },
+                "get_global_variable_23": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "j5 current cmd"
+                        }
+                    }
+                },
+                "logic_gate_24": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "not",
+                        "input_count": 1
+                    }
+                },
+                "logic_gate_25": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "or",
+                        "input_count": 2
+                    }
+                },
+                "logic_gate_26": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "or",
+                        "input_count": 2
+                    }
+                },
+                "edge_delay_27": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": false,
+                        "falling_edge": true,
+                        "cycles": 30
+                    }
+                },
+                "logic_gate_28": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "and",
+                        "input_count": 2
+                    }
+                },
+                "logic_gate_29": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "not",
+                        "input_count": 1
+                    }
+                },
+                "logic_gate_30": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "and",
+                        "input_count": 2
+                    }
+                },
+                "get_global_variable_31": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "power is on"
+                        }
+                    }
+                },
+                "edge_delay_32": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false,
+                        "cycles": 100
+                    }
+                },
+                "get_global_variable_33": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "j6 current cmd"
+                        }
+                    }
+                },
+                "converter_34": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "float",
+                        "output_type": "int32",
+                        "mode": "scale",
+                        "invert": false,
+                        "input_min": -1.5,
+                        "input_max": 1.5,
+                        "output_min": -1500.0,
+                        "output_max": 1500.0
+                    }
+                },
+                "get_global_variable_50": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "j4 current cmd"
+                        }
+                    }
+                },
+                "converter_51": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "float",
+                        "output_type": "int32",
+                        "mode": "scale",
+                        "invert": false,
+                        "input_min": -1.5,
+                        "input_max": 1.5,
+                        "output_min": -1500.0,
+                        "output_max": 1500.0
+                    }
+                },
+                "converter_52": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "float",
+                        "output_type": "int32",
+                        "mode": "scale",
+                        "invert": false,
+                        "input_min": -1.5,
+                        "input_max": 1.5,
+                        "output_min": -1500.0,
+                        "output_max": 1500.0
+                    }
+                }
+            }
+        },
+        "pfc": {
+            "enable": true,
+            "dynamic_enable_starting": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 2,
+            "connections": {
+                "0": {
+                    "src_node": "get_global_variable_0",
+                    "src_port": "output",
+                    "dst_node": "pfc drive",
+                    "dst_port": "em_device"
+                },
+                "1": {
+                    "src_node": "edge_delay_3",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_4",
+                    "dst_port": "input"
+                },
+                "2": {
+                    "src_node": "get_global_variable_2",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_3",
+                    "dst_port": "input"
+                }
+            },
+            "nodes": {
+                "get_global_variable_0": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "node_vars.drivers.node_5_em_serial_controller_A.device_0"
+                        }
+                    }
+                },
+                "pfc drive": {
+                    "type": "em_serial_device",
+                    "config": {
+                        "enabled": true,
+                        "comm": {
+                            "device_address": 0,
+                            "timeout_tries": 20
+                        },
+                        "device": {
+                            "device_descriptor": "controller/config/em_devices/device_H0_0_F1.json",
+                            "cyclic_write_regs": [],
+                            "cyclic_read_regs": [],
+                            "async_write_regs": [],
+                            "async_read_regs": [],
+                            "set": []
+                        }
+                    }
+                },
+                "get_global_variable_2": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "pfc precharge active"
+                        }
+                    }
+                },
+                "edge_delay_3": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false,
+                        "cycles": 1000
+                    }
+                },
+                "set_global_variable_4": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "pfc precharge done"
+                        }
+                    }
+                }
+            }
+        },
+        "api data": {
+            "enable": true,
+            "dynamic_enable_starting": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 3,
+            "connections": {
+                "0": {
+                    "src_node": "edge_detect_6",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_8",
+                    "dst_port": "input_enable"
+                },
+                "1": {
+                    "src_node": "edge_detect_5",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_7",
+                    "dst_port": "input_enable"
+                },
+                "2": {
+                    "src_node": "get_global_variable_12",
+                    "src_port": "output",
+                    "dst_node": "print_23",
+                    "dst_port": "input"
+                },
+                "3": {
+                    "src_node": "edge_detect_2",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_1",
+                    "dst_port": "input"
+                },
+                "4": {
+                    "src_node": "error reset",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_2",
+                    "dst_port": "input"
+                },
+                "5": {
+                    "src_node": "edge_detect_5",
+                    "src_port": "output",
+                    "dst_node": "print_18",
+                    "dst_port": "input"
+                },
+                "6": {
+                    "src_node": "power on",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_13",
+                    "dst_port": "input_1"
+                },
+                "7": {
+                    "src_node": "edge_detect_5",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_7",
+                    "dst_port": "input"
+                },
+                "8": {
+                    "src_node": "edge_delay_20",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_22",
+                    "dst_port": "input"
+                },
+                "9": {
+                    "src_node": "get_global_variable_12",
+                    "src_port": "output",
+                    "dst_node": "print_23",
+                    "dst_port": "enable"
+                },
+                "10": {
+                    "src_node": "edge_detect_6",
+                    "src_port": "output",
+                    "dst_node": "print_17",
+                    "dst_port": "enable"
+                },
+                "11": {
+                    "src_node": "edge_detect_6",
+                    "src_port": "output",
+                    "dst_node": "print_17",
+                    "dst_port": "input"
+                },
+                "12": {
+                    "src_node": "logic_gate_11",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_6",
+                    "dst_port": "input"
+                },
+                "13": {
+                    "src_node": "edge_detect_6",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_8",
+                    "dst_port": "input"
+                },
+                "14": {
+                    "src_node": "edge_detect_2",
+                    "src_port": "output",
+                    "dst_node": "print_19",
+                    "dst_port": "input"
+                },
+                "15": {
+                    "src_node": "logic_gate_15",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_13",
+                    "dst_port": "input_0"
+                },
+                "16": {
+                    "src_node": "power off",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_11",
+                    "dst_port": "input_1"
+                },
+                "17": {
+                    "src_node": "logic_gate_13",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_5",
+                    "dst_port": "input"
+                },
+                "18": {
+                    "src_node": "edge_detect_22",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_21",
+                    "dst_port": "input_enable"
+                },
+                "19": {
+                    "src_node": "get_global_variable_12",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_11",
+                    "dst_port": "input_0"
+                },
+                "20": {
+                    "src_node": "edge_detect_2",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_20",
+                    "dst_port": "input"
+                },
+                "21": {
+                    "src_node": "edge_detect_2",
+                    "src_port": "output",
+                    "dst_node": "print_19",
+                    "dst_port": "enable"
+                },
+                "22": {
+                    "src_node": "edge_detect_5",
+                    "src_port": "output",
+                    "dst_node": "print_18",
+                    "dst_port": "enable"
+                },
+                "23": {
+                    "src_node": "get_global_variable_12",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_15",
+                    "dst_port": "input_0"
+                }
+            },
+            "nodes": {
+                "error reset": {
+                    "type": "api_input",
+                    "config": {
+                        "config": {
+                            "type": "bool",
+                            "min": null,
+                            "max": null,
+                            "default": null,
+                            "timeout": 0.1
+                        }
+                    }
+                },
+                "set_global_variable_1": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "error reset"
+                        }
+                    }
+                },
+                "edge_detect_2": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false
+                    }
+                },
+                "power on": {
+                    "type": "api_input",
+                    "config": {
+                        "config": {
+                            "type": "bool",
+                            "min": null,
+                            "max": null,
+                            "default": null,
+                            "timeout": 0.1
+                        }
+                    }
+                },
+                "power off": {
+                    "type": "api_input",
+                    "config": {
+                        "config": {
+                            "type": "bool",
+                            "min": null,
+                            "max": null,
+                            "default": null,
+                            "timeout": 0.1
+                        }
+                    }
+                },
+                "edge_detect_5": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false
+                    }
+                },
+                "edge_detect_6": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false
+                    }
+                },
+                "set_global_variable_7": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "power on step 0_enable"
+                        }
+                    }
+                },
+                "set_global_variable_8": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "power off step 0_enable"
+                        }
+                    }
+                },
+                "logic_gate_11": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "or",
+                        "input_count": 2
+                    }
+                },
+                "get_global_variable_12": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "errors active"
+                        }
+                    }
+                },
+                "logic_gate_13": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "and",
+                        "input_count": 2
+                    }
+                },
+                "logic_gate_15": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "not",
+                        "input_count": 1
+                    }
+                },
+                "print_17": {
+                    "type": "print",
+                    "config": {
+                        "name": "power off",
+                        "type": "bool"
+                    }
+                },
+                "print_18": {
+                    "type": "print",
+                    "config": {
+                        "name": "power on",
+                        "type": "bool"
+                    }
+                },
+                "print_19": {
+                    "type": "print",
+                    "config": {
+                        "name": "error reset",
+                        "type": "bool"
+                    }
+                },
+                "edge_delay_20": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": false,
+                        "falling_edge": true,
+                        "cycles": 100
+                    }
+                },
+                "set_global_variable_21": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "errors active"
+                        }
+                    }
+                },
+                "edge_detect_22": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": false,
+                        "falling_edge": true
+                    }
+                },
+                "print_23": {
+                    "type": "print",
+                    "config": {
+                        "name": "errors active",
+                        "type": "bool"
+                    }
+                }
+            }
+        },
+        "power on step 0": {
+            "enable": true,
+            "dynamic_enable_starting": false,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 4,
+            "connections": {
+                "0": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "print_3",
+                    "dst_port": "input"
+                },
+                "1": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "print_3",
+                    "dst_port": "enable"
+                },
+                "2": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_0",
+                    "dst_port": "input_enable"
+                },
+                "3": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_2",
+                    "dst_port": "input_enable"
+                },
+                "4": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_0",
+                    "dst_port": "input"
+                }
+            },
+            "nodes": {
+                "set_global_variable_0": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "enable power"
+                        }
+                    }
+                },
+                "true": {
+                    "type": "constant",
+                    "config": {
+                        "type": "bool",
+                        "value": true
+                    }
+                },
+                "set_global_variable_2": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "power on step 0_enable"
+                        }
+                    }
+                },
+                "print_3": {
+                    "type": "print",
+                    "config": {
+                        "name": "power enabled",
+                        "type": "bool"
+                    }
+                }
+            }
+        },
+        "power off step 0": {
+            "enable": true,
+            "dynamic_enable_starting": false,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 5,
+            "connections": {
+                "0": {
+                    "src_node": "fan off speed",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_4",
+                    "dst_port": "input"
+                },
+                "1": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_1",
+                    "dst_port": "input_enable"
+                },
+                "2": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_2",
+                    "dst_port": "input_enable"
+                }
+            },
+            "nodes": {
+                "true": {
+                    "type": "constant",
+                    "config": {
+                        "type": "bool",
+                        "value": true
+                    }
+                },
+                "set_global_variable_1": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "power off step 0_enable"
+                        }
+                    }
+                },
+                "set_global_variable_2": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "enable power"
+                        }
+                    }
+                },
+                "fan off speed": {
+                    "type": "constant",
+                    "config": {
+                        "type": "uint16",
+                        "value": 10000.0
+                    }
+                },
+                "set_global_variable_4": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "case fan speed"
+                        }
+                    }
+                }
+            }
+        },
+        "motion enable": {
+            "enable": true,
+            "dynamic_enable_starting": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 6,
+            "connections": {
+                "0": {
+                    "src_node": "get_global_variable_8",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_9",
+                    "dst_port": "input"
+                },
+                "1": {
+                    "src_node": "edge_detect_10",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_9",
+                    "dst_port": "input_enable"
+                },
+                "2": {
+                    "src_node": "edge_detect_10",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_14",
+                    "dst_port": "input_enable"
+                },
+                "3": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "bitwise_join_2",
+                    "dst_port": "input_bit_4"
+                },
+                "4": {
+                    "src_node": "bitwise_join_2",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_3",
+                    "dst_port": "input_1"
+                },
+                "5": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "bitwise_join_2",
+                    "dst_port": "input_bit_3"
+                },
+                "6": {
+                    "src_node": "get_global_variable_11",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_14",
+                    "dst_port": "input"
+                },
+                "7": {
+                    "src_node": "get_global_variable_12",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_13",
+                    "dst_port": "input"
+                },
+                "8": {
+                    "src_node": "edge_detect_10",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_13",
+                    "dst_port": "input_enable"
+                },
+                "9": {
+                    "src_node": "drives ok temp",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_7",
+                    "dst_port": "input_1"
+                },
+                "10": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "bitwise_join_2",
+                    "dst_port": "input_bit_5"
+                },
+                "11": {
+                    "src_node": "get_global_variable_15",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_20",
+                    "dst_port": "input"
+                },
+                "12": {
+                    "src_node": "get_global_variable_16",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_18",
+                    "dst_port": "input"
+                },
+                "13": {
+                    "src_node": "get_global_variable_6",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_7",
+                    "dst_port": "input_0"
+                },
+                "14": {
+                    "src_node": "edge_detect_10",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_20",
+                    "dst_port": "input_enable"
+                },
+                "15": {
+                    "src_node": "edge_detect_10",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_18",
+                    "dst_port": "input_enable"
+                },
+                "16": {
+                    "src_node": "edge_delay_4",
+                    "src_port": "output",
+                    "dst_node": "multiplexer_3",
+                    "dst_port": "select_bit_0"
+                },
+                "17": {
+                    "src_node": "get_global_variable_17",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_19",
+                    "dst_port": "input"
+                },
+                "18": {
+                    "src_node": "multiplexer_3",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_1",
+                    "dst_port": "input"
+                },
+                "19": {
+                    "src_node": "logic_gate_7",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_4",
+                    "dst_port": "input"
+                },
+                "20": {
+                    "src_node": "true",
+                    "src_port": "output",
+                    "dst_node": "bitwise_join_2",
+                    "dst_port": "input_bit_0"
+                },
+                "21": {
+                    "src_node": "edge_detect_10",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_19",
+                    "dst_port": "input_enable"
+                },
+                "22": {
+                    "src_node": "get_global_variable_6",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_10",
+                    "dst_port": "input"
+                }
+            },
+            "nodes": {
+                "drives ok temp": {
+                    "type": "constant",
+                    "config": {
+                        "type": "bool",
+                        "value": true
+                    }
+                },
+                "set_global_variable_1": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "brake command"
+                        }
+                    }
+                },
+                "bitwise_join_2": {
+                    "type": "bitwise_join",
+                    "config": {
+                        "type": "uint8"
+                    }
+                },
+                "multiplexer_3": {
+                    "type": "multiplexer",
+                    "config": {
+                        "input_bits": 1,
+                        "type": "uint8"
+                    }
+                },
+                "edge_delay_4": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false,
+                        "cycles": 200
+                    }
+                },
+                "true": {
+                    "type": "constant",
+                    "config": {
+                        "type": "bool",
+                        "value": true
+                    }
+                },
+                "get_global_variable_6": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "power is on"
+                        }
+                    }
+                },
+                "logic_gate_7": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "and",
+                        "input_count": 2
+                    }
+                },
+                "get_global_variable_8": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:3.total_turns"
+                        }
+                    }
+                },
+                "set_global_variable_9": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j4 pos cmd"
+                        }
+                    }
+                },
+                "edge_detect_10": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false
+                    }
+                },
+                "get_global_variable_11": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:4.total_turns"
+                        }
+                    }
+                },
+                "get_global_variable_12": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:5.total_turns"
+                        }
+                    }
+                },
+                "set_global_variable_13": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j6 pos cmd"
+                        }
+                    }
+                },
+                "set_global_variable_14": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j5 pos cmd"
+                        }
+                    }
+                },
+                "get_global_variable_15": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:2.total_turns"
+                        }
+                    }
+                },
+                "get_global_variable_16": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:1.total_turns"
+                        }
+                    }
+                },
+                "get_global_variable_17": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:0.total_turns"
+                        }
+                    }
+                },
+                "set_global_variable_18": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j2 pos cmd"
+                        }
+                    }
+                },
+                "set_global_variable_19": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j1 pos cmd"
+                        }
+                    }
+                },
+                "set_global_variable_20": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j3 pos cmd"
+                        }
+                    }
+                }
+            }
+        },
+        "PI loops": {
+            "enable": true,
+            "dynamic_enable_starting": true,
+            "type": "sync",
+            "timeout_usec": 10000,
+            "update_cycle_trigger_count": 1,
+            "execution_order": 7,
+            "connections": {
+                "0": {
+                    "src_node": "j4 vel loop",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_9",
+                    "dst_port": "input"
+                },
+                "1": {
+                    "src_node": "edge_detect_11",
+                    "src_port": "output",
+                    "dst_node": "j6 pos loop",
+                    "dst_port": "reset"
+                },
+                "2": {
+                    "src_node": "math_operation_30",
+                    "src_port": "output",
+                    "dst_node": "math_operation_32",
+                    "dst_port": "input_1"
+                },
+                "3": {
+                    "src_node": "converter_7",
+                    "src_port": "output",
+                    "dst_node": "j4 pos loop",
+                    "dst_port": "input"
+                },
+                "4": {
+                    "src_node": "get_global_variable_10",
+                    "src_port": "output",
+                    "dst_node": "edge_detect_11",
+                    "dst_port": "input"
+                },
+                "5": {
+                    "src_node": "get_global_variable_14",
+                    "src_port": "output",
+                    "dst_node": "math_operation_15",
+                    "dst_port": "input_0"
+                },
+                "6": {
+                    "src_node": "math_operation_23",
+                    "src_port": "output",
+                    "dst_node": "converter_24",
+                    "dst_port": "input"
+                },
+                "7": {
+                    "src_node": "math_operation_17",
+                    "src_port": "output",
+                    "dst_node": "math_operation_23",
+                    "dst_port": "input_0"
+                },
+                "8": {
+                    "src_node": "converter_12",
+                    "src_port": "output",
+                    "dst_node": "j5 pos loop",
+                    "dst_port": "input"
+                },
+                "9": {
+                    "src_node": "math_operation_17",
+                    "src_port": "output",
+                    "dst_node": "vel_estimator_21",
+                    "dst_port": "input"
+                },
+                "10": {
+                    "src_node": "edge_detect_11",
+                    "src_port": "output",
+                    "dst_node": "j5 vel loop",
+                    "dst_port": "reset"
+                },
+                "11": {
+                    "src_node": "edge_detect_11",
+                    "src_port": "output",
+                    "dst_node": "j4 vel loop",
+                    "dst_port": "reset"
+                },
+                "12": {
+                    "src_node": "j5 pos loop",
+                    "src_port": "output",
+                    "dst_node": "math_operation_29",
+                    "dst_port": "input_0"
+                },
+                "13": {
+                    "src_node": "j6 vel loop",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_34",
+                    "dst_port": "input"
+                },
+                "14": {
+                    "src_node": "get_global_variable_16",
+                    "src_port": "output",
+                    "dst_node": "math_operation_17",
+                    "dst_port": "input_0"
+                },
+                "15": {
+                    "src_node": "vel_estimator_20",
+                    "src_port": "output",
+                    "dst_node": "math_operation_31",
+                    "dst_port": "input_0"
+                },
+                "16": {
+                    "src_node": "j6 pos loop",
+                    "src_port": "output",
+                    "dst_node": "math_operation_30",
+                    "dst_port": "input_0"
+                },
+                "17": {
+                    "src_node": "j5 vel loop",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_33",
+                    "dst_port": "input"
+                },
+                "18": {
+                    "src_node": "math_operation_22",
+                    "src_port": "output",
+                    "dst_node": "converter_12",
+                    "dst_port": "input"
+                },
+                "19": {
+                    "src_node": "math_operation_15",
+                    "src_port": "output",
+                    "dst_node": "math_operation_22",
+                    "dst_port": "input_0"
+                },
+                "20": {
+                    "src_node": "get_global_variable_18",
+                    "src_port": "output",
+                    "dst_node": "math_operation_22",
+                    "dst_port": "input_1"
+                },
+                "21": {
+                    "src_node": "edge_detect_11",
+                    "src_port": "output",
+                    "dst_node": "j5 pos loop",
+                    "dst_port": "reset"
+                },
+                "22": {
+                    "src_node": "converter_24",
+                    "src_port": "output",
+                    "dst_node": "j6 pos loop",
+                    "dst_port": "input"
+                },
+                "23": {
+                    "src_node": "math_operation_15",
+                    "src_port": "output",
+                    "dst_node": "vel_estimator_20",
+                    "dst_port": "input"
+                },
+                "24": {
+                    "src_node": "get_global_variable_0",
+                    "src_port": "output",
+                    "dst_node": "math_operation_5",
+                    "dst_port": "input_0"
+                },
+                "25": {
+                    "src_node": "vel_estimator_21",
+                    "src_port": "output",
+                    "dst_node": "math_operation_32",
+                    "dst_port": "input_0"
+                },
+                "26": {
+                    "src_node": "edge_detect_11",
+                    "src_port": "output",
+                    "dst_node": "j6 vel loop",
+                    "dst_port": "reset"
+                },
+                "27": {
+                    "src_node": "j4 pos loop",
+                    "src_port": "output",
+                    "dst_node": "math_operation_13",
+                    "dst_port": "input_0"
+                },
+                "28": {
+                    "src_node": "math_operation_29",
+                    "src_port": "output",
+                    "dst_node": "math_operation_31",
+                    "dst_port": "input_1"
+                },
+                "29": {
+                    "src_node": "get_global_variable_19",
+                    "src_port": "output",
+                    "dst_node": "math_operation_23",
+                    "dst_port": "input_1"
+                },
+                "30": {
+                    "src_node": "math_operation_8",
+                    "src_port": "output",
+                    "dst_node": "j4 vel loop",
+                    "dst_port": "input"
+                },
+                "31": {
+                    "src_node": "math_operation_31",
+                    "src_port": "output",
+                    "dst_node": "j5 vel loop",
+                    "dst_port": "input"
+                },
+                "32": {
+                    "src_node": "get_global_variable_3",
+                    "src_port": "output",
+                    "dst_node": "math_operation_6",
+                    "dst_port": "input_1"
+                },
+                "33": {
+                    "src_node": "edge_detect_11",
+                    "src_port": "output",
+                    "dst_node": "j4 pos loop",
+                    "dst_port": "reset"
+                },
+                "34": {
+                    "src_node": "math_operation_5",
+                    "src_port": "output",
+                    "dst_node": "vel_estimator_1",
+                    "dst_port": "input"
+                },
+                "35": {
+                    "src_node": "math_operation_13",
+                    "src_port": "output",
+                    "dst_node": "math_operation_8",
+                    "dst_port": "input_1"
+                },
+                "36": {
+                    "src_node": "vel_estimator_1",
+                    "src_port": "output",
+                    "dst_node": "math_operation_8",
+                    "dst_port": "input_0"
+                },
+                "37": {
+                    "src_node": "math_operation_5",
+                    "src_port": "output",
+                    "dst_node": "math_operation_6",
+                    "dst_port": "input_0"
+                },
+                "38": {
+                    "src_node": "math_operation_6",
+                    "src_port": "output",
+                    "dst_node": "converter_7",
+                    "dst_port": "input"
+                },
+                "39": {
+                    "src_node": "math_operation_32",
+                    "src_port": "output",
+                    "dst_node": "j6 vel loop",
+                    "dst_port": "input"
+                }
+            },
+            "nodes": {
+                "get_global_variable_0": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:3.total_turns"
+                        }
+                    }
+                },
+                "vel_estimator_1": {
+                    "type": "vel_estimator",
+                    "config": {
+                        "alpha": 0.3
+                    }
+                },
+                "j4 vel loop": {
+                    "type": "pi_controller",
+                    "config": {
+                        "Kp": 0.05,
+                        "Ki": 0.01,
+                        "i_limit": 1.5,
+                        "output_min": -1.2,
+                        "output_max": 1.2
+                    }
+                },
+                "get_global_variable_3": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "j4 pos cmd"
+                        }
+                    }
+                },
+                "j4 pos loop": {
+                    "type": "pi_controller",
+                    "config": {
+                        "Kp": 20.0,
+                        "Ki": 0.0,
+                        "i_limit": 0.0,
+                        "output_min": -20.0,
+                        "output_max": 20.0
+                    }
+                },
+                "math_operation_5": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "unary",
+                        "op": "negate"
+                    }
+                },
+                "math_operation_6": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "converter_7": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "double",
+                        "output_type": "float",
+                        "mode": "direct",
+                        "invert": false
+                    }
+                },
+                "math_operation_8": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "float",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "set_global_variable_9": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j4 current cmd"
+                        }
+                    }
+                },
+                "get_global_variable_10": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "power is on"
+                        }
+                    }
+                },
+                "edge_detect_11": {
+                    "type": "edge_detect",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false
+                    }
+                },
+                "converter_12": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "double",
+                        "output_type": "float",
+                        "mode": "direct",
+                        "invert": false
+                    }
+                },
+                "math_operation_13": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "float",
+                        "op_type": "unary",
+                        "op": "negate"
+                    }
+                },
+                "get_global_variable_14": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:4.total_turns"
+                        }
+                    }
+                },
+                "math_operation_15": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "unary",
+                        "op": "negate"
+                    }
+                },
+                "get_global_variable_16": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "yaskawa_encoders:5.total_turns"
+                        }
+                    }
+                },
+                "math_operation_17": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "unary",
+                        "op": "negate"
+                    }
+                },
+                "get_global_variable_18": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "j5 pos cmd"
+                        }
+                    }
+                },
+                "get_global_variable_19": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "j6 pos cmd"
+                        }
+                    }
+                },
+                "vel_estimator_20": {
+                    "type": "vel_estimator",
+                    "config": {
+                        "alpha": 0.3
+                    }
+                },
+                "vel_estimator_21": {
+                    "type": "vel_estimator",
+                    "config": {
+                        "alpha": 0.3
+                    }
+                },
+                "math_operation_22": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "math_operation_23": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "converter_24": {
+                    "type": "converter",
+                    "config": {
+                        "input_type": "double",
+                        "output_type": "float",
+                        "mode": "direct",
+                        "invert": false
+                    }
+                },
+                "j5 pos loop": {
+                    "type": "pi_controller",
+                    "config": {
+                        "Kp": 20.0,
+                        "Ki": 0.0,
+                        "i_limit": 0.0,
+                        "output_min": -20.0,
+                        "output_max": 20.0
+                    }
+                },
+                "j5 vel loop": {
+                    "type": "pi_controller",
+                    "config": {
+                        "Kp": 0.05,
+                        "Ki": 0.01,
+                        "i_limit": 1.5,
+                        "output_min": -1.2,
+                        "output_max": 1.2
+                    }
+                },
+                "j6 pos loop": {
+                    "type": "pi_controller",
+                    "config": {
+                        "Kp": 20.0,
+                        "Ki": 0.0,
+                        "i_limit": 0.0,
+                        "output_min": -20.0,
+                        "output_max": 20.0
+                    }
+                },
+                "j6 vel loop": {
+                    "type": "pi_controller",
+                    "config": {
+                        "Kp": 0.05,
+                        "Ki": 0.01,
+                        "i_limit": 1.5,
+                        "output_min": -1.2,
+                        "output_max": 1.2
+                    }
+                },
+                "math_operation_29": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "float",
+                        "op_type": "unary",
+                        "op": "negate"
+                    }
+                },
+                "math_operation_30": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "float",
+                        "op_type": "unary",
+                        "op": "negate"
+                    }
+                },
+                "math_operation_31": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "float",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "math_operation_32": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "float",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "set_global_variable_33": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j5 current cmd"
+                        }
+                    }
+                },
+                "set_global_variable_34": {
+                    "type": "set_global_variable",
+                    "config": {
+                        "variables": {
+                            "input": "j6 current cmd"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "user_node_vars": {
+        "error reset": {
+            "type": "bool"
+        },
+        "enable drives": {
+            "type": "bool"
+        },
+        "power on": {
+            "type": "bool"
+        },
+        "errors active": {
+            "type": "bool"
+        },
+        "power is on": {
+            "type": "bool"
+        },
+        "case fan speed": {
+            "type": "uint16"
+        },
+        "brake status": {
+            "type": "uint8"
+        },
+        "brake command": {
+            "type": "uint8"
+        },
+        "enable power": {
+            "type": "bool"
+        },
+        "pfc precharge done": {
+            "type": "bool"
+        },
+        "pfc precharge active": {
+            "type": "bool"
+        },
+        "j4 pos cmd": {
+            "type": "double"
+        },
+        "j4 current cmd": {
+            "type": "float"
+        },
+        "j5 current cmd": {
+            "type": "float"
+        },
+        "j6 current cmd": {
+            "type": "float"
+        },
+        "j5 pos cmd": {
+            "type": "double"
+        },
+        "j6 pos cmd": {
+            "type": "double"
+        },
+        "j1 pos cmd": {
+            "type": "double"
+        },
+        "j2 pos cmd": {
+            "type": "double"
+        },
+        "j3 pos cmd": {
+            "type": "double"
+        },
+        "j1 current cmd": {
+            "type": "float"
+        },
+        "j2 current cmd": {
+            "type": "float"
+        },
+        "j3 current cmd": {
+            "type": "float"
+        }
+    },
+    "node_var_values": {}
+}

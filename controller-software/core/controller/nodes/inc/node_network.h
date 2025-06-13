@@ -11,6 +11,7 @@
 
 class node_network {
     public:
+        bool* dynamic_enable = nullptr; // enable flag that points to a global variable
         enum update_type{
             SYNC,
             ASYNC

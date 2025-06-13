@@ -43,8 +43,7 @@ class bitwise_split: public base_node {
                 return 1;
             }
 
-            auto config = json->find("config");
-            type = get_io_type(config->at("type").get<std::string>());
+            type = get_io_type(json->at("type").get<std::string>());
 
             switch(type){
                 case io_type::UINT8:

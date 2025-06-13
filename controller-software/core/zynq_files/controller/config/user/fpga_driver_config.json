@@ -38,23 +38,23 @@
         "devices": {
             "0": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "1": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "2": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "3": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "4": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             }
         }
     },
@@ -64,15 +64,15 @@
         "devices": {
             "0": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "1": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "2": {
                 "cyclic_read_node_vars":0,
-                "cyclic_write_node_vars":0
+                "cyclic_write_node_vars":1
             },
             "3": {
                 "cyclic_read_node_vars":0,

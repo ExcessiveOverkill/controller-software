@@ -209,6 +209,8 @@ class math_operation: public base_node {
                     std::cerr << "Error: undefined unary operation" << std::endl;
                     return 2; // undefined operation error
             }
+            double d = *(double*)out;
+            float f = *(float*)out;
             return 0; // success
         }
         
@@ -317,14 +319,13 @@ class math_operation: public base_node {
                 return 1;
             }
 
-            auto config = json->find("config");
-            io_type type = get_io_type(config->at("type").get<std::string>());
+            type = get_io_type(json->at("type").get<std::string>());
             if(type == io_type::UNDEFINED){
                 std::cerr << "Error: invalid type for comparator node" << std::endl;
                 return 1;
             }
 
-            mode = get_operation_mode(config->at("op_type").get<std::string>());
+            mode = get_operation_mode(json->at("op_type").get<std::string>());
             if (mode == operation_mode::UNDEFINED) {
                 std::cerr << "Error: invalid operation mode" << std::endl;
                 return 2;
@@ -332,19 +333,19 @@ class math_operation: public base_node {
 
             switch(mode) {
                 case operation_mode::NARY:
-                    nary_op = get_nary_operation(config->at("op").get<std::string>());
+                    nary_op = get_nary_operation(json->at("op").get<std::string>());
                     if (nary_op == nary_operation::UNDEFINED) {
                         std::cerr << "Error: invalid nary operation" << std::endl;
                         return 3;
                     }
-                    input_count = config->at("input_count").get<uint8_t>();
+                    input_count = json->at("input_count").get<uint8_t>();
                     if (input_count < 2 || input_count > 32) {
                         std::cerr << "Error: input count must be between 2 and 32" << std::endl;
                         return 4;
                     }
                     break;
                 case operation_mode::BINARY:
-                    binary_op = get_binary_operation(config->at("op").get<std::string>());
+                    binary_op = get_binary_operation(json->at("op").get<std::string>());
                     if (binary_op == binary_operation::UNDEFINED) {
                         std::cerr << "Error: invalid binary operation" << std::endl;
                         return 4;
@@ -352,7 +353,7 @@ class math_operation: public base_node {
                     input_count = 2; // binary operations always have 2 inputs
                     break;
                 case operation_mode::UNARY:
-                    unary_op = get_unary_operation(config->at("op").get<std::string>());
+                    unary_op = get_unary_operation(json->at("op").get<std::string>());
                     if (unary_op == unary_operation::UNDEFINED) {
                         std::cerr << "Error: invalid unary operation" << std::endl;
                         return 5;
@@ -394,10 +395,10 @@ class math_operation: public base_node {
                     return 7; // invalid type
             }
 
-            outputs.emplace("output", output(type, &out, &execution_number));
+            outputs.emplace("output", output(type, out, &execution_number));
 
             for (uint8_t i = 0; i < input_count; ++i) {
-                std::string input_name = "in_" + std::to_string(i);
+                std::string input_name = "input_" + std::to_string(i);
                 inputs.emplace(input_name, input(type, nullptr));
                 input_signals[i] = &inputs[input_name];
             }

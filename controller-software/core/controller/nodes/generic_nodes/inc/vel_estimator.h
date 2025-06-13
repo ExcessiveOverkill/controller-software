@@ -85,15 +85,12 @@ class vel_estimator: public base_node {
             
             */
 
-            if(data->find("config") == data->end()){
-                std::cerr << "Error: config not found" << std::endl;
-                return 1;
+            if(data->find("alpha") != data->end()){
+                estimator.setAlpha(data->at("alpha"));
             }
-
-            auto config = data->at("config");
-
-            if(config.find("alpha") != config.end()){
-                estimator.setAlpha(config["alpha"]);
+            else {
+                std::cerr << "Error: 'alpha' not found in configuration" << std::endl;
+                return 1; // Error code for missing alpha
             }
             return 0;
         }

@@ -38,8 +38,7 @@ class constant: public base_node {
                 return 1;
             }
 
-            auto config = json->find("config");
-            io_type type = get_io_type(config->at("type").get<std::string>());
+            io_type type = get_io_type(json->at("type").get<std::string>());
             if(type == io_type::UNDEFINED){
                 std::cerr << "Error: invalid type for constant node" << std::endl;
                 return 1;
@@ -47,31 +46,31 @@ class constant: public base_node {
 
             switch(type){
                 case io_type::UINT8:
-                    data_ptr = new uint8_t(config->at("value").get<uint8_t>());
+                    data_ptr = new uint8_t(json->at("value").get<uint8_t>());
                     break;
                 case io_type::INT8:
-                    data_ptr = new int8_t(config->at("value").get<int8_t>());
+                    data_ptr = new int8_t(json->at("value").get<int8_t>());
                     break;
                 case io_type::UINT16:
-                    data_ptr = new uint16_t(config->at("value").get<uint16_t>());
+                    data_ptr = new uint16_t(json->at("value").get<uint16_t>());
                     break;
                 case io_type::INT16:
-                    data_ptr = new int16_t(config->at("value").get<int16_t>());
+                    data_ptr = new int16_t(json->at("value").get<int16_t>());
                     break;
                 case io_type::UINT32:
-                    data_ptr = new uint32_t(config->at("value").get<uint32_t>());
+                    data_ptr = new uint32_t(json->at("value").get<uint32_t>());
                     break;
                 case io_type::INT32:
-                    data_ptr = new int32_t(config->at("value").get<int32_t>());
+                    data_ptr = new int32_t(json->at("value").get<int32_t>());
                     break;
                 case io_type::FLOAT:
-                    data_ptr = new float(config->at("value").get<float>());
+                    data_ptr = new float(json->at("value").get<float>());
                     break;
                 case io_type::DOUBLE:
-                    data_ptr = new double(config->at("value").get<double>());
+                    data_ptr = new double(json->at("value").get<double>());
                     break;
                 case io_type::BOOL:
-                    data_ptr = new bool(config->at("value").get<bool>());
+                    data_ptr = new bool(json->at("value").get<bool>());
                     break;
                 default:
                     std::cerr << "Error: invalid type for constant node" << std::endl;

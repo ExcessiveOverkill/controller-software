@@ -257,16 +257,34 @@ void Controller::setup_main_thread(){
 uint32_t Controller::critical_calls(){  // realtime calls that must be completed each cycle
     // realtime loop at a set frequency
 
+    volatile int32_t cache_invalidate_us;
+    volatile int32_t cache_flush_us;
+    volatile int32_t run_fpga_driver_update_us;
+    volatile int32_t run_node_core_us;
+
     cycle_count++;
 
+    auto start_time = std::chrono::high_resolution_clock::now();
     // run low level fpga drivers
     fpga.cache_invalidate_all();    // make sure any cached memory gets updated
+    auto end_time = std::chrono::high_resolution_clock::now();
+    cache_invalidate_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+
+    start_time = std::chrono::high_resolution_clock::now();
     fpga_manager.run_update();  // updates low level drivers
+    end_time = std::chrono::high_resolution_clock::now();
+    run_fpga_driver_update_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     
     // run node network
+    start_time = std::chrono::high_resolution_clock::now();
     node_core.run_update();
+    end_time = std::chrono::high_resolution_clock::now();
+    run_node_core_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     
+    start_time = std::chrono::high_resolution_clock::now();
     fpga.cache_flush_all(); // write any changed data to FPGA memory
+    end_time = std::chrono::high_resolution_clock::now();
+    cache_flush_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
 
     return 0;
 }

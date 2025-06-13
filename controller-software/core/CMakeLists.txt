@@ -31,6 +31,8 @@ file(GLOB_RECURSE sources_SRCS
     ${PROJ_PATH}/controller/nodes/generic_nodes/src/*.c
     ${PROJ_PATH}/controller/nodes/global_variables/src/*.cpp
     ${PROJ_PATH}/controller/nodes/global_variables/src/*.c
+    ${PROJ_PATH}/controller/nodes/solvers/src/*.cpp
+    ${PROJ_PATH}/controller/nodes/solvers/src/*.c
     ${PROJ_PATH}/controller/api_drivers/src/*.cpp
     ${PROJ_PATH}/controller/api_drivers/src/*.c
     ${PROJ_PATH}/controller/api_drivers/calls/src/*.cpp
@@ -50,6 +52,7 @@ set(include_path_DIRS
     ${PROJ_PATH}/controller/nodes/inc
     ${PROJ_PATH}/controller/nodes/generic_nodes/inc
     ${PROJ_PATH}/controller/nodes/global_variables/inc
+    ${PROJ_PATH}/controller/nodes/solvers/inc
     ${PROJ_PATH}/controller/api_drivers/inc
     ${PROJ_PATH}/controller/api_drivers/calls/inc
 

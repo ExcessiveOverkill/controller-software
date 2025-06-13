@@ -3,8 +3,13 @@
 #include <iostream>
 #include "controller.h"
 
+#include "kins_6_axis.h"
 
 int main() {
+
+    // InverseKinematics ik;
+    // ik.benchmark();
+    // return 0;
 
     Controller controller;
 

@@ -10,8 +10,10 @@ Make a global variable accessible by nodes
 
 class set_global_variable: public base_node {
     private:
+        bool default_enable = true;
         struct input_pair{
             input* input_ptr = nullptr;
+            input* enable_ptr = nullptr; // optional enable input, if not set, the node will always run
             global_variable* variable = nullptr;
         };
 
@@ -29,6 +31,9 @@ class set_global_variable: public base_node {
             // copy input data to global variable
             for(auto& pair : input_pairs){
                 if(pair.variable != nullptr && pair.input_ptr->data_pointer != nullptr){
+                    if(!*(bool*)pair.enable_ptr->data_pointer){
+                        continue;   // skip if enable input is false
+                    }
                     pair.variable->set_value(pair.input_ptr->data_pointer);
                 }
             }
@@ -43,9 +48,11 @@ class set_global_variable: public base_node {
             }
 
             inputs.emplace(input_name, input(variable->get_type(), nullptr));
+            inputs.emplace(input_name + "_enable", input(io_type::BOOL, &default_enable)); // optional enable input
 
             input_pair new_pair;
             new_pair.input_ptr = &inputs[input_name];
+            new_pair.enable_ptr = &inputs[input_name + "_enable"];
             new_pair.variable = variable;
             input_pairs.push_back(new_pair);
             
