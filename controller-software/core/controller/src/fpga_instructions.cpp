@@ -588,12 +588,12 @@ uint32_t fpga_instructions::compile(){
 
     std::cout << "instructions placed" << std::endl;
 
-    for(auto instruction : instructions){
-        if(instruction.block_placeholder){
-            continue;
-        }
-        std::cout << instruction.dma_execution_cycle << "\t" << instruction.source_name << " -> " << instruction.destination_name << std::endl;
-    }
+    // for(auto instruction : instructions){
+    //     if(instruction.block_placeholder){
+    //         continue;
+    //     }
+    //     std::cout << instruction.dma_execution_cycle << "\t" << instruction.source_name << " -> " << instruction.destination_name << std::endl;
+    // }
 
     condense_instructions();
 
@@ -837,12 +837,12 @@ uint32_t fpga_instructions::update_dynamic_instructions(){
 }
 
 uint64_t fpga_instructions::create_instruction_COPY(uint8_t src_node, uint16_t src_addr, uint8_t dst_node, uint16_t dst_addr){
-    std::cout << "src_node: " << (uint64_t)src_node << " src_addr: " << (uint64_t)src_addr << " dst_node: " << (uint64_t)dst_node << " dst_addr: " << (uint64_t)dst_addr << std::endl;
+    // std::cout << "src_node: " << (uint64_t)src_node << " src_addr: " << (uint64_t)src_addr << " dst_node: " << (uint64_t)dst_node << " dst_addr: " << (uint64_t)dst_addr << std::endl;
     return  ((uint64_t)src_node << 0) | ((uint64_t)dst_node << 8) | ((uint64_t)src_addr << 16) | ((uint64_t)dst_addr << 32) | ((uint64_t)instruction_type::COPY << 48);
 }
 
 uint64_t fpga_instructions::create_instruction_WAIT(uint32_t cycles){
-    std::cout << "wait: " << cycles << std::endl;
+    // std::cout << "wait: " << cycles << std::endl;
     return ((uint64_t)cycles) | ((uint64_t)instruction_type::WAIT << 48);
 }
 

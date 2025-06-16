@@ -35,23 +35,20 @@ class api_output: public base_node {
             /*
             parse settings from json
             {
-                "config":
-                {
-                    "type": "uint8"
-                },
+
+                "type": "uint8"
                 "get": 0    // adding the get key will trigger the retrieval of the value from the input
             }
             */
 
             
 
-            if(json->find("config") != json->end()){    // config mode
+            if(json->find("type") != json->end()){    // config mode
                 if(configured){
                     std::cerr << "Error: api_input node already configured" << std::endl;
                     return 1;
                 }
-                auto c = (*json)["config"];
-                type = get_io_type(c["type"].get<std::string>());
+                type = get_io_type((*json)["type"].get<std::string>());
                 if(type == io_type::UNDEFINED || type == io_type::EM_SERIAL_DEVICE){
                     std::cerr << "Error: invalid type for api_output node" << std::endl;
                     return 1;
@@ -98,7 +95,6 @@ class api_output: public base_node {
                         break;
                     default:
                         std::cerr << "Error: invalid type for api_output node" << std::endl;
-
                 }
             }
             

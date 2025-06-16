@@ -23,7 +23,9 @@ class math_operation: public base_node {
 
         enum class nary_operation {
             ADD,
+            SUB,
             MUL,
+            DIV,
             MIN,
             MAX,
             AVG,
@@ -65,6 +67,10 @@ class math_operation: public base_node {
         nary_operation get_nary_operation(std::string op_str) {
             if (op_str == "add") {
                 return nary_operation::ADD;
+            } else if (op_str == "sub") {
+                return nary_operation::SUB;
+            } else if (op_str == "div") {
+                return nary_operation::DIV;
             } else if (op_str == "mul") {
                 return nary_operation::MUL;
             } else if (op_str == "min") {
@@ -123,8 +129,33 @@ class math_operation: public base_node {
                     case nary_operation::ADD:
                         result += value;
                         break;
+                    case nary_operation::SUB:
+                        if (i == 0) {
+                            result = value; // initialize result with the first value
+                        }
+                        else{
+                            result -= value;
+                        }
+                        break;
                     case nary_operation::MUL:
-                        result *= value;
+                        if (i == 0) {
+                            result = value; // initialize result with the first value
+                        }
+                        else{
+                            result *= value;
+                        }
+                        break;
+                    case nary_operation::DIV:
+                        if (i == 0) {
+                            result = value; // initialize result with the first value
+                        }
+                        else{
+                            if (value == 0) {
+                                std::cerr << "Error: division by zero in math_operation node" << std::endl;
+                                return 2; // division by zero error
+                            }
+                            result /= value;
+                        }
                         break;
                     case nary_operation::MIN:
                         if (i == 0 || value < result) {
