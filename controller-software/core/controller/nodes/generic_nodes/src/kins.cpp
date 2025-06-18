@@ -327,6 +327,11 @@ void kins::inverse_kins(){
         angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
     }
 
+    // invert j3, j4, j5 to match the robot's joint directions
+    current_joint_angles[2] = -current_joint_angles[2];
+    current_joint_angles[3] = -current_joint_angles[3];
+    current_joint_angles[4] = -current_joint_angles[4];
+
     std::array<float, 6> cartTwist = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // No twist
     std::array<float, 6> outSolution;
     std::array<float, 6> outVelocities;
