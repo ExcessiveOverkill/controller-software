@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/zynq_files/controller/bin/controller_core",
             "args": [],
-            "stopAtEntry": true,
+            "stopAtEntry": false,   // stop at main?
             "targetArchitecture": "arm",
             "cwd": "${workspaceFolder}/build",
             "environment": [],

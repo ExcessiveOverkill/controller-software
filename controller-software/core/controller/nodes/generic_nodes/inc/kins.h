@@ -129,12 +129,26 @@ class kins: public base_node {
         std::array<joint_lim_distance,6> joint_distances_to_limit;
         void update_joint_distances_to_limit();
 
-        float last_jog_vel = 0.0f; // last jog vel used, to limit acceleration
         float max_jog_speed = 0.1f; // max jog speed as a portion of the joint max_vel
+
+        cartesian_positions last_cmd_cartesian_positions; // these are what were used with the inverse kins
+
+        float last_joint_jog_vel = 0.0f; // last jog vel used, to limit acceleration
         void jog_joint(uint8_t jog_axis, float jog_vel, float speed_override);
 
+        float last_cartesian_jog_vel = 0.0f; // last jog vel used, to limit acceleration
+        void jog_cartesian(uint8_t jog_axis, float jog_vel, float speed_override);
+
+        void inverse_kins();
+
+        void set_closest_joint_positions(std::array<float,6>* joint_angles);
+        
+        
+        bool clamp_to_limits();
 
         void rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* euler);
+
+        double wrapNearest(double absAngle, double cmdAngle);
 
 
         
@@ -199,10 +213,10 @@ class kins: public base_node {
                 if(dh_params.is_array() && dh_params.size() == 6){
                     std::array<InverseKinematics::DHParam,6> dh;
                     for(size_t i = 0; i < 6; i++){
-                        dh[i].alpha = dh_params[i]["alpha"].get<float>();
+                        dh[i].alpha = dh_params[i]["alpha"].get<float>() * M_PI / 180.0f; // convert degrees to radians
                         dh[i].a = dh_params[i]["a"].get<float>();
                         dh[i].d = dh_params[i]["d"].get<float>();
-                        dh[i].thetaOffset = dh_params[i]["theta"].get<float>();
+                        dh[i].thetaOffset = dh_params[i]["theta"].get<float>() * M_PI / 180.0f; // convert degrees to radians
                     }
                     ik_solver.setDHParameters(dh);
                 }
@@ -219,10 +233,10 @@ class kins: public base_node {
                 if(limits.is_object()){
                     for(int i = 0; i < 6; i++){
                         if(limits.find(std::to_string(i)) != limits.end()){
-                            joint_limits[i].min_pos = limits[std::to_string(i)]["min_pos"].get<float>();
-                            joint_limits[i].max_pos = limits[std::to_string(i)]["max_pos"].get<float>();
-                            joint_limits[i].max_vel = limits[std::to_string(i)]["max_vel"].get<float>();
-                            joint_limits[i].max_acc = limits[std::to_string(i)]["max_acc"].get<float>();
+                            joint_limits[i].min_pos = limits[std::to_string(i)]["min_pos"].get<float>() * M_PI / 180.0f; // convert degrees to radians
+                            joint_limits[i].max_pos = limits[std::to_string(i)]["max_pos"].get<float>() * M_PI / 180.0f;
+                            joint_limits[i].max_vel = limits[std::to_string(i)]["max_vel"].get<float>() * M_PI / 180.0f;
+                            joint_limits[i].max_acc = limits[std::to_string(i)]["max_acc"].get<float>() * M_PI / 180.0f;
                         }
                         else {
                             std::cerr << "Missing limit for joint " << i << std::endl;
@@ -271,6 +285,12 @@ class kins: public base_node {
                         else {
                             std::cerr << "Missing cartesian limit for axis " << axis_name << std::endl;
                             return 1; // error code for configuration failure
+                        }
+                        if(i > 2){  // angle axes
+                            cartesian_limits[i].min_pos *= M_PI / 180.0f; // convert degrees to radians
+                            cartesian_limits[i].max_pos *= M_PI / 180.0f;
+                            cartesian_limits[i].max_vel *= M_PI / 180.0f;
+                            cartesian_limits[i].max_acc *= M_PI / 180.0f;
                         }
                     }
                 }

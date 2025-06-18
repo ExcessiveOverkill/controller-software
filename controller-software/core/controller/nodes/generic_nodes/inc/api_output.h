@@ -87,6 +87,7 @@ class api_output: public base_node {
                         break;
                     case io_type::FLOAT:
                         (*json)["get"] = *(float*)input_ptr->data_pointer;
+                        break;
                     case io_type::DOUBLE:
                         (*json)["get"] = *(double*)input_ptr->data_pointer;
                         break;
