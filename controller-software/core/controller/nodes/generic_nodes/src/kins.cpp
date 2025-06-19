@@ -117,31 +117,32 @@ uint32_t kins::run(){
 
     update_joint_distances_to_limit();
 
-    if(!in_sigs.reset){
-        switch(in_sigs.control_mode){
-            case control_modes::JOG:
-                // update joint positions based on jog inputs
-                if(in_sigs.jog_mode == jog_modes::JOINT){
-                    // jog in joint space, automatic joint endstop limiting
-                    jog_joint(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+    switch(in_sigs.control_mode){
+        case control_modes::JOG:
+            // update joint positions based on jog inputs
+            if(in_sigs.jog_mode == jog_modes::JOINT){
+                if(last_jog_mode != jog_modes::JOINT || in_sigs.reset){
+                    out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
+                    last_joint_jog_vel = 0.0f;
                 }
-                else if(in_sigs.jog_mode == jog_modes::CARTESIAN){
-                    // jog in cartesian space, no automatic endstop limiting (yet)
-                    jog_cartesian(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+                // jog in joint space, automatic joint endstop limiting
+                jog_joint(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+            }
+            else if(in_sigs.jog_mode == jog_modes::CARTESIAN){
+                if(last_jog_mode != jog_modes::CARTESIAN || in_sigs.reset){
+                    last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions; // reset the commanded cartesian positions to the current positions
                 }
-                break;
-        }
-        
-        // TODO: fix this possibly causing motion on starup if past a limit
-        bool on_limit = clamp_to_limits();  // clamp the commanded joint positions to the limits as a failsafe
+                // jog in cartesian space, no automatic endstop limiting (yet)
+                jog_cartesian(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+            }
+            last_jog_mode = in_sigs.jog_mode;
+            break;
+    }
+    
+    // TODO: fix this possibly causing motion on starup if past a limit
+    bool on_limit = clamp_to_limits();  // clamp the commanded joint positions to the limits as a failsafe
 
-    }
-    // reset sets cmds to the current fbk positions
-    else{
-        out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
-        last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions; // reset the commanded cartesian positions to the current positions
-        return 0;
-    }
+
 
     return 0; // no errors
 }
@@ -214,9 +215,6 @@ void kins::update_forward_kinematics_outputs(){
     std::array<float,3> pos_out;
     std::array<float,9> rot_out;
     ik_solver.forwardKinematicsF32(joint_angles, pos_out, rot_out);
-    float* xfbk_ptr = &out_sigs.fbk_cartesian_positions.x;
-    float* yfbk_ptr = &out_sigs.fbk_cartesian_positions.y;
-    float* zfbk_ptr = &out_sigs.fbk_cartesian_positions.z;
     
     out_sigs.fbk_cartesian_positions.x = pos_out[0];
     out_sigs.fbk_cartesian_positions.y = pos_out[1];
@@ -228,6 +226,74 @@ void kins::update_forward_kinematics_outputs(){
     out_sigs.fbk_cartesian_positions.yangle = euler_out[1];
     out_sigs.fbk_cartesian_positions.zangle = euler_out[2];
     return;
+}
+
+bool kins::validate_kins_solution(const std::array<float,6>* joint_angles_, const cartesian_positions* cartesian_pos, const float pos_tol, const float angle_tol){
+    
+    std::array<float,6> joint_angles = {
+        (*joint_angles_)[0],
+        (*joint_angles_)[1],
+        (*joint_angles_)[2],
+        (*joint_angles_)[3],
+        (*joint_angles_)[4],
+        (*joint_angles_)[5]
+    };
+    
+    joint_angles[2] += joint_angles[1]; // j3 is relative to j2, so we need to add them together
+
+    // invert j3, j4, j5 to match the robot's joint directions
+    joint_angles[2] = -joint_angles[2];
+    joint_angles[3] = -joint_angles[3];
+    joint_angles[4] = -joint_angles[4];
+
+    // wrap angles to [-pi, pi]
+    for(auto& angle : joint_angles){
+        angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
+    }
+
+    // get cartesian position and rotation matrix
+    std::array<float,3> pos_out;
+    std::array<float,9> rot_out;
+    ik_solver.forwardKinematicsF32(joint_angles, pos_out, rot_out);
+
+    cartesian_positions pos_out_cartesian;
+    pos_out_cartesian.x = pos_out[0];
+    pos_out_cartesian.y = pos_out[1];
+    pos_out_cartesian.z = pos_out[2];
+
+    std::array<float,3> euler_out;
+    rot_to_euler(&rot_out, &euler_out);
+    pos_out_cartesian.xangle = euler_out[0];
+    pos_out_cartesian.yangle = euler_out[1];
+    pos_out_cartesian.zangle = euler_out[2];
+
+    bool valid = true;
+
+    // check position error
+    if(fabs(pos_out_cartesian.x - cartesian_pos->x) > pos_tol ||
+       fabs(pos_out_cartesian.y - cartesian_pos->y) > pos_tol ||
+       fabs(pos_out_cartesian.z - cartesian_pos->z) > pos_tol){
+        valid = false;
+    }
+
+    // check angle error (shortest angle distance)
+    auto shortest_angle_dist = [](float a, float b) -> float {
+        float diff = a - b;
+        diff = fmod(diff + M_PI, 2.0f * M_PI);
+        if (diff < 0) diff += 2.0f * M_PI;
+        return diff - M_PI;
+    };
+    float angle_error_x = shortest_angle_dist(pos_out_cartesian.xangle, cartesian_pos->xangle);
+    float angle_error_y = shortest_angle_dist(pos_out_cartesian.yangle, cartesian_pos->yangle);
+    float angle_error_z = shortest_angle_dist(pos_out_cartesian.zangle, cartesian_pos->zangle);
+    if(fabs(angle_error_x) > angle_tol ||
+       fabs(angle_error_y) > angle_tol ||
+       fabs(angle_error_z) > angle_tol){
+        valid = false;
+    }
+    
+    return valid;
+
 }
 
 void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override){
@@ -255,26 +321,53 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
         jog_vel = last_cartesian_jog_vel; // use the limited jog vel for the rest of the function
     }
 
+
+    jog_vel *= time_step; // convert to position change in this time step
+
     // update the commanded cartesian position based on the jog speed
-    switch(jog_axis){
-        case 0:
-            last_cmd_cartesian_positions.x += jog_vel * time_step;
-            break;
-        case 1:
-            last_cmd_cartesian_positions.y += jog_vel * time_step;
-            break;
-        case 2:
-            last_cmd_cartesian_positions.z += jog_vel * time_step;
-            break;
-        case 3:
-            last_cmd_cartesian_positions.xangle += jog_vel * time_step;
-            break;
-        case 4:
-            last_cmd_cartesian_positions.yangle += jog_vel * time_step;
-            break;
-        case 5:
-            last_cmd_cartesian_positions.zangle += jog_vel * time_step;
-            break;
+    if(jog_axis < 3){ // x, y, z axes
+        switch(jog_axis){
+            case 0:
+                last_cmd_cartesian_positions.x += jog_vel;
+                break;
+            case 1:
+                last_cmd_cartesian_positions.y += jog_vel;
+                break;
+            case 2:
+                last_cmd_cartesian_positions.z += jog_vel;
+                break;
+        }
+    }
+    else{   // xangle, yangle, zangle axes
+        
+        // use quaternions to rotate, so the rotations are intuitive
+
+        quat_rot q = quatFromZYX(
+            last_cmd_cartesian_positions.zangle,
+            last_cmd_cartesian_positions.yangle,
+            last_cmd_cartesian_positions.xangle
+        );
+
+        float h = jog_vel * 0.5f;
+        float c = cosf(h), s = sinf(h);
+        quat_rot jog_rot;
+        switch(jog_axis) {
+            case 3: jog_rot = quat_rot{c,  0, 0, s}; break; // xangle
+            case 4: jog_rot = quat_rot{c,  0, s, 0}; break; // yangle
+            case 5: jog_rot = quat_rot{c,  s, 0, 0}; break; // zangle
+            default: jog_rot = quat_rot{1,0,0,0}; break; // no rotation
+        }
+
+        // apply the jog rotation to the current quaternion
+        q = multiply(q, jog_rot);
+
+        // convert the quaternion back to euler angles
+        toEulerZYX(&q, 
+            &last_cmd_cartesian_positions.zangle, 
+            &last_cmd_cartesian_positions.yangle, 
+            &last_cmd_cartesian_positions.xangle
+        );
+        
     }
 
     inverse_kins(); // calculate the joint positions based on the new cartesian positions
@@ -294,12 +387,14 @@ void kins::inverse_kins(){
         last_cmd_cartesian_positions.zangle
     };
 
-    target_euler = {0.0, 0.0, 0.0}; // set target euler angles to zero for testing
+    // target_euler = {0.0, 0.0, 0.0}; // set target euler angles to zero for testing
 
     // wrap angles to [-pi, pi]
-    for(auto& angle : target_euler){
-        angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
-    }
+    // for(auto& angle : target_euler){
+    //     angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
+    // }
+
+    // std::array<float,6> current_joint_angles = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
     std::array<float,6> current_joint_angles = {    // use commanded joint positions as the current joint angles
         (float)out_sigs.cmd_joint_positions.j1,
@@ -322,9 +417,9 @@ void kins::inverse_kins(){
     // get correct j3 angle
     current_joint_angles[2] += current_joint_angles[1]; // j3 is relative to j2, so we need to add them together
 
-    // wrap angles to [-pi, pi]
+    // wrap angles to [0 - 2pi]
     for(auto& angle : current_joint_angles){
-        angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
+        angle = fmod(angle + 2.0f * M_PI, 2.0f * M_PI);
     }
 
     // invert j3, j4, j5 to match the robot's joint directions
@@ -357,8 +452,6 @@ void kins::inverse_kins(){
         // un-offset j3
         outSolution[2] -= outSolution[1];
 
-        set_closest_joint_positions(&outSolution);
-
         // update the last commanded cartesian positions
         last_cmd_cartesian_positions.x = target_pos[0];
         last_cmd_cartesian_positions.y = target_pos[1];
@@ -366,6 +459,17 @@ void kins::inverse_kins(){
         last_cmd_cartesian_positions.xangle = target_euler[0];
         last_cmd_cartesian_positions.yangle = target_euler[1];
         last_cmd_cartesian_positions.zangle = target_euler[2];
+
+        bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.01f, 0.01f);
+
+        if(valid){
+            set_closest_joint_positions(&outSolution);
+        }
+        else{
+            volatile bool t; // for debugging breakpoint
+            t = true; // set a breakpoint here to debug invalid kins solution
+        }
+
     }
 
 }
@@ -384,6 +488,7 @@ void kins::set_closest_joint_positions(std::array<float,6>* joint_angles){
         }
 
         *actual_joint_pos = wrapNearest(*actual_joint_pos, (double)(*joint_angles)[i]);
+        // *actual_joint_pos = (double)(*joint_angles)[i]; // no wrapping for now, just set the joint position to the desired angle
 
     }
 }
@@ -479,6 +584,11 @@ void kins::rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* eul
         (*euler)[1] = atan2(-(*rot)[6], sy);
         (*euler)[2] = 0;
     }
+
+    // flip x and z
+    float temp = (*euler)[0];
+    (*euler)[0] = (*euler)[2];
+    (*euler)[2] = temp;
 }
 
 void kins::update_joint_distances_to_limit(){

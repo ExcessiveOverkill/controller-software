@@ -33,17 +33,17 @@ InverseKinematics::solve(
         solF.data(),
         velF.data(),
         detail,
-        maxIter,
-        tolerance * 10.0f  // looser tol for float pre-pass
+        maxIter/2, // Use half iterations for first pass
+        tolerance
     );
+
     if(ec == ErrorCode::Success && detail.finalErrorNorm < tolerance) {
+        // complete and in tolerance, no need for double precision
         outSolutionF = solF;
         outVelF      = velF;
         return ErrorCode::Success;
     }
 
-    // test with only single precision
-    return ec;
 
     // 2) Double-precision refinement
     std::array<double,3> tgtPosD, tgtEulD;
@@ -65,7 +65,7 @@ InverseKinematics::solve(
         solD.data(),
         velD.data(),
         detailD,
-        maxIter,
+        maxIter/2,
         static_cast<double>(tolerance)
     );
     // Cast back

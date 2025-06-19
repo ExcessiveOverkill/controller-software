@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cmath>
 
 class InverseKinematics {
 public:
@@ -117,3 +118,45 @@ private:
         T       x[6]
     ) const;
 };
+
+struct quat_rot {
+    float w,x,y,z;  ///< Quaternion components (w, x, y, z) representing rotation
+};
+struct euler_rot {
+    float roll;   ///< Roll angle (x-axis rotation)
+    float pitch;  ///< Pitch angle (y-axis rotation)
+    float yaw;    ///< Yaw angle (z-axis rotation)
+};
+
+static quat_rot quatFromZYX(float z, float y, float x) {
+    float c1 = cosf(z/2), s1 = sinf(z/2);
+    float c2 = cosf(y/2), s2 = sinf(y/2);
+    float c3 = cosf(x/2), s3 = sinf(x/2);
+
+    quat_rot q;
+    q.w = c1*c2*c3 + s1*s2*s3;
+    q.x = c1*c2*s3 - s1*s2*c3;
+    q.y = c1*s2*c3 + s1*c2*s3;
+    q.z = s1*c2*c3 - c1*s2*s3;
+    return q;
+}
+
+static void toEulerZYX(const quat_rot* q, float* yaw, float* pitch, float* roll) {
+    float sinθ =  2*(q->w*q->y - q->z*q->x);
+    *pitch = asinf( fmin(fmax(sinθ, -1.0f), 1.0f)) ;
+
+    *yaw = atan2f( 2*(q->w*q->z + q->x*q->y),
+                1 - 2*(q->y*q->y + q->z*q->z) );
+
+    *roll = atan2f( 2*(q->w*q->x + q->y*q->z),
+                1 - 2*(q->x*q->x + q->y*q->y) );
+}
+
+static quat_rot multiply(const quat_rot &A, const quat_rot &B) {
+    return quat_rot{
+        A.w*B.w - A.x*B.x - A.y*B.y - A.z*B.z,
+        A.w*B.x + A.x*B.w + A.y*B.z - A.z*B.y,
+        A.w*B.y - A.x*B.z + A.y*B.w + A.z*B.x,
+        A.w*B.z + A.x*B.y - A.y*B.x + A.z*B.w
+    };
+}
