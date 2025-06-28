@@ -120,23 +120,50 @@ uint32_t kins::run(){
     switch(in_sigs.control_mode){
         case control_modes::JOG:
             // update joint positions based on jog inputs
-            if(in_sigs.jog_mode == jog_modes::JOINT){
-                if(last_jog_mode != jog_modes::JOINT || in_sigs.reset){
-                    out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
-                    last_joint_jog_vel = 0.0f;
-                }
-                // jog in joint space, automatic joint endstop limiting
-                jog_joint(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+            switch(in_sigs.jog_mode){
+                case jog_modes::JOINT:
+                    if(last_jog_mode != jog_modes::JOINT || in_sigs.reset){
+                        out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
+                        last_joint_jog_vel = 0.0f;
+                    }
+                    // jog in joint space, automatic joint endstop limiting
+                    jog_joint(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+                    break;
+                case jog_modes::CARTESIAN:
+                    if(last_jog_mode != jog_modes::CARTESIAN || in_sigs.reset){
+                        last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions; // reset the commanded cartesian positions to the current positions
+                    }
+                    // jog in cartesian space, no automatic endstop limiting (yet)
+                    jog_cartesian(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
+                    break;
+                case jog_modes::MOUSE:
+                    if(last_jog_mode != jog_modes::MOUSE || in_sigs.reset){
+                        last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions; // reset the commanded cartesian positions to the current positions
+                        starting_mouse_positions = in_sigs.cmd_cartesian_positions; // store the starting positions for mouse jog
+                        starting_robot_positions = out_sigs.fbk_cartesian_positions; // store the starting robot positions
+                        starting_mouse_quat = quatFromZYX(starting_mouse_positions.zangle, starting_mouse_positions.yangle, starting_mouse_positions.xangle);
+                        starting_robot_quat = quatFromZYX(starting_robot_positions.zangle, starting_robot_positions.yangle, starting_robot_positions.xangle);
+                        // reset filters
+                        quat_smoothing_filter = starting_robot_quat;
+                        for(int i = 0; i < 3; i++){
+                            pos_smoothing_filters[i].reset();
+                        }
+                    }
+                    // jog in cartesian space based on mouse delta, no automatic endstop limiting (yet)
+                    jog_mouse();
+                    break;
+                default:
+                    // no jog mode selected, do nothing
+                    break;
             }
-            else if(in_sigs.jog_mode == jog_modes::CARTESIAN){
-                if(last_jog_mode != jog_modes::CARTESIAN || in_sigs.reset){
-                    last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions; // reset the commanded cartesian positions to the current positions
-                }
-                // jog in cartesian space, no automatic endstop limiting (yet)
-                jog_cartesian(in_sigs.jog_axis_select, in_sigs.jog_vel, in_sigs.speed_override);
-            }
+
             last_jog_mode = in_sigs.jog_mode;
             break;
+    }
+
+    if(in_sigs.reset){
+        // reset the commanded joint positions to the current positions
+        out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
     }
     
     // TODO: fix this possibly causing motion on starup if past a limit
@@ -374,6 +401,57 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
 
 }
 
+void kins::jog_mouse(){
+    std::array<float,3> mouse_pos_delta = {
+        in_sigs.cmd_cartesian_positions.x - starting_mouse_positions.x,
+        in_sigs.cmd_cartesian_positions.y - starting_mouse_positions.y,
+        in_sigs.cmd_cartesian_positions.z - starting_mouse_positions.z
+    };
+    
+
+    // invert x and so they match mouse orientation
+    // mouse_pos_delta[0] = -mouse_pos_delta[0];
+    // mouse_pos_delta[1] = -mouse_pos_delta[1];
+
+    quat_rot q_mouse_cur = quatFromZYX(in_sigs.cmd_cartesian_positions.zangle, in_sigs.cmd_cartesian_positions.yangle, in_sigs.cmd_cartesian_positions.xangle);
+    quat_rot q_delta = multiply(inverse(starting_mouse_quat), q_mouse_cur);
+    quat_rot q_robot_new = multiply(starting_robot_quat, q_delta);
+
+    quat_smoothing_filter = slerp(quat_smoothing_filter, q_robot_new, slerp_a);
+
+    float newYaw, newPitch, newRoll;
+    toEulerZYX(&quat_smoothing_filter, &newYaw, &newPitch, &newRoll);
+
+    std::array<float,3> mouse_angles_delta = {
+        newRoll - starting_robot_positions.xangle,
+        newPitch - starting_robot_positions.yangle,
+        newYaw - starting_robot_positions.zangle
+    };
+    
+    // filter the position delta for smoothing
+
+    for(int i = 0; i < 3; i++){
+        float smooth = pos_smoothing_filters[i].update(mouse_pos_delta[i], 0.001f);   // TODO: use the time step from the system
+        mouse_pos_delta[i] = smooth; // update the mouse position delta with the smoothed value
+        // mouse_pos_delta[i] = axis_filters[i].update(smooth, 0.001f);
+    }
+
+    last_cmd_cartesian_positions.x = starting_robot_positions.x + mouse_pos_delta[0];
+    last_cmd_cartesian_positions.y = starting_robot_positions.y + mouse_pos_delta[1];
+    last_cmd_cartesian_positions.z = starting_robot_positions.z + mouse_pos_delta[2];
+    last_cmd_cartesian_positions.xangle = starting_robot_positions.xangle + mouse_angles_delta[0];
+    last_cmd_cartesian_positions.yangle = starting_robot_positions.yangle + mouse_angles_delta[1];
+    last_cmd_cartesian_positions.zangle = starting_robot_positions.zangle + mouse_angles_delta[2];
+
+    // absolute angles
+    // last_cmd_cartesian_positions.xangle = in_sigs.cmd_cartesian_positions.xangle;
+    // last_cmd_cartesian_positions.yangle = in_sigs.cmd_cartesian_positions.yangle;
+    // last_cmd_cartesian_positions.zangle = in_sigs.cmd_cartesian_positions.zangle;
+
+    inverse_kins(); // calculate the joint positions based on the new cartesian positions
+
+}
+
 void kins::inverse_kins(){
 
     std::array<float,3> target_pos = {
@@ -387,14 +465,10 @@ void kins::inverse_kins(){
         last_cmd_cartesian_positions.zangle
     };
 
-    // target_euler = {0.0, 0.0, 0.0}; // set target euler angles to zero for testing
-
-    // wrap angles to [-pi, pi]
-    // for(auto& angle : target_euler){
-    //     angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
-    // }
-
-    // std::array<float,6> current_joint_angles = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    // wrap angles to [0, 2pi]
+    for(auto& angle : target_euler){
+        angle = fmod(angle + 2.0f * M_PI, 2.0f * M_PI);
+    }
 
     std::array<float,6> current_joint_angles = {    // use commanded joint positions as the current joint angles
         (float)out_sigs.cmd_joint_positions.j1,
@@ -434,7 +508,7 @@ void kins::inverse_kins(){
 
     InverseKinematics::ErrorCode ec = ik_solver.solve(
         target_pos, target_euler, current_joint_angles,
-        cartTwist, outSolution, outVelocities, detail, 50, 1e-6f);
+        cartTwist, outSolution, outVelocities, detail, 50, 1e-4f);
 
     if(ec != InverseKinematics::ErrorCode::Success){
         // TODO: handle error
@@ -469,9 +543,7 @@ void kins::inverse_kins(){
             volatile bool t; // for debugging breakpoint
             t = true; // set a breakpoint here to debug invalid kins solution
         }
-
     }
-
 }
 
 void kins::set_closest_joint_positions(std::array<float,6>* joint_angles){

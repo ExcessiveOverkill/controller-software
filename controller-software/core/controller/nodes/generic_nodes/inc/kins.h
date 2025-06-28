@@ -83,6 +83,7 @@ class kins: public base_node {
         enum class jog_modes{
             JOINT = 1,
             CARTESIAN = 2,
+            MOUSE = 3,
             UNDEFINED = 0
         };
         enum class control_modes{
@@ -141,6 +142,13 @@ class kins: public base_node {
         float last_cartesian_jog_vel = 0.0f; // last jog vel used, to limit acceleration
         void jog_cartesian(uint8_t jog_axis, float jog_vel, float speed_override);
 
+        cartesian_positions starting_mouse_positions;
+        cartesian_positions starting_robot_positions;
+        quat_rot starting_mouse_quat;
+        quat_rot starting_robot_quat;
+        
+        void jog_mouse();
+
         void inverse_kins();
 
         bool validate_kins_solution(const std::array<float,6>* joint_angles, const cartesian_positions* cartesian_pos, const float pos_tol, const float angle_tol);
@@ -153,8 +161,123 @@ class kins: public base_node {
 
         double wrapNearest(double absAngle, double cmdAngle);
 
+        struct AxisFilter {
+            float P_prev    = 0.0f;  // last filtered position
+            float V_prev    = 0.0f;  // last filtered velocity
 
-        
+            // tuning knobs
+            float V_max;            // max speed (units/sec)
+            float A_max;            // max accel (units/sec²)
+
+            AxisFilter(float vmax, float amax)
+            : V_max(vmax), A_max(amax) {}
+
+            // call this every dt seconds
+            float update(float P_cmd, float dt) {
+                // 1) desired vel to catch cmd
+                float V_des = (P_cmd - P_prev) / dt;
+
+                // 2) saturate velocity
+                float V_sat = std::clamp(V_des, -V_max, +V_max);
+
+                // 3) compute needed accel and limit it
+                float A_req = (V_sat - V_prev) / dt;
+                float A_sat = std::clamp(A_req, -A_max, +A_max);
+
+                // 4) integrate accel → new velocity
+                float V_new = V_prev + A_sat * dt;
+
+                // 5) integrate velocity → new position
+                float P_new = P_prev + V_new * dt;
+
+                // 6) save for next time
+                V_prev = V_new;
+                P_prev = P_new;
+                return P_new;
+            }
+        };
+
+        struct CDampedFilter {
+            float y     = 0, ydot = 0;
+            float ωn;           // natural frequency (rad/s)
+
+            CDampedFilter(float wn) : ωn(wn) {}
+
+            // simple Euler integration; call every dt
+            float update(float x, float dt) {
+                // compute accel
+                float ydd = ωn*ωn*(x - y) - 2*ωn*ydot;
+                // integrate
+                ydot += ydd * dt;
+                y    += ydot * dt;
+                return y;
+            }
+
+            float reset() {
+                y = 0;
+                ydot = 0;
+                return y;
+            }
+        };
+
+        quat_rot normalize(const quat_rot &q) {
+            float norm = sqrtf(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+            if (norm < 1e-6f) return {1, 0, 0, 0}; // return identity if norm is too small
+            return {q.w/norm, q.x/norm, q.y/norm, q.z/norm};
+        }
+
+        quat_rot slerp(const quat_rot &A, const quat_rot &B, float t) {
+            // compute cosθ = dot(A,B)
+            float cosθ = A.w*B.w + A.x*B.x + A.y*B.y + A.z*B.z;
+            // if opposite hemisphere, flip
+            quat_rot T = (cosθ < 0 ? quat_rot{-B.w,-B.x,-B.y,-B.z} : B);
+            if (std::abs(cosθ) > 0.9995f) {
+                // linear fallback
+                quat_rot R = { A.w + t*(T.w-A.w),
+                        A.x + t*(T.x-A.x),
+                        A.y + t*(T.y-A.y),
+                        A.z + t*(T.z-A.z) };
+                return normalize(R);
+            }
+            float θ = acosf(fabsf(cosθ));
+            float sinθ = sinf(θ);
+            float w1 = sinf((1-t)*θ)/sinθ;
+            float w2 = sinf(t*θ)/sinθ;
+            return normalize(quat_rot{
+                A.w*w1 + T.w*w2,
+                A.x*w1 + T.x*w2,
+                A.y*w1 + T.y*w2,
+                A.z*w1 + T.z*w2
+            });
+        }
+
+
+        // mouse filters
+
+        // const float mouse_filter_pos_vmax = 0.5f; // max speed for mouse jog (m/s)
+        // const float mouse_filter_pos_amax = 1.0f; // max acceleration for mouse (m/s2)
+        // const float mouse_filter_angle_vmax = 30.0f * M_PI / 180.0f; // max speed for mouse jog (rad/s)
+        // const float mouse_filter_angle_amax = 10.0f * M_PI / 180.0f; // max acceleration for mouse (rad/s2)
+
+        // AxisFilter axis_filters[6] = {
+        //     AxisFilter(mouse_filter_pos_vmax, mouse_filter_pos_amax), // X
+        //     AxisFilter(mouse_filter_pos_vmax, mouse_filter_pos_amax), // Y
+        //     AxisFilter(mouse_filter_pos_vmax, mouse_filter_pos_amax), // Z
+        //     AxisFilter(mouse_filter_angle_vmax, mouse_filter_angle_amax), // Xangle
+        //     AxisFilter(mouse_filter_angle_vmax, mouse_filter_angle_amax), // Yangle
+        //     AxisFilter(mouse_filter_angle_vmax, mouse_filter_angle_amax)  // Zangle
+        // };
+
+        CDampedFilter pos_smoothing_filters[3] = {
+            CDampedFilter(30.0f), // X
+            CDampedFilter(30.0f), // Y
+            CDampedFilter(30.0f)  // Z
+        };
+
+        const float slerp_a = .02f;
+        quat_rot quat_smoothing_filter = {1.0f, 0.0f, 0.0f, 0.0f};
+
+
     public:
 
         kins();
@@ -304,7 +427,7 @@ class kins: public base_node {
                 cartesian_limits_set = true;
             }
 
-            configured = dh_set && limits_set && max_jog_speed_set && cartesian_limits_set;
+            configured |= dh_set && limits_set && max_jog_speed_set && cartesian_limits_set;
             if(!configured){
                 std::cerr << "Kins node initial configuration failed, missing required parameters." << std::endl;
                 return 1; // error code for configuration failure

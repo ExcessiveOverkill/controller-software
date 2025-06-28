@@ -3,14 +3,12 @@
 
 #pragma once
 
-class kins: public base_node {
+class mouse: public base_node {
     private:
         bool configured = false;
 
-        float time_step = 0.001f; // time step for running the node
-
         struct input_signal_ptrs{
-            // actual robot joints
+            // actual mouse joints
             input* j1_fbk_pos = nullptr;
             input* j2_fbk_pos = nullptr;
             input* j3_fbk_pos = nullptr;
@@ -18,55 +16,15 @@ class kins: public base_node {
             input* j5_fbk_pos = nullptr;
             input* j6_fbk_pos = nullptr;
 
-            // controls
-            input* jog_axis_select = nullptr;
-            input* jog_vel = nullptr;
-            input* jog_mode = nullptr;
-            input* control_mode = nullptr;
-            input* speed_override = nullptr;
-
-            // commanded positions
-            input* j1_cmd_pos = nullptr;
-            input* j2_cmd_pos = nullptr;
-            input* j3_cmd_pos = nullptr;
-            input* j4_cmd_pos = nullptr;
-            input* j5_cmd_pos = nullptr;
-            input* j6_cmd_pos = nullptr;
-            
-            input* x_cmd_pos = nullptr;
-            input* y_cmd_pos = nullptr;
-            input* z_cmd_pos = nullptr;
-            input* xangle_cmd_pos = nullptr;
-            input* yangle_cmd_pos = nullptr;
-            input* zangle_cmd_pos = nullptr;
-
-            input* reset = nullptr;
-
         } in_sig_ptrs;
 
-        struct joint_limit{
-            float min_pos = 0;
-            float max_pos = 0;
-            float max_vel = 0;
-            float max_acc = 0;
-        };
-
-        std::array<joint_limit,6> joint_limits;
-
-        struct cartesian_limit{
-            float min_pos = 0;
-            float max_pos = 0;
-            float max_vel = 0;
-            float max_acc = 0;
-        };
-
         struct joint_positions{
-            double j1 = 0.0f;
-            double j2 = 0.0f;
-            double j3 = 0.0f;
-            double j4 = 0.0f;
-            double j5 = 0.0f;
-            double j6 = 0.0f;
+            float j1 = 0.0f;
+            float j2 = 0.0f;
+            float j3 = 0.0f;
+            float j4 = 0.0f;
+            float j5 = 0.0f;
+            float j6 = 0.0f;
         };
 
         struct cartesian_positions{
@@ -78,35 +36,20 @@ class kins: public base_node {
             float zangle = 0.0f;
         };
 
-        std::array<cartesian_limit,6> cartesian_limits;
+        struct joint_params{
+            int32_t count_per_rev;
+            int32_t home_pos;
+        };
 
-        enum class jog_modes{
-            JOINT = 1,
-            CARTESIAN = 2,
-            UNDEFINED = 0
-        };
-        enum class control_modes{
-            JOINT = 1,
-            CARTESIAN = 2,
-            JOG = 3,
-            UNDEFINED = 0
-        };
+        std::array<joint_params,6> joint_parameters;
 
         struct input_signals{
             joint_positions fbk_joint_positions;
-            float jog_vel = 0.0f;
-            uint8_t jog_axis_select = 0;
-            jog_modes jog_mode = jog_modes::UNDEFINED;
-            control_modes control_mode = control_modes::UNDEFINED;
-            float speed_override = 1.0f;
-            cartesian_positions cmd_cartesian_positions;
-            joint_positions cmd_joint_positions;
-            bool reset = false;
+            bool button = false;
 
         } in_sigs;
 
         struct output_signals{
-            joint_positions cmd_joint_positions;
             cartesian_positions fbk_cartesian_positions;
         } out_sigs;
 
@@ -118,46 +61,13 @@ class kins: public base_node {
 
         void update_forward_kinematics_outputs();
 
-        struct joint_lim_distance{
-            double to_min = 0.0f;   // distance to min limit, positive if within limits, negative if outside
-            double to_max = 0.0f;   // distance to max limit
-            float allowed_positive_vel = 0.0f; // how fast we can move in the positive direction
-            float allowed_negative_vel = 0.0f;
-
-            bool infinite = false; // true if joint is continuous
-        };
-        std::array<joint_lim_distance,6> joint_distances_to_limit;
-        void update_joint_distances_to_limit();
-
-        float max_jog_speed = 0.1f; // max jog speed as a portion of the joint max_vel
-
-        cartesian_positions last_cmd_cartesian_positions; // these are what were used with the inverse kins
-
-        jog_modes last_jog_mode = jog_modes::UNDEFINED; // last jog mode used, to prevent unnecessary calculations
-
-        float last_joint_jog_vel = 0.0f; // last jog vel used, to limit acceleration
-        void jog_joint(uint8_t jog_axis, float jog_vel, float speed_override);
-
-        float last_cartesian_jog_vel = 0.0f; // last jog vel used, to limit acceleration
-        void jog_cartesian(uint8_t jog_axis, float jog_vel, float speed_override);
-
-        void inverse_kins();
-
-        bool validate_kins_solution(const std::array<float,6>* joint_angles, const cartesian_positions* cartesian_pos, const float pos_tol, const float angle_tol);
-
-        void set_closest_joint_positions(std::array<float,6>* joint_angles);
-        
-        bool clamp_to_limits();
-
         void rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* euler);
-
-        double wrapNearest(double absAngle, double cmdAngle);
 
 
         
     public:
 
-        kins();
+        mouse();
 
         uint32_t run() override;
 
@@ -174,42 +84,20 @@ class kins: public base_node {
                         "theta": 0
                     }
                     // other joints...
-            ],
+                ],
 
-                "limits":{
-                    0:{
-                        "min_pos": -160,    // degrees, both set to zero for continuous joints
-                        "max_pos": 160,
-                        "max_vel": 50,      // degrees per second
-                        "max_acc": 100      // degrees per second squared
+                "joint_params":[
+                    {
+                        "count_per_rev": 100,
+                        "home_pos": 0
                     }
                     // other joints...
-                },
-
-                "max_jog_speed": .1,    // max speed for jogging, as a portion of the joint max_vel
-                "cartesian_limits":{   // cartesian limits for the end effector
-                    "x":{
-                        "min_pos": -.2,
-                        "max_pos": .2,
-                        "max_vel": .1,
-                        "max_acc": .2
-                    }
-                    // other axes...
-                    "xangle":{
-                        "min_pos": -180,
-                        "max_pos": 180,
-                        "max_vel": 50,
-                        "max_acc": 100
-                    }
-                    // other angles...
-                }
+                ]
             }
             */
-            bool dh_set = false;
-            bool limits_set = false;
-            bool max_jog_speed_set = false;
-            bool cartesian_limits_set = false;
 
+            bool dh_set = false;
+            bool joint_params_set = false;
 
             if(json->find("dh_params") != json->end()){
                 auto& dh_params = (*json)["dh_params"];
@@ -230,81 +118,23 @@ class kins: public base_node {
                 dh_set = true;
             }
 
-
-            if(json->find("limits") != json->end()){
-                auto& limits = (*json)["limits"];
-                if(limits.is_object()){
-                    for(int i = 0; i < 6; i++){
-                        if(limits.find(std::to_string(i)) != limits.end()){
-                            joint_limits[i].min_pos = limits[std::to_string(i)]["min_pos"].get<float>() * M_PI / 180.0f; // convert degrees to radians
-                            joint_limits[i].max_pos = limits[std::to_string(i)]["max_pos"].get<float>() * M_PI / 180.0f;
-                            joint_limits[i].max_vel = limits[std::to_string(i)]["max_vel"].get<float>() * M_PI / 180.0f;
-                            joint_limits[i].max_acc = limits[std::to_string(i)]["max_acc"].get<float>() * M_PI / 180.0f;
-                        }
-                        else {
-                            std::cerr << "Missing limit for joint " << i << std::endl;
-                            return 1; // error code for configuration failure
-                        }
+            if(json->find("joint_params") != json->end()){
+                auto& joint_params = (*json)["joint_params"];
+                if(joint_params.is_array() && joint_params.size() == 6){
+                    for(size_t i = 0; i < 6; i++){
+                        joint_parameters[i].count_per_rev = joint_params[i]["count_per_rev"].get<int32_t>();
+                        joint_parameters[i].home_pos = joint_params[i]["home_pos"].get<int32_t>();
                     }
                 }
                 else {
-                    std::cerr << "Invalid limits format, expected an object." << std::endl;
+                    std::cerr << "Invalid joint parameters format, expected an array of 6 objects." << std::endl;
                     return 1; // error code for configuration failure
                 }
-                limits_set = true;
+                joint_params_set = true;
             }
 
+            configured |= dh_set && joint_params_set;
 
-            if(json->find("max_jog_speed") != json->end()){
-                max_jog_speed = (*json)["max_jog_speed"].get<float>();
-                if(max_jog_speed < 0.0f || max_jog_speed > 1.0f){
-                    std::cerr << "Invalid max jog speed, must be between 0.0 and 1.0." << std::endl;
-                    return 1; // error code for configuration failure
-                }
-                else {
-                    max_jog_speed_set = true;
-                }
-            }
-
-            if(json->find("cartesian_limits") != json->end()){
-                auto& cartesian_limits_json = (*json)["cartesian_limits"];
-                if(cartesian_limits_json.is_object()){
-                    for(uint8_t i = 0; i < 6; i++){
-                        std::string axis_name;
-                        switch(i){
-                            case 0: axis_name = "x"; break;
-                            case 1: axis_name = "y"; break;
-                            case 2: axis_name = "z"; break;
-                            case 3: axis_name = "xangle"; break;
-                            case 4: axis_name = "yangle"; break;
-                            case 5: axis_name = "zangle"; break;
-                        }
-                        if(cartesian_limits_json.find(axis_name) != cartesian_limits_json.end()){
-                            cartesian_limits[i].min_pos = cartesian_limits_json[axis_name]["min_pos"].get<float>();
-                            cartesian_limits[i].max_pos = cartesian_limits_json[axis_name]["max_pos"].get<float>();
-                            cartesian_limits[i].max_vel = cartesian_limits_json[axis_name]["max_vel"].get<float>();
-                            cartesian_limits[i].max_acc = cartesian_limits_json[axis_name]["max_acc"].get<float>();
-                        }
-                        else {
-                            std::cerr << "Missing cartesian limit for axis " << axis_name << std::endl;
-                            return 1; // error code for configuration failure
-                        }
-                        if(i > 2){  // angle axes
-                            cartesian_limits[i].min_pos *= M_PI / 180.0f; // convert degrees to radians
-                            cartesian_limits[i].max_pos *= M_PI / 180.0f;
-                            cartesian_limits[i].max_vel *= M_PI / 180.0f;
-                            cartesian_limits[i].max_acc *= M_PI / 180.0f;
-                        }
-                    }
-                }
-                else {
-                    std::cerr << "Invalid cartesian limits format, expected an object." << std::endl;
-                    return 1; // error code for configuration failure
-                }
-                cartesian_limits_set = true;
-            }
-
-            configured = dh_set && limits_set && max_jog_speed_set && cartesian_limits_set;
             if(!configured){
                 std::cerr << "Kins node initial configuration failed, missing required parameters." << std::endl;
                 return 1; // error code for configuration failure

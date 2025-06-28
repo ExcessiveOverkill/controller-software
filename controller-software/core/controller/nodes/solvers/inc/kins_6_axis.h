@@ -160,3 +160,7 @@ static quat_rot multiply(const quat_rot &A, const quat_rot &B) {
         A.w*B.z + A.x*B.y - A.y*B.x + A.z*B.w
     };
 }
+
+static quat_rot inverse(const quat_rot &q) {
+    return quat_rot{q.w, -q.x, -q.y, -q.z};  // conjugate for unit quaternions
+}
