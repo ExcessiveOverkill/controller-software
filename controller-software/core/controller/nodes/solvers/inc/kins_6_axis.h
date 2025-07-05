@@ -164,3 +164,128 @@ static quat_rot multiply(const quat_rot &A, const quat_rot &B) {
 static quat_rot inverse(const quat_rot &q) {
     return quat_rot{q.w, -q.x, -q.y, -q.z};  // conjugate for unit quaternions
 }
+
+static float wrapPi(float a) {
+    a = std::fmod(a + M_PI, 2*M_PI);
+    if(a < 0) a += 2*M_PI;
+    return a - M_PI;
+}
+
+// Build a 4×4 from pos[3] and ZYX Euler [yaw, pitch, roll]
+struct Mat4 { float m[4][4]; };
+
+static Mat4 poseToMatrix(const std::array<float,3>& pos,
+                  const std::array<float,3>& zyx) {
+    float φ = zyx[0], θ = zyx[1], ψ = zyx[2];
+    float c1 = cosf(φ), s1 = sinf(φ);
+    float c2 = cosf(θ), s2 = sinf(θ);
+    float c3 = cosf(ψ), s3 = sinf(ψ);
+
+    // R = Rz(φ) * Ry(θ) * Rx(ψ)
+    Mat4 T{};
+    T.m[0][0] = c1*c2;
+    T.m[0][1] = c1*s2*s3 - s1*c3;
+    T.m[0][2] = c1*s2*c3 + s1*s3;
+    T.m[1][0] = s1*c2;
+    T.m[1][1] = s1*s2*s3 + c1*c3;
+    T.m[1][2] = s1*s2*c3 - c1*s3;
+    T.m[2][0] =    -s2;
+    T.m[2][1] =     c2*s3;
+    T.m[2][2] =     c2*c3;
+
+    // translation
+    T.m[0][3] = pos[0];
+    T.m[1][3] = pos[1];
+    T.m[2][3] = pos[2];
+
+    // bottom row
+    T.m[3][0] = T.m[3][1] = T.m[3][2] = 0.0f;
+    T.m[3][3] = 1.0f;
+    return T;
+}
+
+// Extract pos + ZYX Euler from 4×4 matrix
+static void matrixToPose(const Mat4& T,
+                  std::array<float,3>& pos,
+                  std::array<float,3>& zyx) {
+    pos = { T.m[0][3], T.m[1][3], T.m[2][3] };
+    // pitch = asin(-r20)
+    float sy = -T.m[2][0];
+    zyx[1] = asinf(fmin(fmax(sy, -1.0f), 1.0f));
+    // yaw = atan2(r10, r00)
+    zyx[0] = atan2f(T.m[1][0], T.m[0][0]);
+    // roll = atan2(r21, r22)
+    zyx[2] = atan2f(T.m[2][1], T.m[2][2]);
+    // wrap all three
+    for(auto &a : zyx) a = wrapPi(a);
+}
+
+// Multiply A·B → C
+static Mat4 mul(const Mat4 &A, const Mat4 &B) {
+    Mat4 C{};
+    for(int i=0;i<4;i++){
+      for(int j=0;j<4;j++){
+        float s=0;
+        for(int k=0;k<4;k++) s += A.m[i][k]*B.m[k][j];
+        C.m[i][j]=s;
+      }
+    }
+    return C;
+}
+
+// Invert a 4×4 rigid‐body transform (R|p) easily:
+static Mat4 invertRigid(const Mat4 &T) {
+    Mat4 Rinv{}, Tout{};
+    // transpose upper 3×3
+    for(int i=0;i<3;i++) for(int j=0;j<3;j++) Rinv.m[i][j] = T.m[j][i];
+    // new translation = -R^T * p
+    for(int i=0;i<3;i++){
+      float s=0;
+      for(int j=0;j<3;j++) s += -Rinv.m[i][j]*T.m[j][3];
+      Rinv.m[i][3] = s;
+    }
+    // bottom row
+    Rinv.m[3][0] = Rinv.m[3][1] = Rinv.m[3][2] = 0;
+    Rinv.m[3][3] = 1;
+    return Rinv;
+}
+
+// --- User‐facing APIs ---
+
+/// @param flangePos   flange XYZ
+/// @param flangeEul   flange ZYX [yaw,pitch,roll]
+/// @param toolPos     tool offset XYZ in flange frame
+/// @param toolEul     tool offset ZYX Euler
+/// @param tcpPos      (out) TCP XYZ in world
+/// @param tcpEul      (out) TCP Euler in world
+static void applyTool(const std::array<float,3>& flangePos,
+               const std::array<float,3>& flangeEul,
+               const std::array<float,3>& toolPos,
+               const std::array<float,3>& toolEul,
+               std::array<float,3>& tcpPos,
+               std::array<float,3>& tcpEul)
+{
+    auto T_flange = poseToMatrix(flangePos, flangeEul);
+    auto T_tool   = poseToMatrix(toolPos,   toolEul);
+    auto T_tcp    = mul(T_flange, T_tool);
+    matrixToPose(T_tcp, tcpPos, tcpEul);
+}
+
+/// @param tcpPos      desired TCP XYZ in world
+/// @param tcpEul      desired TCP ZYX [yaw,pitch,roll]
+/// @param toolPos     tool offset XYZ in flange frame
+/// @param toolEul     tool offset ZYX Euler
+/// @param flangePos   (out) computed flange XYZ in world (to feed IK)
+/// @param flangeEul   (out) computed flange ZYX Euler
+static void removeTool(const std::array<float,3>& tcpPos,
+                const std::array<float,3>& tcpEul,
+                const std::array<float,3>& toolPos,
+                const std::array<float,3>& toolEul,
+                std::array<float,3>& flangePos,
+                std::array<float,3>& flangeEul)
+{
+    auto T_tcp    = poseToMatrix(tcpPos, tcpEul);
+    auto T_tool   = poseToMatrix(toolPos,   toolEul);
+    auto T_flange = mul(T_tcp, invertRigid(T_tool));
+    matrixToPose(T_flange, flangePos, flangeEul);
+}

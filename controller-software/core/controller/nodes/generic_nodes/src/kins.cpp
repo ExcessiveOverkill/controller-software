@@ -5,6 +5,15 @@ kins::kins(){
     // create all IO
     create_inputs();
     create_outputs();
+
+    // add a default tool (no offset)
+    std::array<float,3> default_tool_pos = {0.0f, 0.0f, 0.0f};
+    std::array<float,3> default_tool_eul = {0.0f, 0.0f, 0.0f};
+    tool default_tool;
+    default_tool.position = default_tool_pos;
+    default_tool.orientation = default_tool_eul;
+    add_tool(default_tool);
+    select_tool(0); // select the default tool
 }
 
 void kins::create_inputs(){
@@ -59,6 +68,9 @@ void kins::create_inputs(){
     in_sig_ptrs.yangle_cmd_pos = &inputs["yangle_cmd_pos"];
     in_sig_ptrs.zangle_cmd_pos = &inputs["zangle_cmd_pos"];
 
+    inputs.emplace("tool_select", input(io_type::UINT8, nullptr));
+    in_sig_ptrs.tool_select = &inputs["tool_select"];
+
     inputs.emplace("reset", input(io_type::BOOL, nullptr));
     in_sig_ptrs.reset = &inputs["reset"];
 }
@@ -103,6 +115,7 @@ void kins::update_inputs(){
     in_sigs.cmd_joint_positions.j4 = *(double*)(in_sig_ptrs.j4_cmd_pos->data_pointer);
     in_sigs.cmd_joint_positions.j5 = *(double*)(in_sig_ptrs.j5_cmd_pos->data_pointer);
     in_sigs.cmd_joint_positions.j6 = *(double*)(in_sig_ptrs.j6_cmd_pos->data_pointer);
+    in_sigs.tool_select = *(uint8_t*)(in_sig_ptrs.tool_select->data_pointer);
     in_sigs.reset = *(bool*)(in_sig_ptrs.reset->data_pointer);
 
     in_sigs.speed_override = fmax(0.001f, fmin(in_sigs.speed_override, 1.0f)); // clamp speed override to [0.001, 1]
@@ -120,6 +133,13 @@ uint32_t kins::run(){
     switch(in_sigs.control_mode){
         case control_modes::JOG:
             // update joint positions based on jog inputs
+
+            if(in_sigs.jog_mode != last_jog_mode || in_sigs.reset){
+                // tool changes only apply when the mode is changed or the reset is triggered
+                select_tool(in_sigs.tool_select); // select the tool based on the input
+                update_forward_kinematics_outputs();    // recalculate in the event the tool changed
+            }
+
             switch(in_sigs.jog_mode){
                 case jog_modes::JOINT:
                     if(last_jog_mode != jog_modes::JOINT || in_sigs.reset){
@@ -242,16 +262,22 @@ void kins::update_forward_kinematics_outputs(){
     std::array<float,3> pos_out;
     std::array<float,9> rot_out;
     ik_solver.forwardKinematicsF32(joint_angles, pos_out, rot_out);
-    
-    out_sigs.fbk_cartesian_positions.x = pos_out[0];
-    out_sigs.fbk_cartesian_positions.y = pos_out[1];
-    out_sigs.fbk_cartesian_positions.z = pos_out[2];
 
     std::array<float,3> euler_out;
     rot_to_euler(&rot_out, &euler_out);
-    out_sigs.fbk_cartesian_positions.xangle = euler_out[0];
-    out_sigs.fbk_cartesian_positions.yangle = euler_out[1];
-    out_sigs.fbk_cartesian_positions.zangle = euler_out[2];
+
+    std::array<float,3> pos_out_tcp;
+    std::array<float,3> euler_out_tcp;
+
+    apply_tool_offset(pos_out, euler_out, pos_out_tcp, euler_out_tcp);
+
+    out_sigs.fbk_cartesian_positions.x = pos_out_tcp[0];
+    out_sigs.fbk_cartesian_positions.y = pos_out_tcp[1];
+    out_sigs.fbk_cartesian_positions.z = pos_out_tcp[2];
+
+    out_sigs.fbk_cartesian_positions.xangle = euler_out_tcp[0];
+    out_sigs.fbk_cartesian_positions.yangle = euler_out_tcp[1];
+    out_sigs.fbk_cartesian_positions.zangle = euler_out_tcp[2];
     return;
 }
 
@@ -284,15 +310,22 @@ bool kins::validate_kins_solution(const std::array<float,6>* joint_angles_, cons
     ik_solver.forwardKinematicsF32(joint_angles, pos_out, rot_out);
 
     cartesian_positions pos_out_cartesian;
-    pos_out_cartesian.x = pos_out[0];
-    pos_out_cartesian.y = pos_out[1];
-    pos_out_cartesian.z = pos_out[2];
 
     std::array<float,3> euler_out;
     rot_to_euler(&rot_out, &euler_out);
-    pos_out_cartesian.xangle = euler_out[0];
-    pos_out_cartesian.yangle = euler_out[1];
-    pos_out_cartesian.zangle = euler_out[2];
+
+    std::array<float,3> pos_out_tcp;
+    std::array<float,3> euler_out_tcp;
+
+    apply_tool_offset(pos_out, euler_out, pos_out_tcp, euler_out_tcp);
+
+    pos_out_cartesian.x = pos_out_tcp[0];
+    pos_out_cartesian.y = pos_out_tcp[1];
+    pos_out_cartesian.z = pos_out_tcp[2];
+
+    pos_out_cartesian.xangle = euler_out_tcp[0];
+    pos_out_cartesian.yangle = euler_out_tcp[1];
+    pos_out_cartesian.zangle = euler_out_tcp[2];
 
     bool valid = true;
 
@@ -454,16 +487,21 @@ void kins::jog_mouse(){
 
 void kins::inverse_kins(){
 
-    std::array<float,3> target_pos = {
+    std::array<float,3> target_pos_tool = {
         last_cmd_cartesian_positions.x,
         last_cmd_cartesian_positions.y,
         last_cmd_cartesian_positions.z
     };
-    std::array<float,3> target_euler = {
+    std::array<float,3> target_euler_tool = {
         last_cmd_cartesian_positions.xangle,
         last_cmd_cartesian_positions.yangle,
         last_cmd_cartesian_positions.zangle
     };
+
+    // un-apply tool offset to get the flange position and orientation
+    std::array<float,3> target_pos;
+    std::array<float,3> target_euler;
+    remove_tool_offset(target_pos_tool, target_euler_tool, target_pos, target_euler);
 
     // wrap angles to [0, 2pi]
     for(auto& angle : target_euler){
@@ -527,12 +565,12 @@ void kins::inverse_kins(){
         outSolution[2] -= outSolution[1];
 
         // update the last commanded cartesian positions
-        last_cmd_cartesian_positions.x = target_pos[0];
-        last_cmd_cartesian_positions.y = target_pos[1];
-        last_cmd_cartesian_positions.z = target_pos[2];
-        last_cmd_cartesian_positions.xangle = target_euler[0];
-        last_cmd_cartesian_positions.yangle = target_euler[1];
-        last_cmd_cartesian_positions.zangle = target_euler[2];
+        last_cmd_cartesian_positions.x = target_pos_tool[0];
+        last_cmd_cartesian_positions.y = target_pos_tool[1];
+        last_cmd_cartesian_positions.z = target_pos_tool[2];
+        last_cmd_cartesian_positions.xangle = target_euler_tool[0];
+        last_cmd_cartesian_positions.yangle = target_euler_tool[1];
+        last_cmd_cartesian_positions.zangle = target_euler_tool[2];
 
         bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.01f, 0.01f);
 
@@ -749,6 +787,57 @@ void kins::update_joint_distances_to_limit(){
         }
     }
 
+}
+
+uint32_t kins::select_tool(uint8_t tool_index) {
+    if (tool_index < tools.size()) {
+        current_tool = &tools[tool_index];
+        return 0; // success
+    }
+    current_tool = nullptr;
+    return 1; // error: tool index out of range
+}
+
+uint32_t kins::add_tool(const tool new_tool) {
+    if (tools.size() < 32) {
+        tools.push_back(new_tool);
+        return 0; // success
+    }
+    return 1; // error: too many tools
+}
+
+void kins::apply_tool_offset(const std::array<float,3>& flange_pos,
+                                       const std::array<float,3>& flange_eul,
+                                       std::array<float,3>& tool_pos,
+                                       std::array<float,3>& tool_eul) {
+    if (current_tool != nullptr) {
+        // Apply the current tool's offset to the TCP position and orientation
+        applyTool(flange_pos, flange_eul, current_tool->position, current_tool->orientation, tool_pos, tool_eul);
+    }
+    else {
+        // If no tool is selected, just copy the flange position and orientation
+        for (int i = 0; i < 3; i++) {
+            tool_pos[i] = flange_pos[i];
+            tool_eul[i] = flange_eul[i];
+        }
+    }
+}
+
+void kins::remove_tool_offset(const std::array<float,3>& tcp_pos,
+                                       const std::array<float,3>& tcp_eul,
+                                       std::array<float,3>& flange_pos,
+                                       std::array<float,3>& flange_eul) {
+    if (current_tool != nullptr) {
+        // Remove the current tool's offset from the TCP position and orientation
+        removeTool(tcp_pos, tcp_eul, current_tool->position, current_tool->orientation, flange_pos, flange_eul);
+    }
+    else {
+        // If no tool is selected, just copy the TCP position and orientation
+        for (int i = 0; i < 3; i++) {
+            flange_pos[i] = tcp_pos[i];
+            flange_eul[i] = tcp_eul[i];
+        }
+    }
 }
 
 static Node_Registrar<kins> node_registrar_kins("kins");

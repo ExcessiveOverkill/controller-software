@@ -24,6 +24,7 @@ class kins: public base_node {
             input* jog_mode = nullptr;
             input* control_mode = nullptr;
             input* speed_override = nullptr;
+            input* tool_select = nullptr;
 
             // commanded positions
             input* j1_cmd_pos = nullptr;
@@ -102,6 +103,7 @@ class kins: public base_node {
             float speed_override = 1.0f;
             cartesian_positions cmd_cartesian_positions;
             joint_positions cmd_joint_positions;
+            uint8_t tool_select = 0;
             bool reset = false;
 
         } in_sigs;
@@ -158,6 +160,29 @@ class kins: public base_node {
         bool clamp_to_limits();
 
         void rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* euler);
+
+        struct tool {
+            // offset from flange to TCP
+            std::array<float,3> position;
+            std::array<float,3> orientation;
+        };
+
+        tool* current_tool = nullptr; // current tool offset
+        std::vector<tool> tools; // list of tools
+
+        uint32_t select_tool(uint8_t tool_index); // select a tool by index
+
+        uint32_t add_tool(const tool new_tool); // add a new tool to the list
+
+        void apply_tool_offset(const std::array<float,3>& flange_pos,
+                                       const std::array<float,3>& flange_eul,
+                                       std::array<float,3>& tool_pos,
+                                       std::array<float,3>& tool_eul);  // get postion of the current TCP
+
+        void remove_tool_offset(const std::array<float,3>& tcp_pos,
+                                       const std::array<float,3>& tcp_eul,
+                                       std::array<float,3>& flange_pos,
+                                       std::array<float,3>& flange_eul); // get position of the flange from the TCP
 
         double wrapNearest(double absAngle, double cmdAngle);
 
@@ -325,7 +350,15 @@ class kins: public base_node {
                         "max_acc": 100
                     }
                     // other angles...
-                }
+                },
+
+                "tools":[
+                    {
+                        "position": [0.0, 0.0, 0.0], // offset from flange to TCP in meters
+                        "orientation": [0.0, 0.0, 0.0] // offset from flange to TCP in radians
+                    }
+                    // other tools...
+                ]
             }
             */
             bool dh_set = false;
@@ -425,6 +458,37 @@ class kins: public base_node {
                     return 1; // error code for configuration failure
                 }
                 cartesian_limits_set = true;
+            }
+
+            // optionally add tools
+            if(json->find("tools") != json->end()){
+                auto& tools_json = (*json)["tools"];
+                if(tools_json.is_array()){
+                    for(auto& tool_json : tools_json){
+                        if(tool_json.is_object() && tool_json.contains("position") && tool_json.contains("orientation")){
+                            tool new_tool;
+                            new_tool.position = tool_json["position"].get<std::array<float,3>>();
+                            new_tool.orientation = tool_json["orientation"].get<std::array<float,3>>();
+                            // convert orientation from degrees to radians
+                            for(auto& angle : new_tool.orientation){
+                                angle *= M_PI / 180.0f;
+                            }
+                            auto ret = add_tool(new_tool);
+                            if(ret != 0){
+                                std::cerr << "Failed to add tool." << std::endl;
+                                return 1; // error code for configuration failure
+                            }
+                        }
+                        else {
+                            std::cerr << "Invalid tool format, expected an object with position and orientation arrays." << std::endl;
+                            return 1; // error code for configuration failure
+                        }
+                    }
+                }
+                else {
+                    std::cerr << "Invalid tools format, expected an array." << std::endl;
+                    return 1; // error code for configuration failure
+                }
             }
 
             configured |= dh_set && limits_set && max_jog_speed_set && cartesian_limits_set;

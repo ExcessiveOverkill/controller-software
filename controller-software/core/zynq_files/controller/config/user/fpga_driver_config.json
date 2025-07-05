@@ -95,7 +95,7 @@
         "baud_rate": 12.5e6,
         "devices": {
             "0": {
-                "cyclic_read_node_vars":7,
+                "cyclic_read_node_vars":0,
                 "cyclic_write_node_vars":0
             }
         }
