@@ -40,6 +40,8 @@ Host zynq
     IdentityFile /home/excessive/controller-software/controller-software/core/.ssh/zynq (replace with actual path to the keys)
     Port 22
 
+replace "miDebuggerServerAddress" with the correct IP address in .vscode/launch.json
+
 build project to copy files to zynq
 
 TODO: figure out a way to better handle the permissions, currently you must enter the password each time (maybe not that bad?)
