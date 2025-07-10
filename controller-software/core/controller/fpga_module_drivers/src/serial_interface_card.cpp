@@ -2,46 +2,99 @@
 
 static Driver_Registrar<serial_interface_card> registrar("serial_interface_card");
 
-serial_interface_card::serial_interface_card(){
-}
 
-serial_interface_card::~serial_interface_card(){
-}
+uint32_t serial_interface_card::custom_load_config(json* user_driver_config){
 
-uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* instructions){
+    // no accesses to register or node variable values are allowed here, only in the run function
 
-    if(!load_json_value(config, "node_address", &node_address)){
-        std::cerr << "Failed to load node address" << std::endl;
-        return 1;
-    }
+    // fpga_instructions::copy cpy;
+    // cpy.set_time_reference(0);
+    // cpy.set_write_priority();
+    // cpy.set_execution_window(0, 1000);
 
-    // configure registers
-    Address_Map_Loader loader;
-    loader.setup(&config, &base_mem, node_address, instructions);
+    cpy_time_reference(0);
+    cpy_write_priority();
+    cpy_execution_window(0, 1000);
 
+    // load register from config json
     auto port_mode_enable = loader.get_register("port_mode_enable", 0);
-    loader.sync_with_PS(port_mode_enable);
     regs2.rs485_mode_enable = port_mode_enable->get_register("rs485_mode_enable");
     regs2.rs422_mode_enable = port_mode_enable->get_register("rs422_mode_enable");
     regs2.quadrature_mode_enable = port_mode_enable->get_register("rs422_mode_enable");
+    
+    // node_core->create_global_variable(node_var_prefix + ".port_mode_enable", io_type::UINT32);
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".port_mode_enable", (void**)&(port_mode_enable->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".port_mode_enable", (void**)&(regs2.rs485_mode_enable->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".port_mode_enable", (void**)&(regs2.rs422_mode_enable->ps_data.software_data_ptr));
+
+    // cpy.set_destination(port_mode_enable->pl_data.full_name);
+    // cpy.set_source(node_var_prefix + ".port_mode_enable");
+    // fpga_instr->add(cpy);
+    cpy_destination(port_mode_enable);
+    cpy_source("port_mode_enable");
+    cpy_add_instruction();
+
+    
 
     auto i2c_config = loader.get_register("i2c_config", 0);
-    loader.sync_with_PS(i2c_config);
     regs2.i2c_config_read_mode = i2c_config->get_register("read");
     regs2.i2c_config_device_address = i2c_config->get_register("device_address");
     regs2.i2c_config_reg_address = i2c_config->get_register("register_address");
     regs2.i2c_config_data_length = i2c_config->get_register("byte_count");
     regs2.i2c_config_start = i2c_config->get_register("start");
 
+    // TODO: refactor this pointer stuff to not require setting each sub-register manually
+
+    // node_core->create_global_variable(node_var_prefix + ".i2c_config", io_type::UINT32);
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_config", (void**)&(i2c_config->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_config", (void**)&(regs2.i2c_config_read_mode->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_config", (void**)&(regs2.i2c_config_device_address->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_config", (void**)&(regs2.i2c_config_reg_address->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_config", (void**)&(regs2.i2c_config_data_length->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_config", (void**)&(regs2.i2c_config_start->ps_data.software_data_ptr));
+
+
+    // cpy.set_destination(i2c_config->pl_data.full_name);
+    // cpy.set_source(node_var_prefix + ".i2c_config");
+    // fpga_instr->add(cpy);
+    cpy_destination(i2c_config);
+    cpy_source("i2c_config");
+    cpy_add_instruction();
+
     regs2.i2c_data_tx = loader.get_register("i2c_data_tx", 0);
-    loader.sync_with_PS(regs2.i2c_data_tx);
+    // node_core->create_global_variable(node_var_prefix + ".i2c_data_tx", io_type::UINT32);
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_data_tx", (void**)&(regs2.i2c_data_tx->ps_data.software_data_ptr));
+    
+    // cpy.set_destination(regs2.i2c_data_tx->pl_data.full_name);
+    // cpy.set_source(node_var_prefix + ".i2c_data_tx");
+    // fpga_instr->add(cpy);
+    cpy_destination(regs2.i2c_data_tx);
+    cpy_source("i2c_data_tx");
+    cpy_add_instruction();
+
     regs2.i2c_data_rx = loader.get_register("i2c_data_rx", 0);
-    loader.sync_with_PS(regs2.i2c_data_rx);
+    // node_core->create_global_variable(node_var_prefix + ".i2c_data_rx", io_type::UINT32);
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_data_rx", (void**)&(regs2.i2c_data_rx->ps_data.software_data_ptr));
+    // cpy.set_destination(node_var_prefix + ".i2c_data_rx");
+    // cpy.set_source(regs2.i2c_data_rx->pl_data.full_name);
+    // fpga_instr->add(cpy);
+    cpy_source(regs2.i2c_data_rx);
+    cpy_destination("i2c_data_rx");
+    cpy_add_instruction();
 
     auto i2c_status = loader.get_register("i2c_status", 0);
-    loader.sync_with_PS(i2c_status);
     regs2.i2c_status_busy = i2c_status->get_register("busy");
     regs2.i2c_status_error = i2c_status->get_register("error");
+    // node_core->create_global_variable(node_var_prefix + ".i2c_status", io_type::UINT32);
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_status", (void**)&(i2c_status->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_status", (void**)&(regs2.i2c_status_busy->ps_data.software_data_ptr));
+    // node_core->get_global_variable_data_ptr(node_var_prefix + ".i2c_status", (void**)&(regs2.i2c_status_error->ps_data.software_data_ptr));
+    // cpy.set_destination(node_var_prefix + ".i2c_status");
+    // cpy.set_source(i2c_status->pl_data.full_name);
+    // fpga_instr->add(cpy);
+    cpy_source(i2c_status);
+    cpy_destination("i2c_status");
+    cpy_add_instruction();
     
 
     // test print instructions
@@ -60,6 +113,11 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
     #define CONFIG_PORT_0 0x6
     #define CONFIG_PORT_1 0x7
 
+    // configure IO expander ports
+    io_expander_data[0].configuration = 0x0; // all outputs
+    io_expander_data[1].configuration = 0x0; // all outputs
+    io_expander_data[2].configuration = 0b00111000 << 8; // all outputs except for status inputs
+
     // setup i2c transfers that will continuously run
     i2c_transfer transfer;
 
@@ -69,13 +127,13 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
     transfer.data_length = 2;
 
     transfer.device_address = TOP_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[0].configuration);
+    transfer.out_data = &io_expander_data[0].configuration;
     i2c_transfers.push_back(transfer);
     transfer.device_address = MIDDLE_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[1].configuration);
+    transfer.out_data = &io_expander_data[1].configuration;
     i2c_transfers.push_back(transfer);
     transfer.device_address = BOTTOM_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[2].configuration);
+    transfer.out_data = &io_expander_data[2].configuration;
     i2c_transfers.push_back(transfer);
 
     // write to output ports for all devices/ports
@@ -84,50 +142,126 @@ uint32_t serial_interface_card::load_config(json config, std::vector<uint64_t>* 
     transfer.data_length = 2;
 
     transfer.device_address = TOP_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[0].outputs);
+    transfer.out_data = &io_expander_data[0].outputs;
     i2c_transfers.push_back(transfer);
     transfer.device_address = MIDDLE_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[1].outputs);
+    transfer.out_data = &io_expander_data[1].outputs;
     i2c_transfers.push_back(transfer);
     transfer.device_address = BOTTOM_DEVICE_ADDRESS;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[2].outputs);
+    transfer.out_data = &io_expander_data[2].outputs;
     i2c_transfers.push_back(transfer);
 
     // read from input port for last port of last device
     transfer.read = true;
     transfer.reg_address = INPUT_PORT_1;
     transfer.data_length = 1;
-    transfer.data = reinterpret_cast<uint32_t*>(&io_expander_data[2].inputs);
+    transfer.in_data = &io_expander_data[2].inputs;
     i2c_transfers.push_back(transfer);
 
 
-    // configure IO expander ports
-    io_expander_data[0].configuration = 0x0; // all outputs
-    io_expander_data[1].configuration = 0x0; // all outputs
-    io_expander_data[2].configuration = 0b00111000 << 8; // all outputs except for status inputs
 
-    // for(int i = 0; i < 10; i++){
-    //     configure_port_mode(i, port_mode::RS485);
-    // }
-
-    //////////////// HARDCODED SECTION ////////////////
-    led_modes[0] = led_mode::BLINK_SLOW;
-    led_modes[1] = led_mode::BLINK_MED;
-    led_modes[2] = led_mode::BLINK_FAST;
-
-    power_out_enable = true;
-
-    configure_port_mode(9, port_mode::RS422);   // servo drive
-    configure_port_mode(0, port_mode::RS422);   // encoder
+    power_out_enable = true;    // TODO: make this a node variable
 
     //////////////// END HARDCODED SECTION ////////////////
 
+    if(user_driver_config == nullptr){
+        // no user config, card will not be usable
+        led_modes[0] = led_mode::OFF;
+        led_modes[1] = led_mode::OFF;
+        led_modes[2] = led_mode::OFF;
+        for(int i = 0; i < 10; i++){
+            configure_port_mode(i, port_mode::NONE);
+        }
+        return 0;
+    }
+
+    // load port modes from user config
+    for(int i = 0; i < 10; i++){
+        std::string port_mode_str = "";
+        try{
+            port_mode_str = (*user_driver_config)["port_modes"][std::to_string(i)].get<std::string>();
+        }
+        catch(json::exception e){
+            std::cerr << "Error: Invalid port mode for port " << i << std::endl;
+            configure_port_mode(i, port_mode::NONE);
+            continue;
+        }
+        if(port_mode_str == "RS422"){
+            configure_port_mode(i, port_mode::RS422);
+        }
+        else if(port_mode_str == "RS485"){
+            configure_port_mode(i, port_mode::RS485);
+        }
+        else{
+            std::cout << "Error: Invalid port mode: " << port_mode_str << std::endl;
+            configure_port_mode(i, port_mode::NONE);
+        }
+    }
+
+    // load led modes from user config
+    for(int i = 0; i < 3; i++){
+        std::string led_mode_str = "";
+        try{
+            led_mode_str = (*user_driver_config)["led_modes"][std::to_string(i)].get<std::string>();
+        }
+        catch(json::exception e){
+            std::cerr << "Error: Invalid led mode for led " << i << std::endl;
+            led_modes[i] = led_mode::OFF;
+            continue;
+        }
+        if(led_mode_str == "OFF"){
+            led_modes[i] = led_mode::OFF;
+        }
+        else if(led_mode_str == "ON"){
+            led_modes[i] = led_mode::ON;
+        }
+        else if(led_mode_str == "BLINK_SLOW"){
+            led_modes[i] = led_mode::BLINK_SLOW;
+        }
+        else if(led_mode_str == "BLINK_MED"){
+            led_modes[i] = led_mode::BLINK_MED;
+        }
+        else if(led_mode_str == "BLINK_FAST"){
+            led_modes[i] = led_mode::BLINK_FAST;
+        }
+        else if(led_mode_str == "NODE_VAR"){
+            if(i == 0){
+                add_node_var("led_0", io_type::BOOL, (void**)&manual_led_0_mode);
+            }
+            else if(i == 1){
+                add_node_var("led_1", io_type::BOOL, (void**)&manual_led_1_mode);
+            }
+            else if(i == 2){
+                add_node_var("led_2", io_type::BOOL, (void**)&manual_led_2_mode);
+            }
+        }
+        else{
+            std::cout << "Error: Invalid led mode: " << led_mode_str << std::endl;
+            led_modes[i] = led_mode::OFF;
+        }
+    }
 
     return 0;
 }
 
 uint32_t serial_interface_card::run(){
     // run stuff
+
+    // configure_port_mode(9, port_mode::RS422);   // servo drive
+    // configure_port_mode(0, port_mode::RS422);   // fanuc encoder
+    // configure_port_mode(1, port_mode::RS485);   // yaskawa encoder
+
+    *(regs2.rs485_mode_enable->get_raw_data_ptr<uint32_t>()) = hdl_config;
+
+    if(manual_led_0_mode != nullptr){
+        led_modes[0] = *manual_led_0_mode ? led_mode::ON : led_mode::OFF;
+    }
+    if(manual_led_1_mode != nullptr){
+        led_modes[1] = *manual_led_1_mode ? led_mode::ON : led_mode::OFF;
+    }
+    if(manual_led_2_mode != nullptr){
+        led_modes[2] = *manual_led_2_mode ? led_mode::ON : led_mode::OFF;
+    }
 
     // update leds
     uint8_t led_states = 0;
@@ -160,7 +294,8 @@ uint32_t serial_interface_card::run(){
         }
     }
 
-    io_expander_data[2].outputs = ((~led_states & 0b111) << 8) | (power_out_enable << 14);
+    io_expander_data[2].outputs &= 0xFF;
+    io_expander_data[2].outputs |= ((~led_states & 0b111) << 8) | (power_out_enable << 14);
 
     // update power ok signals
     power_out_5v5_1_ok = io_expander_data[2].inputs >> 13 & 0b1;
@@ -183,10 +318,10 @@ void serial_interface_card::run_i2c_transfers(){
     if(regs2.i2c_status_error->get_value()){ // error bit set
         i2c_consecutive_error_count++;
     }
-    else{
+    else{   // successful transfer
 
         if(i2c_transfers[last_i2c_transfer].read){  // if a read was just completed, save the data from the rx register
-            *i2c_transfers[last_i2c_transfer].data = regs2.i2c_data_rx->get_value();
+            *i2c_transfers[last_i2c_transfer].in_data = regs2.i2c_data_rx->get_value();
         }
 
         last_i2c_transfer++;
@@ -206,7 +341,7 @@ void serial_interface_card::run_i2c_transfers(){
 
     
     if(!transfer.read){ // if its a write, copy the data to the tx register
-        regs2.i2c_data_tx->set_value(*transfer.data);
+        regs2.i2c_data_tx->set_value(*transfer.out_data);
     }
 
 }
@@ -217,7 +352,7 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
         return 1;
     }
 
-    // configs are in the order: 3, 1, 2, 4
+    // configs are in the order: 3, 1, 2, 4 (LSB first)
     #define RS485_CONFIG 0b0001
     #define RS422_CONFIG 0b1110
     #define BOTH_INPUTS_CONFIG 0b0010
@@ -240,19 +375,19 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
     case 1:
     case 2:
     case 3:
-        io_expander_data[0].configuration = (io_expander_data[0].configuration & ~(0xf << 4*(3-port))) | (config << 4*(3-port));
+        io_expander_data[0].outputs = (io_expander_data[0].outputs & ~(0xf << 4*(3-port))) | (config << 4*(3-port));
         break;
 
     case 4:
     case 5:
     case 6:
     case 7:
-        io_expander_data[1].configuration = (io_expander_data[1].configuration & ~(0xf << 4*(7-port))) | (config << 4*(7-port));
+        io_expander_data[1].outputs = (io_expander_data[1].outputs & ~(0xf << 4*(7-port))) | (config << 4*(7-port));
         break;
 
     case 8:
     case 9:
-        io_expander_data[2].configuration = (io_expander_data[2].configuration & ~(0xf << 4*(9-port))) | (config << 4*(9-port));
+        io_expander_data[2].outputs = (io_expander_data[2].outputs & ~(0xf << 4*(9-port))) | (config << 4*(9-port));
         break;
     
     default:
@@ -261,7 +396,7 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
 
     port_modes[port] = mode;
 
-    uint32_t hdl_config = 0;
+    hdl_config = 0;
     for(int i = 0; i < 10; i++){
         if(port_modes[i] == port_mode::RS485){
             hdl_config |= 0b1 << i;
@@ -274,8 +409,6 @@ uint32_t serial_interface_card::configure_port_mode(uint8_t port, port_mode mode
         //     hdl_config |= 0b1 << (i+20);
         // }
     }
-
-    *(regs2.rs485_mode_enable->get_raw_data_ptr<uint32_t>()) = hdl_config;
 
     return 0;
 }

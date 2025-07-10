@@ -22,3 +22,17 @@ controller-firmware/python/pyvenv.cfg
 controller-software/core/zynq_files/controller/config/fpga_configs/bit_files/bitfile.bit.bin
 controller-software/core/zynq_files/controller/config/fpga_configs/controller_config.json
 controller-software/core/zynq_files/controller/bin/controller_core
+fpga_config.json
+
+controller-software/web/web-interface/node_modules
+
+
+# ignore large data capture files
+controller-firmware/python/src/sandbox/analog.csv
+controller-firmware/python/src/sandbox/fanuc_encoder_rs485_raw.csv
+controller-firmware/python/src/sandbox/fanuc_rs485_detected_edges.csv
+controller-firmware/python/src/sandbox/yaskawa_decoded_manchester_raw.csv
+controller-firmware/python/src/sandbox/t.txt
+
+
+controller-firmware/Vivado/autogen_sources/*

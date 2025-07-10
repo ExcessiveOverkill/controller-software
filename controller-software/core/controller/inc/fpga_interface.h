@@ -58,6 +58,7 @@ private:
     fpga_mem_layout mem_layout;
 
     uint16_t* fpga_main_trigger_counter = nullptr;    // 16 bit counter at 25 Mhz
+    uint16_t* fpga_watchdog = nullptr;    // this value must be written at LEAST every 16 update cycles to prevent the FPGA DMA from shutting down
     bool first_cycle = true;
 
     void* ocm_base_pointer;
@@ -67,6 +68,8 @@ private:
     
     void cache_flush(void* addr, uint32_t size);
     void cache_invalidate(void* addr, uint32_t size);
+
+    void feed_watchdog();   // feed the watchdog to prevent the FPGA DMA from shutting down
 
     void error_if_nullptr();    // check to ensure memory is allocated before returning any pointers
 };

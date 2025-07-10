@@ -9,7 +9,7 @@ config SYSTEM_ZYNQ
         bool "ZYNQ Configuration"
         help
           ZYNQ Configuration for petalinux project.
-          All these config options will be in /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/config
+          All these config options will be in /home/excessive/github/controller-software/em-os/project-spec/configs/config
 
 # Copyright (C) 2021-2022, Xilinx, Inc.  All rights reserved.
 # Copyright (C) 2022, Advanced Micro Devices, Inc.  All rights reserved.
@@ -433,7 +433,7 @@ config SUBSYSTEM_AUTOCONFIG_U__BOOT
 endif
 endmenu
 
-source /home/excessive/github/controller-software/controller-software/em-os/project-spec/configs/configs/Kconfig.syshw
+source /home/excessive/github/controller-software/em-os/project-spec/configs/configs/Kconfig.syshw
 
 choice
 	prompt "System Architecture"

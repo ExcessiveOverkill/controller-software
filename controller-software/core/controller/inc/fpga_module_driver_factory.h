@@ -15,10 +15,12 @@ using json = nlohmann::json;
 // base driver for which all other module drivers will inherit from
 class base_driver {
 public:
-    const uint32_t* microseconds = nullptr;    // pointer to the microseconds counter in the fpga manager, used for timing
+    const uint64_t* microseconds = nullptr;    // pointer to the microseconds counter in the fpga manager, used for timing
 
-    virtual uint32_t load_config(json config, std::vector<uint64_t>* instructions) = 0; // configures the internal memory pointers
-    //virtual uint32_t get_base_instructions(std::vector<uint64_t>* instructions) = 0; // gets the base instructions for the driver, just for syncing required memory with the PS
+    uint32_t load_config(json* config, std::string module_name, Node_Core* node_core, fpga_instructions* fpga_instr, json* user_driver_config); // configures the internal memory pointers and user nodes
+    
+    virtual uint32_t custom_load_config(json* user_driver_config) = 0; // custom configuration for the driver
+
     virtual uint32_t run() = 0; // run the driver, called after each FPGA update
 
     fpga_mem base_mem;  // this is what is required for MINIMUM functionality of a driver
@@ -37,6 +39,33 @@ protected:
     bool load_json_value(const json& config, const std::string& value_name, T* dest); 
 
     uint8_t node_address = 255;   // address of the node in the FPGA
+
+    Node_Core* node_core = nullptr; // pointer to the node core for the FPGA
+    fpga_instructions* fpga_instr = nullptr; // pointer to the fpga instructions for the FPGA
+    json* config = nullptr; // pointer to the json config for the driver
+    Address_Map_Loader loader;  // loader for the address map
+    std::string node_var_prefix = "";  // prefix for the node variables
+
+
+    // functions/variables used for creating copy instructions and node vars
+    
+    fpga_instructions::copy cpy;    // copy instruction
+    Register* copy_reg = nullptr;   // register to copy to/from
+
+    void cpy_source(Register* reg);
+    void cpy_destination(Register* reg);
+    void cpy_source(std::string var_name);
+    void cpy_destination(std::string var_name);
+    void cpy_add_instruction();
+    void cpy_time_reference(uint32_t time_reference);
+    void cpy_time_reference(fpga_instructions::copy* ref_instruction, bool write_priority);
+    void cpy_execution_window(int32_t earliest, int32_t latest);
+    void cpy_write_priority();
+    void cpy_read_priority();
+    void cpy_dynamic_source(std::string var_name, uint32_t** data_ptr);  // create a dynamic index source for the copy instruction and set the data to use
+
+    void add_node_var(std::string var_name, io_type type, void** data_ptr);
+
 };
 
 
@@ -51,8 +80,6 @@ bool base_driver::load_json_value(const json& config, const std::string& value_n
     *dest = config[value_name].get<T>();
     return true;
 }
-
-
 
 
 

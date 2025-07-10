@@ -6,7 +6,7 @@ from em_serial_port import EM_Serial_Port
 from registers2 import *
 import numpy as np
 
-
+# TODO: fix issue which previous back packets affecting fututre packets
 class EM_Serial_Controller(Component):
     """
     Specific serial interface for managing communication with our own devices at high speeds
@@ -21,6 +21,7 @@ class EM_Serial_Controller(Component):
 
         assert max_packet_size <= 255, "max_cyclic_registers must be less than or equal to 255"
         assert max_number_of_devices <= 255, "max_number_of_devices must be less than or equal to 255"
+        assert max_number_of_devices >= 2, "at least 2 devices"   # this is a bug and eventually should be fixed, but for now we need at least 2 devices for the module to work
 
         self.debug = debug
         self.clock = 100e6
@@ -95,7 +96,7 @@ class EM_Serial_Controller(Component):
         self.rx_not_finished_fault = Signal()
         self.rx_no_response_fault = Signal()
 
-        self.debugPins = Signal(5)
+        self.debugPins = Signal(8)
         self.debugPins_fsm = Signal(5)
         
 
@@ -108,10 +109,12 @@ class EM_Serial_Controller(Component):
         m.d.comb += self.serialPort.rx.eq(self.rx)
         m.d.comb += self.tx.eq(self.serialPort.tx)
 
+        m.d.comb += self.debugPins.eq(self.serialPort.debugPins)
+
         if(self.debug):
             m.submodules.debug_drive_serial_port = self.debugSerialPort
             m.d.comb += self.debugSerialPort.rx.eq(self.serialPort.tx)
-            m.d.comb += self.serialPort.rx.eq(self.debugSerialPort.tx)
+            # m.d.comb += self.serialPort.rx.eq(self.debugSerialPort.tx)
             #m.d.comb += self.serialPort.rx.eq(1)
 
         self.address_ToSerialPort = self.serialPort.bram_address
@@ -178,6 +181,7 @@ class EM_Serial_Controller(Component):
         m.d.comb += self.cyclic_register_starting_bit_index.eq(self.cyclic_register_starting_byte_index<<3)
 
         self.cyclic_data_enabled = Signal()
+        self.rx_cyclic_data_enabled = Signal()
 
 
         device_group_offset = int(np.log2(self.rm.devices.alignment))   # offset for device group sections
@@ -253,6 +257,11 @@ class EM_Serial_Controller(Component):
                 m.d.sync_100 += sig.eq(0)
 
         
+
+        ######### TEST CONTROL READ THEN BRAM WRITE SEQUENCE ##########
+
+
+
         # handle bram interface
 
         self.bram_control_mode = Signal()
@@ -260,7 +269,7 @@ class EM_Serial_Controller(Component):
         with m.If((self.bram_address == self.rm.control.address_offset) | (self.bram_address == self.rm.bit_length.address_offset) | (self.bram_address == self.rm.status.address_offset)):
             m.d.sync_100 += self.bram_control_mode.eq(1)
             m.d.comb += self.bram_control_mode_comb.eq(1)
-            m.d.comb += self.debugPins[0].eq(1)
+            #m.d.comb += self.debugPins[0].eq(1)
         with m.Else():
             m.d.sync_100 += self.bram_control_mode.eq(0)
 
@@ -357,12 +366,17 @@ class EM_Serial_Controller(Component):
             with m.State("get_tx_device_config"):
                 m.d.comb += self.debugPins_fsm.eq(4)
                 m.d.comb += use_future_device_bram.eq(1)
-                with m.If(self.internalBramReadData[self.rm.devices.control.enable.starting_bit]):  # if device is enabled
+                m.d.sync_100 += self.last_enabled_device_index.eq(self.current_enabled_device_index)
+                with m.If(self.current_enabled_device_index == (self.max_number_of_devices-1)):
+                    m.d.sync_100 += self.timer.eq(self.rx_packet_size+self.deviceRXdelay)
+                    m.d.sync_100 += self.pre_timer.eq(self.word_time)
+                    m.next = "wait_for_final_rx_packet"
+                with m.Elif(self.internalBramReadData[self.rm.devices.control.enable.starting_bit]):  # if device is enabled
                     # save last enabled device index
-                    m.d.sync_100 += self.last_enabled_device_index.eq(self.current_enabled_device_index)
+                    # m.d.sync_100 += self.last_enabled_device_index.eq(self.current_enabled_device_index)
                     m.d.sync_100 += self.current_enabled_device_index.eq(self.current_device_index)
 
-                    m.d.comb += self.debugPins[0].eq(1)
+                    # m.d.comb += self.debugPins[0].eq(1)
 
                     # read configuration
                     m.d.sync_100 += [
@@ -385,11 +399,15 @@ class EM_Serial_Controller(Component):
                     ]
                     m.next = "get_tx_device_config_wait"
 
-                with m.Else():  # no more devices to send packets for, receive the last RX packet
+                with m.Else():
                     m.d.sync_100 += self.timer.eq(self.rx_packet_size+self.deviceRXdelay)
                     m.d.sync_100 += self.pre_timer.eq(self.word_time)
                     m.next = "wait_for_final_rx_packet"
-                    pass
+
+                    # m.d.sync_100 += self.update_busy.eq(0)
+                    # m.d.sync_100 += self.update_done.eq(1)
+                    # m.next = "idle"
+                    
 
             
             with m.State("get_tx_register_config"):
@@ -531,8 +549,9 @@ class EM_Serial_Controller(Component):
                                 m.next = "idle"
 
                         # write status to memory
-                        #m.d.comb += use_previous_device_bram.eq(1)
+                        #with m.If(self.current_device_index == 1):
                         m.d.comb += use_previous_device_bram.eq(1)
+
                         m.d.sync_100 += device_register_address.eq(self.rm.devices.status.address_offset)
                         m.d.sync_100 += self.internalBramWriteData.eq(Cat(self.rx_no_response_fault, self.rx_not_finished_fault, self.rx_invalid_crc_fault))
                         m.d.sync_100 += self.internalBramWriteEnable.eq(1)
@@ -603,7 +622,7 @@ class EM_Serial_Controller(Component):
                 12-15: cyclic write register data size (bytes)
                 16-23: cyclic read register starting byte index in 32bit word
                 """
-                with m.If((cyclic_read_data_size != 0) & ((self.current_cyclic_register < 3) | (self.cyclic_data_enabled))):
+                with m.If((cyclic_read_data_size != 0) & ((self.current_cyclic_register < 3) | (self.rx_cyclic_data_enabled))):
                     
                     m.d.sync_100 += self.cyclic_register_size.eq(cyclic_read_data_size)
                     m.d.sync_100 += self.cyclic_register_starting_byte_index.eq(cyclic_read_data_starting_byte_index)
@@ -638,7 +657,7 @@ class EM_Serial_Controller(Component):
                         m.next = "partial_slice_rx_register_data_wait"  # wait for next word to be available
 
                 # invalid config means we reached an unconfigured register, packet is done
-                with m.Elif(self.current_device_index < (self.max_number_of_devices-1)):
+                with m.Elif((self.current_device_index != (self.max_number_of_devices-1)) | ((self.current_enabled_device_index == (self.max_number_of_devices-1)) & (self.current_enabled_device_index != self.last_enabled_device_index))):  # skip next device if the current one is disabled and we still have devices left to try
                     m.next = "start_rx"
 
                 with m.Else():
@@ -709,8 +728,10 @@ class EM_Serial_Controller(Component):
                     m.d.sync_100 += self.writeEnable_ToSerialPort.eq(0)
                     m.next = "get_tx_device_config_wait"
                 with m.Else():
+                    with m.If(self.current_device_index != (self.max_number_of_devices-1)):
+                        m.d.sync_100 += self.current_device_index.eq(self.current_device_index + 1)
                     m.d.sync_100 += self.writeEnable_ToSerialPort.eq(1)
-                    m.d.sync_100 += self.current_device_index.eq(self.current_device_index + 1)
+                    m.d.sync_100 += self.rx_cyclic_data_enabled.eq(self.cyclic_data_enabled)   # save cyclic data enabled state for interpreting the rx packet
 
 
 
@@ -718,7 +739,7 @@ class EM_Serial_Controller(Component):
     
 
 clock = int(100e6) # 100 Mhz
-dut = EM_Serial_Controller(64, 4, True)
+dut = EM_Serial_Controller(16, 2, True)
 
 regs = dut.rm
 
@@ -743,25 +764,28 @@ cyclic_read_offset = regs.devices.cyclic_read_data.address_offset
 
 async def serialBench(ctx):
 
+    print(regs.devices.status.address_offset)
+    print(regs.devices.alignment)
+
     # enable devices
-    ctx.set(dut.memory.data[dev0 + regs.devices.control.address_offset], dev_control(1, 1, 4))   # device 0: enable, cyclic mode, and 4 byte packet size
-    #ctx.set(dut.memory.data[dev1 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 1: enable, cyclic mode, and 4 byte packet size
-    #ctx.set(dut.memory.data[dev2 + regs.devices.control.address_offset], dev_control(1, 0, 3))   # device 2: enable, cyclic mode, and 4 byte packet size
+    ctx.set(dut.memory.data[dev0 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 0: enable, cyclic mode, and 4 byte packet size
+    ctx.set(dut.memory.data[dev1 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 1: enable, cyclic mode, and 4 byte packet size
+    # ctx.set(dut.memory.data[dev2 + regs.devices.control.address_offset], dev_control(1, 1, 3))   # device 2: enable, cyclic mode, and 4 byte packet size
 
     # config address and sequential registers
     ctx.set(dut.memory.data[dev0 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
     ctx.set(dut.memory.data[dev0 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
     ctx.set(dut.memory.data[dev0 + cyclic_config_offset+2], cyclic_config(4, 1, 4, 1))   # config RX/TX reg2 for 4 byte 1 offset
 
-    ctx.set(dut.memory.data[dev0 + cyclic_config_offset+3], cyclic_config(0, 0, 2, 1))
-    ctx.set(dut.memory.data[dev0 + cyclic_config_offset+4], cyclic_config(0, 0, 4, 3))
+    ctx.set(dut.memory.data[dev0 + cyclic_config_offset+3], cyclic_config(2, 1, 2, 1))
+    #ctx.set(dut.memory.data[dev0 + cyclic_config_offset+4], cyclic_config(0, 0, 4, 3))
 
-    ctx.set(dut.memory.data[dev1 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
-    ctx.set(dut.memory.data[dev1 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
-    ctx.set(dut.memory.data[dev1 + cyclic_config_offset+2], cyclic_config(4, 1, 4, 1))   # config RX/TX reg2 for 4 byte 1 offse1
-    ctx.set(dut.memory.data[dev2 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
-    ctx.set(dut.memory.data[dev2 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
-    ctx.set(dut.memory.data[dev2 + cyclic_config_offset+2], cyclic_config(4, 1, 4, 1))   # config RX/TX reg2 for 4 byte 1 offset
+    # ctx.set(dut.memory.data[dev1 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
+    # ctx.set(dut.memory.data[dev1 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
+    # ctx.set(dut.memory.data[dev1 + cyclic_config_offset+2], cyclic_config(4, 1, 4, 1))   # config RX/TX reg2 for 4 byte 1 offse1
+    # ctx.set(dut.memory.data[dev2 + cyclic_config_offset], cyclic_config(1, 0, 1, 0))   # config RX/TX reg0 for 1 byte 0 offset
+    # ctx.set(dut.memory.data[dev2 + cyclic_config_offset+1], cyclic_config(4, 1, 4, 1))   # config RX/TX reg1 for 4 byte 1 offset
+    # ctx.set(dut.memory.data[dev2 + cyclic_config_offset+2], cyclic_config(4, 1, 4, 1))   # config RX/TX reg2 for 4 byte 1 offset
     
 
     ctx.set(dut.memory.data[dev0 + cyclic_write_offset], 0xAB)
@@ -771,20 +795,20 @@ async def serialBench(ctx):
     ctx.set(dut.memory.data[dev0 + cyclic_write_offset+4], 0xABCDEF12)
 
 
-    ctx.set(dut.memory.data[dev1 + cyclic_write_offset], 0xCD)
-    ctx.set(dut.memory.data[dev1 + cyclic_write_offset+1], 0xFFFFFFFF)
-    ctx.set(dut.memory.data[dev1 + cyclic_write_offset+2], 0x12345678)
+    # ctx.set(dut.memory.data[dev1 + cyclic_write_offset], 0xCD)
+    # ctx.set(dut.memory.data[dev1 + cyclic_write_offset+1], 0xFFFFFFFF)
+    # ctx.set(dut.memory.data[dev1 + cyclic_write_offset+2], 0x12345678)
 
-    ctx.set(dut.memory.data[dev2 + cyclic_write_offset], 0xEF)
-    ctx.set(dut.memory.data[dev2 + cyclic_write_offset+1], 0xFFFFFFFF)
-    ctx.set(dut.memory.data[dev2 + cyclic_write_offset+2], 0x123456781)
+    # ctx.set(dut.memory.data[dev2 + cyclic_write_offset], 0xEF)
+    # ctx.set(dut.memory.data[dev2 + cyclic_write_offset+1], 0xFFFFFFFF)
+    # ctx.set(dut.memory.data[dev2 + cyclic_write_offset+2], 0x123456781)
 
 
     # load test response into debug serial port to simulate a device
     testTXpacket = [
-    0x123456AA,
-    0x70605040,
-    0xB0A09080
+    0x345678AA,
+    0x34567812,
+    0x00ABCD12
     ]
     offset = dut.debugSerialPort.rm.tx_data.address_offset
     for e, index in enumerate(range(offset, offset+len(testTXpacket))):
@@ -830,31 +854,38 @@ async def serialBench(ctx):
         ctx.set(dut.debugSerialPort.bram_write_enable, False)
 
 
-        # wait for test device to begin receiving packet
-        x=0
-        while(not ctx.get(dut.debugSerialPort.rxBusy)):
-            x+=1
-            await ctx.tick("sync_100")
-            if(x>1500):
-                print("test device did not start receiving packet within timeout")
-                return
-        print("test device started receiving packet")
+        # # wait for test device to begin receiving packet
+        # x=0
+        # while(not ctx.get(dut.debugSerialPort.rxBusy)):
+        #     x+=1
+        #     await ctx.tick("sync_100")
+        #     if(x>1500):
+        #         print("test device did not start receiving packet within timeout")
+        #         return
+        # print("test device started receiving packet")
 
-        # wait for test device to finish receiving packet
-        x=0
-        while(ctx.get(dut.debugSerialPort.rxBusy)):
-            x+=1
-            await ctx.tick("sync_100")
-            if(x>1500):
-                print("test device did not finish receiving packet within timeout")
-                return
-        print("test device finished receiving packet")
+        # # wait for test device to finish receiving packet
+        # x=0
+        # while(ctx.get(dut.debugSerialPort.rxBusy)):
+        #     x+=1
+        #     await ctx.tick("sync_100")
+        #     if(x>1500):
+        #         print("test device did not finish receiving packet within timeout")
+        #         return
+        # print("test device finished receiving packet")
 
         #assert ctx.get(dut.debugSerialPort.rxCRCvalid)
         if not ctx.get(dut.debugSerialPort.rxCRCvalid):
             print("CRC invalid")
 
-        await ctx.tick("sync_100").repeat(500)  # delay between rx and tx
+        ctx.set(dut.rx, 1)
+
+        await ctx.tick("sync_100").repeat(1800)  # delay between rx and tx
+
+        ctx.set(dut.rx, 0)
+        await ctx.tick("sync_100").repeat(500)
+        ctx.set(dut.rx, 1)
+
 
         # start TX on test device
         # trigger tx and set rx/tx packet sizes (RX: 3, TX: 4)
@@ -870,34 +901,30 @@ async def serialBench(ctx):
         await ctx.tick("sync_100")
         ctx.set(dut.debugSerialPort.bram_write_enable, False)
 
+        for i in range(1500):
+            ctx.set(dut.rx, ctx.get(dut.debugSerialPort.tx))
+            await ctx.tick("sync_100")
+
         await ctx.tick("sync_100").repeat(10)
 
-    await ctx.tick("sync_100").repeat(7000)
+    await ctx.tick("sync_100").repeat(1400)
 
-    # write to memory
-    ctx.set(dut.bram_address, dev0 + 0)
-    ctx.set(dut.bram_write_data, 1)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
+    print(ctx.get(dut.memory.data[dev0 + 1]))
+    # print(ctx.get(dut.memory.data[dev1 + 1]))
+    # print(ctx.get(dut.memory.data[dev2 + 1]))
 
-    # write to memory
-    ctx.set(dut.bram_address, dev0 + 1)
-    ctx.set(dut.bram_write_data, 2)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
-    ctx.set(dut.bram_write_enable, False)
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 0)
+    # ctx.set(dut.bram_write_data, 1)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
 
-    # read from memory
-    ctx.set(dut.bram_address, dev0 + 0)
-    await ctx.tick("sync_100")
-
-    # read from memory
-    ctx.set(dut.bram_address, dev0 + 1)
-    await ctx.tick("sync_100")
-
-    # read from status
-    ctx.set(dut.bram_address, dut.rm.status.address_offset)
-    await ctx.tick("sync_100")
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 1)
+    # ctx.set(dut.bram_write_data, 2)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # ctx.set(dut.bram_write_enable, False)
 
     # write to control
     # ctx.set(dut.bram_address, dut.rm.control.address_offset)
@@ -906,9 +933,23 @@ async def serialBench(ctx):
     # await ctx.tick("sync_100")
     # ctx.set(dut.bram_write_enable, False)
 
+    # read from memory
+    # ctx.set(dut.bram_address, dev0 + 0)
+    # await ctx.tick("sync_100")
+
+    # # read from memory
+    # ctx.set(dut.bram_address, dev0 + 1)
+    # await ctx.tick("sync_100")
+
     # read from status
-    ctx.set(dut.bram_address, dut.rm.status.address_offset)
-    await ctx.tick("sync_100")
+    # ctx.set(dut.bram_address, dut.rm.status.address_offset)
+    # await ctx.tick("sync_100")
+
+    
+
+    # read from status
+    # ctx.set(dut.bram_address, dut.rm.status.address_offset)
+    # await ctx.tick("sync_100")
 
     # write to control
     # ctx.set(dut.bram_address, dut.rm.control.address_offset)
@@ -916,61 +957,70 @@ async def serialBench(ctx):
     # ctx.set(dut.bram_write_enable, True)
     # await ctx.tick("sync_100")
 
-    # write to memory
-    ctx.set(dut.bram_address, dev0 + 1)
-    ctx.set(dut.bram_write_data, 2)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
-    ctx.set(dut.bram_write_enable, False)
+    # await ctx.tick("sync_100").repeat(20)
 
-    # read from status
-    ctx.set(dut.bram_address, dut.rm.status.address_offset)
-    await ctx.tick("sync_100")
-
-    # read from memory
-    ctx.set(dut.bram_address, dev0 + 1)
-    await ctx.tick("sync_100")
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 1)
+    # ctx.set(dut.bram_write_data, 2)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # ctx.set(dut.bram_write_enable, False)
 
     # write to memory
-    ctx.set(dut.bram_address, dev0 + 0)
-    ctx.set(dut.bram_write_data, 3)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
-    ctx.set(dut.bram_write_enable, False)
+    # ctx.set(dut.bram_address, dev0 + 2)
+    # ctx.set(dut.bram_write_data, 3)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # ctx.set(dut.bram_write_enable, False)
 
-    # read from memory
-    ctx.set(dut.bram_address, dev0 + 1)
-    await ctx.tick("sync_100")
+    # # read from status
+    # ctx.set(dut.bram_address, dut.rm.status.address_offset)
+    # await ctx.tick("sync_100")
 
-    # write to memory
-    ctx.set(dut.bram_address, dev0 + 0)
-    ctx.set(dut.bram_write_data, 4)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
-    #ctx.set(dut.bram_write_enable, False)
+    # # read from memory
+    # ctx.set(dut.bram_address, dev0 + 1)
+    # await ctx.tick("sync_100")
+
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 0)
+    # ctx.set(dut.bram_write_data, 3)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # ctx.set(dut.bram_write_enable, False)
+
+    # # read from memory
+    # ctx.set(dut.bram_address, dev0 + 1)
+    # await ctx.tick("sync_100")
+
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 0)
+    # ctx.set(dut.bram_write_data, 4)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # #ctx.set(dut.bram_write_enable, False)
     
-    # write to memory
-    ctx.set(dut.bram_address, dev0 + 0)
-    ctx.set(dut.bram_write_data, 7)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
-    ctx.set(dut.bram_write_enable, False)
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 0)
+    # ctx.set(dut.bram_write_data, 7)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # ctx.set(dut.bram_write_enable, False)
 
-    # read from memory
-    ctx.set(dut.bram_address, dev0 + 1)
-    await ctx.tick("sync_100")
+    # # read from memory
+    # ctx.set(dut.bram_address, dev0 + 1)
+    # await ctx.tick("sync_100")
 
-    # write to memory
-    ctx.set(dut.bram_address, dev0 + 2)
-    ctx.set(dut.bram_write_data, 6)
-    ctx.set(dut.bram_write_enable, True)
-    await ctx.tick("sync_100")
-    ctx.set(dut.bram_write_enable, False)
+    # # write to memory
+    # ctx.set(dut.bram_address, dev0 + 2)
+    # ctx.set(dut.bram_write_data, 6)
+    # ctx.set(dut.bram_write_enable, True)
+    # await ctx.tick("sync_100")
+    # ctx.set(dut.bram_write_enable, False)
 
 
-    for i in range(10):
-        print(ctx.get(dut.bram_read_data))
-        await ctx.tick("sync_100")
+    # for i in range(10):
+    #     print(ctx.get(dut.bram_read_data))
+    #     await ctx.tick("sync_100")
 
 if __name__ == "__main__":
 

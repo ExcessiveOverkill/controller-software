@@ -95,7 +95,16 @@
 			"filesystem": "cpp",
 			"valarray": "cpp",
 			"hash_map": "cpp",
-			"hash_set": "cpp"
+			"hash_set": "cpp",
+			"numbers": "cpp",
+			"ranges": "cpp",
+			"semaphore": "cpp"
 		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.cmake-tools",
+			"ms-vscode.cpptools-extension-pack"
+		]
 	}
 }

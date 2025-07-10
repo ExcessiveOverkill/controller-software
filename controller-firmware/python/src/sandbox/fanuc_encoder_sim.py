@@ -89,6 +89,28 @@ class rs422_sim():
                 self.tx_level = not self.tx_level
 
         return self.tx_level
+    
+
+HIGH = 1
+LOW = 0
+FLOATING = -1
+
+class rs485():
+    def __init__(self, data_file, clock_frequency):
+        self.file = data_file
+
+        self.current_transfer = 0
+        self.current_edge = 0
+
+        self.transfers = []
+        self.clock_period = 1/clock_frequency
+
+        self.time = 0
+        
+        self.signal_level = FLOATING
+        self.error = False
+
+    
 
 
 if __name__ == "__main__":

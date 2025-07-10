@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Test SPA with Gamepad</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 1em;
+      background: #f0f0f0;
+    }
+    #controls {
+      display: flex;
+      gap: 1em;
+      margin-bottom: 1em;
+    }
+    #readouts {
+      background: #fff;
+      padding: 1em;
+      border-radius: 8px;
+    }
+    .label {
+      font-weight: bold;
+      margin-right: 4px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.3em 0.6em;
+    }
+    th {
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket & Gamepad Demo</h1>
+  
+  <div id="controls">
+    <div>
+      <label>
+        <span class="label">Update Frequency (ms):</span>
+        <input type="number" id="freq" value="1000" style="width:80px">
+      </label>
+      <button id="start">Start Sending</button>
+      <button id="stop">Stop Sending</button>
+    </div>
+    <button id="refreshPage">Refresh Page</button>
+  </div>
+
+  <div id="readouts">
+    <h2>Gamepad Readouts</h2>
+    <p id="gamepadStatus">No gamepad connected.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Axis Index</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody id="axesTableBody"></tbody>
+    </table>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Button Index</th>
+          <th>Pressed</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody id="buttonsTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let ws;
+    let intervalId;
+    let messageId = 1; // For JSON-RPC request IDs
+
+    // Connect to WebSocket
+    function connectWebSocket() {
+      // Use current host if the server runs on same machine
+      // e.g., ws://192.168.1.10:3000 if running on a remote host
+      ws = new WebSocket(`ws://${window.location.host}`);
+
+      ws.onopen = () => {
+        console.log('[WS] Connected.');
+      };
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        console.log('[WS] Received:', message);
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] Disconnected.');
+      };
+    }
+
+    // Get the first connected gamepad, or null if none
+    function getFirstGamepad() {
+      const gamepads = navigator.getGamepads();
+      if (!gamepads) return null;
+      // Return the first non-null gamepad
+      return gamepads[0] || null;
+    }
+
+    // Send the left stick X-axis value over WebSocket using JSON-RPC
+    function sendGamepadValue() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      const gp = getFirstGamepad();
+      if (!gp) {
+        console.log('No gamepad found.');
+        return;
+      }
+
+      // Left stick X-axis is typically axes[0]
+      const axisValue = gp.axes[0] || 0;
+      const rpcMessage = {
+        jsonrpc: '2.0',
+        method: 'updateGamepadValue',
+        params: { value: axisValue },
+        id: messageId++
+      };
+      ws.send(JSON.stringify(rpcMessage));
+      console.log('[WS] Sent gamepad axis[0] value:', axisValue);
+    }
+
+    // Start/Stop sending data at a configurable frequency
+    function startSending() {
+      const freq = parseInt(document.getElementById('freq').value, 10);
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(sendGamepadValue, freq);
+      console.log(`Started sending gamepad data every ${freq} ms.`);
+    }
+
+    function stopSending() {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+      console.log('Stopped sending gamepad data.');
+    }
+
+    // Refresh the page (useful in kiosk mode)
+    function refreshPage() {
+      window.location.reload();
+    }
+
+    // Update the readout tables for axes and buttons in real-time
+    function updateGamepadReadouts() {
+      const gp = getFirstGamepad();
+      const statusEl = document.getElementById('gamepadStatus');
+      const axesTbody = document.getElementById('axesTableBody');
+      const buttonsTbody = document.getElementById('buttonsTableBody');
+
+      if (!gp) {
+        statusEl.textContent = 'No gamepad connected.';
+        axesTbody.innerHTML = '';
+        buttonsTbody.innerHTML = '';
+        requestAnimationFrame(updateGamepadReadouts);
+        return;
+      }
+
+      // Update status
+      statusEl.textContent = `Gamepad: ${gp.id} (index ${gp.index})`;
+
+      // Update axes
+      axesTbody.innerHTML = '';
+      gp.axes.forEach((val, idx) => {
+        const tr = document.createElement('tr');
+        const axisIndexTd = document.createElement('td');
+        axisIndexTd.textContent = idx;
+        const axisValueTd = document.createElement('td');
+        axisValueTd.textContent = val.toFixed(3); // e.g., 0.123
+        tr.appendChild(axisIndexTd);
+        tr.appendChild(axisValueTd);
+        axesTbody.appendChild(tr);
+      });
+
+      // Update buttons
+      buttonsTbody.innerHTML = '';
+      gp.buttons.forEach((btn, idx) => {
+        const tr = document.createElement('tr');
+        const btnIndexTd = document.createElement('td');
+        btnIndexTd.textContent = idx;
+        const pressedTd = document.createElement('td');
+        pressedTd.textContent = btn.pressed;
+        const valueTd = document.createElement('td');
+        valueTd.textContent = btn.value.toFixed(3);
+        tr.appendChild(btnIndexTd);
+        tr.appendChild(pressedTd);
+        tr.appendChild(valueTd);
+        buttonsTbody.appendChild(tr);
+      });
+
+      // Keep updating on every animation frame
+      requestAnimationFrame(updateGamepadReadouts);
+    }
+
+    // Event listeners for gamepad connection
+    window.addEventListener('gamepadconnected', (e) => {
+      console.log(`Gamepad connected at index ${e.gamepad.index}: ${e.gamepad.id}`);
+    });
+    window.addEventListener('gamepaddisconnected', (e) => {
+      console.log(`Gamepad disconnected from index ${e.gamepad.index}: ${e.gamepad.id}`);
+    });
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      connectWebSocket();
+      requestAnimationFrame(updateGamepadReadouts);
+
+      document.getElementById('start').addEventListener('click', startSending);
+      document.getElementById('stop').addEventListener('click', stopSending);
+      document.getElementById('refreshPage').addEventListener('click', refreshPage);
+    });
+  </script>
+</body>
+</html>
