@@ -4,7 +4,7 @@ import numpy as np
 # Connect to the instrument (update the resource string with your DG1022's IP)
 rm = pyvisa.ResourceManager()
 rm.list_resources()
-awg = rm.open_resource('TCPIP0::192.168.1.236::INSTR')
+awg = rm.open_resource('TCPIP0::192.168.1.208::INSTR')
 
 
 sample_rate = 40e6  # 40 MSa/s

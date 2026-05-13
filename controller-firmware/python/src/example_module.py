@@ -67,7 +67,7 @@ class Example_Module(Component):
         self.rm.add(Register("example_register_array", rw="w", type="signed", width=32, desc="Example register array description", bank_size=32))
         # 32 registers in the array, registers may be of any type or size, but will still take 32 consecutive addresses
 
-        # packeted registers
+        # packed registers
         # it is a waste of space to have a full 32 bit memory space if you only have boolean or small values
         # so you can use a packed register to save space
         # it combines multiple sub-registers into a single register

@@ -895,10 +895,7 @@ class Controller(wiring.Component):
                     raise Exception(f"Node {node_name} does not have a dma or bram interface, cannot connect to shift dma")
 
 
-            
-
-            # TODO: get register map from node and add to the main register map
-
+            # add node to register map
             device_map[f"node_{node_address}_{node_name}"] = {
                 "node_address" : node_address,
                 "node" : node_object.rm.export()
@@ -923,25 +920,30 @@ class Controller(wiring.Component):
             self.slot_C_out_enable.eq(card_C.slotOutEnable),
         ]
 
-        # fanuc encoders on ports 9 and 10
-        encoders = m.submodules["fanuc_encoders"]
-        m.d.comb += [
-            encoders.rx[0].eq(card_C.rs422_rx[8]),
-            card_C.rs422_tx[8].eq(encoders.tx[0]),
-            encoders.rx[1].eq(card_C.rs422_rx[9]),
-            card_C.rs422_tx[9].eq(encoders.tx[1]),
+        # fanuc encoders on ports 1 to 6
+        fanuc_encoders = m.submodules["fanuc_encoders"]
+        for encoder_index in range(6):
+            m.d.comb += fanuc_encoders.rx[encoder_index].eq(card_C.rs485_rx[encoder_index])
+            m.d.comb += card_C.rs485_tx[encoder_index].eq(fanuc_encoders.tx[encoder_index])
+            m.d.comb += card_C.rs485_tx_enable[encoder_index].eq(fanuc_encoders.tx_enable[encoder_index])
 
-            #self.debug_pins[0].eq(encoders.tx[0]),
-            #self.debug_pins[1].eq(encoders.rx[0]),
-        ]
+        # m.d.comb += [
+        #     encoders.rx[0].eq(card_C.rs422_rx[8]),
+        #     card_C.rs422_tx[8].eq(encoders.tx[0]),
+        #     encoders.rx[1].eq(card_C.rs422_rx[9]),
+        #     card_C.rs422_tx[9].eq(encoders.tx[1]),
+
+        #     #self.debug_pins[0].eq(encoders.tx[0]),
+        #     #self.debug_pins[1].eq(encoders.rx[0]),
+        # ]
 
 
         # yaskawa encoders on ports 1-6
-        yaskawa_encoders = m.submodules["yaskawa_encoders"]
-        for encoder_index in range(6):
-            m.d.comb += yaskawa_encoders.rx[encoder_index].eq(card_C.rs485_rx[encoder_index])
-            m.d.comb += card_C.rs485_tx[encoder_index].eq(yaskawa_encoders.tx[encoder_index])
-            m.d.comb += card_C.rs485_tx_enable[encoder_index].eq(yaskawa_encoders.tx_enable[encoder_index])
+        # yaskawa_encoders = m.submodules["yaskawa_encoders"]
+        # for encoder_index in range(6):
+        #     m.d.comb += yaskawa_encoders.rx[encoder_index].eq(card_C.rs485_rx[encoder_index])
+        #     m.d.comb += card_C.rs485_tx[encoder_index].eq(yaskawa_encoders.tx[encoder_index])
+        #     m.d.comb += card_C.rs485_tx_enable[encoder_index].eq(yaskawa_encoders.tx_enable[encoder_index])
 
         # m.d.comb += self.debug_pins.eq(yaskawa_encoders.debug)
 
@@ -979,14 +981,14 @@ class Controller(wiring.Component):
             card_B.rs422_tx[0].eq(serial_controller_D.tx),
 
 
-            self.debug_pins[0].eq(serial_controller_A.tx),
-            self.debug_pins[1].eq(serial_controller_A.rx),
-            self.debug_pins[2].eq(serial_controller_B.tx),
-            self.debug_pins[3].eq(serial_controller_B.rx),
-            self.debug_pins[4].eq(serial_controller_C.tx),
-            self.debug_pins[5].eq(serial_controller_C.rx),
-            self.debug_pins[6].eq(serial_controller_D.tx),
-            self.debug_pins[7].eq(serial_controller_D.rx),
+            # self.debug_pins[0].eq(serial_controller_A.tx),
+            # self.debug_pins[1].eq(serial_controller_A.rx),
+            # self.debug_pins[2].eq(serial_controller_B.tx),
+            # self.debug_pins[3].eq(serial_controller_B.rx),
+            # self.debug_pins[4].eq(serial_controller_C.tx),
+            # self.debug_pins[5].eq(serial_controller_C.rx),
+            # self.debug_pins[6].eq(serial_controller_D.tx),
+            # self.debug_pins[7].eq(serial_controller_D.rx),
 
             # self.debug_pins[0:6].eq(serial_controller_B.debugPins[0:5]),
             # self.debug_pins[6].eq(serial_controller_B.tx),
@@ -1035,7 +1037,7 @@ class Controller(wiring.Component):
         # m.d.comb += self.debug_pins[6].eq(self.instruction_read_address[4])
         # m.d.comb += self.debug_pins[7].eq(self.instruction_read_address[5])
 
-        #m.d.comb += self.debug_pins.eq(m.submodules.fanuc_encoders.debug)
+        m.d.comb += self.debug_pins.eq(m.submodules.fanuc_encoders.debug)
 
         # connect last node back to dma controller
         m.d.sync_100 += [
@@ -1074,9 +1076,7 @@ print(f"{bcolors.OKGREEN}=== GENERATING MODULES ==={bcolors.ENDC}")
 nodes = {
     "serial_card_B" : serial_interface_card(),
     "serial_card_C" : serial_interface_card(),
-    "fanuc_encoders" : Fanuc_Encoders(2),
-    "yaskawa_encoders" : Yaskawa_Encoders(6, s),
-    #"global_timers" : Global_Timers(),
+    "fanuc_encoders" : Fanuc_Encoders(6),
     "em_serial_controller_A" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=5),
     "em_serial_controller_B" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=4),
     "em_serial_controller_C" : EM_Serial_Controller(max_packet_size=8, max_number_of_devices=2),
