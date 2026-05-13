@@ -101,6 +101,10 @@ class Fanuc_Encoders(Component):
         encoder_address_lsb = int(math.log2(self.rm.encoder.alignment)) # TODO: add otion to get these directly from the register map
         encoder_address_msb = int(math.log2(self.rm.encoder.count)) + encoder_address_lsb + 1
 
+        selected_encoder = Signal(range(self.number_of_encoders))
+        m.d.comb += selected_encoder.eq(self.bram_address[encoder_address_lsb:encoder_address_msb])
+
+
         for index, e in enumerate(self.encoders):
 
             # debug connections
@@ -113,33 +117,41 @@ class Fanuc_Encoders(Component):
                 m.d.comb += self.debug[4].eq(e.tx_enable)
                 m.d.comb += self.debug[5].eq(e.rx)
 
+            # connect rx/tx
             m.d.comb += e.rx.eq(self.synced_rx[index])
             m.d.comb += self.tx[index].eq(e.tx)
             m.d.comb += self.tx_enable[index].eq(e.tx_enable)
-            
-            with m.If(self.bram_address[encoder_address_lsb:encoder_address_msb] == index<<encoder_address_lsb):  # selected the encoder
-                # TODO: add a way to create these switches automatically from the register map
-                with m.Switch(self.bram_address[0:encoder_address_lsb]):    # select the encoder register
-                    with m.Case(self.rm.encoder.multiturn_count.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.multiturn_count)
-                    with m.Case(self.rm.encoder.singleturn_count.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.singleturn_count)
-                    with m.Case(self.rm.encoder.commutation_count.address_offset):
-                        m.d.sync_100 += self.bram_read_data.eq(e.commutation_count)
-                    with m.Case(self.rm.encoder.status.address_offset):
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.battery_fail.starting_bit].eq(e.battery_fail)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.no_response.starting_bit].eq(e.no_response)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.crc_fail.starting_bit].eq(e.crc_fail)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.done.starting_bit].eq(e.done)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
-                    with m.Case(self.rm.encoder.config.address_offset):
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.config.rs485_mode.starting_bit].eq(e.rs485_mode)
-                        m.d.sync_100 += self.bram_read_data[self.rm.encoder.config.encoder_type.starting_bit: self.rm.encoder.config.encoder_type.starting_bit + self.rm.encoder.config.encoder_type.width].eq(e.encoder_type)
-                        with m.If(self.bram_write_enable):
-                            m.d.sync_100 += e.rs485_mode.eq(self.bram_write_data[self.rm.encoder.config.rs485_mode.starting_bit])
-                            m.d.sync_100 += e.encoder_type.eq(self.bram_write_data[self.rm.encoder.config.encoder_type.starting_bit: self.rm.encoder.config.encoder_type.starting_bit + self.rm.encoder.config.encoder_type.width])
-                    with m.Default():
-                        m.d.sync_100 += self.bram_read_data.eq(0)
+
+
+        # register access
+        with m.Switch(selected_encoder):
+
+            for index, e in enumerate(self.encoders):
+
+                with m.Case(index):
+
+                    # TODO: add a way to create these switches automatically from the register map
+                    with m.Switch(self.bram_address[0:encoder_address_lsb]):    # select the encoder register
+                        with m.Case(self.rm.encoder.multiturn_count.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.multiturn_count)
+                        with m.Case(self.rm.encoder.singleturn_count.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.singleturn_count)
+                        with m.Case(self.rm.encoder.commutation_count.address_offset):
+                            m.d.sync_100 += self.bram_read_data.eq(e.commutation_count)
+                        with m.Case(self.rm.encoder.status.address_offset):
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.battery_fail.starting_bit].eq(e.battery_fail)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.no_response.starting_bit].eq(e.no_response)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.crc_fail.starting_bit].eq(e.crc_fail)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.done.starting_bit].eq(e.done)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.status.unindexed.starting_bit].eq(e.unindexed)
+                        with m.Case(self.rm.encoder.config.address_offset):
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.config.rs485_mode.starting_bit].eq(e.rs485_mode)
+                            m.d.sync_100 += self.bram_read_data[self.rm.encoder.config.encoder_type.starting_bit: self.rm.encoder.config.encoder_type.starting_bit + self.rm.encoder.config.encoder_type.width].eq(e.encoder_type)
+                            with m.If(self.bram_write_enable):
+                                m.d.sync_100 += e.rs485_mode.eq(self.bram_write_data[self.rm.encoder.config.rs485_mode.starting_bit])
+                                m.d.sync_100 += e.encoder_type.eq(self.bram_write_data[self.rm.encoder.config.encoder_type.starting_bit: self.rm.encoder.config.encoder_type.starting_bit + self.rm.encoder.config.encoder_type.width])
+                        with m.Default():
+                            m.d.sync_100 += self.bram_read_data.eq(0)
 
 
         return m
@@ -570,12 +582,82 @@ async def single_encoder_bench(ctx):
         test_rs485_encoder.tick()
         await ctx.tick("sync_100")
 
+cnt = 2
+full_fanuc_dut = Fanuc_Encoders(cnt)
+async def full_fanuc_bench(ctx):
+
+    # rs422 mode
+    print("Testing rs422 mode")
+
+    test_rs422_encoders = []
+    for i in range(cnt):
+        # configure for rs422 mode
+        ctx.set(full_fanuc_dut.bram_address, full_fanuc_dut.rm.encoder.offset + (i << int(math.log2(full_fanuc_dut.rm.encoder.alignment))) + full_fanuc_dut.rm.encoder.config.address_offset)
+        ctx.set(full_fanuc_dut.bram_write_data, 0)   # rs422 mode, encoder type 0
+        ctx.set(full_fanuc_dut.bram_write_enable, 1)
+        await ctx.tick("sync_100")
+        ctx.set(full_fanuc_dut.bram_write_enable, 0)
+        await ctx.tick("sync_100")
+
+        test_rs422_encoders.append(rs422_sim(f"controller-firmware/python/src/sandbox/fanuc_encoder_rs422.csv", 100e6))
+
+    ctx.set(full_fanuc_dut.bram_address, full_fanuc_dut.rm.trigger.address_offset)
+    ctx.set(full_fanuc_dut.bram_write_data, 0xFFFFFFFF)   # trigger all
+    ctx.set(full_fanuc_dut.bram_write_enable, 1)
+    await ctx.tick("sync_100")
+    ctx.set(full_fanuc_dut.bram_write_enable, 0)
+    await ctx.tick("sync_100")
+    
+    for i in range(10000):
+        for i in range(cnt):
+            if(ctx.get(full_fanuc_dut.tx_enable[i]) != 1):
+                print("Error: tx_enable should always be 1 in rs422 mode")
+            
+            test_rs422_encoders[i].set_request_level(ctx.get(full_fanuc_dut.tx[i]))
+            ctx.set(full_fanuc_dut.rx[i], test_rs422_encoders[i].get_tx_level())
+            test_rs422_encoders[i].tick()
+        await ctx.tick("sync_100")
+
+    # rs485 mode
+    print("Testing rs485 mode")
+
+    test_rs485_encoders = []
+    for i in range(cnt):
+        # configure for rs485 mode
+        ctx.set(full_fanuc_dut.bram_address, full_fanuc_dut.rm.encoder.offset + (i << int(math.log2(full_fanuc_dut.rm.encoder.alignment))) + full_fanuc_dut.rm.encoder.config.address_offset)
+        ctx.set(full_fanuc_dut.bram_write_data, 1)   # rs485 mode, encoder type 0
+        ctx.set(full_fanuc_dut.bram_write_enable, 1)
+        await ctx.tick("sync_100")
+        ctx.set(full_fanuc_dut.bram_write_enable, 0)
+        await ctx.tick("sync_100")
+
+        test_rs485_encoders.append(rs485_sim(f"controller-firmware/python/src/sandbox/fanuc_rs485_detected_edges.csv", 100e6))
+
+    ctx.set(full_fanuc_dut.bram_address, full_fanuc_dut.rm.trigger.address_offset)
+    ctx.set(full_fanuc_dut.bram_write_data, 0xFFFFFFFF)   # trigger all
+    ctx.set(full_fanuc_dut.bram_write_enable, 1)
+    await ctx.tick("sync_100")
+    ctx.set(full_fanuc_dut.bram_write_enable, 0)
+    await ctx.tick("sync_100")
+    
+    for i in range(7000):
+        for i in range(cnt):
+            level = test_rs485_encoders[i].get_tx_level()
+            if level == 1:
+                ctx.set(full_fanuc_dut.rx[i], 1)
+            elif level == 0:
+                ctx.set(full_fanuc_dut.rx[i], 0)
+            
+            ctx.set(full_fanuc_dut.rx[i], test_rs485_encoders[i].get_tx_level())
+            test_rs485_encoders[i].set_inputs(ctx.get(full_fanuc_dut.tx[i]), ctx.get(full_fanuc_dut.tx_enable[i]))
+            test_rs485_encoders[i].tick()
+        await ctx.tick("sync_100")
 
 if __name__ == "__main__":
 
     # sim = Simulator(dut)
-    sim = Simulator(single_encoder_dut)
+    sim = Simulator(full_fanuc_dut)
     sim.add_clock(1/100e6, domain="sync_100")
-    sim.add_testbench(single_encoder_bench)
-    with sim.write_vcd("fanuc_single_encoder_test.vcd"):
+    sim.add_testbench(full_fanuc_bench)
+    with sim.write_vcd("fanuc_full_encoder_test.vcd"):
         sim.run()
