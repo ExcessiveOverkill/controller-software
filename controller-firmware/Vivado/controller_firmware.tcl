@@ -37,7 +37,7 @@
 proc checkRequiredFiles { origin_dir} {
   set status true
   set files [list \
- "[file normalize "$origin_dir/controller_firmware/controller_firmware.srcs/sources_1/imports/autogen_sources/controller.v"]"\
+ "[file normalize "$origin_dir/autogen_sources/controller.v"]"\
   ]
   foreach ifile $files {
     if { ![file isfile $ifile] } {
@@ -149,7 +149,7 @@ set proj_dir [get_property directory [current_project]]
 
 # Set project properties
 set obj [current_project]
-set_property -name "customized_default_ip_location" -value "S:/Vivado/ip" -objects $obj
+set_property -name "customized_default_ip_location" -value "$origin_dir/ip" -objects $obj
 set_property -name "default_lib" -value "xil_defaultlib" -objects $obj
 set_property -name "enable_resource_estimation" -value "0" -objects $obj
 set_property -name "enable_vhdl_2008" -value "1" -objects $obj
@@ -186,7 +186,7 @@ add_files -norecurse -fileset $obj $files
 
 # Import local files from the original project
 set files [list \
- [file normalize "${origin_dir}/controller_firmware/controller_firmware.srcs/sources_1/imports/autogen_sources/controller.v"]\
+ [file normalize "${origin_dir}/autogen_sources/controller.v"]\
 ]
 set imported_files [import_files -fileset sources_1 $files]
 
@@ -265,7 +265,7 @@ set obj [get_filesets utils_1]
 
 # Adding sources referenced in BDs, if not already added
 if { [get_files controller.v] == "" } {
-  import_files -quiet -fileset sources_1 S:/Vivado/controller_firmware/controller_firmware.srcs/sources_1/imports/autogen_sources/controller.v
+  import_files -quiet -fileset sources_1 "${origin_dir}/autogen_sources/controller.v"
 }
 
 

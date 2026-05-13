@@ -92,7 +92,7 @@ uint32_t yaskawa_encoders::run(){
 
         // data.commutation_angle = data.commutation_count_reg->get_value<uint16_t>();
         // data.crc_error = data.crc_error_reg->get_value<bool>();
-        // data.no_resonse = data.no_response_reg->get_value<bool>();
+        // data.no_response = data.no_response_reg->get_value<bool>();
         // data.unindexed = data.unindexed_reg->get_value<bool>();
         // data.battery_fail = data.battery_fail_reg->get_value<bool>();
         // data.done = data.done_reg->get_value<bool>();

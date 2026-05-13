@@ -28,7 +28,7 @@ private:
         uint16_t commutation_angle = 0;
         bool battery_fail = false;
         bool unindexed = false;
-        bool no_resonse = false;
+        bool no_response = false;
         bool crc_error = false;
         bool done = false;
 

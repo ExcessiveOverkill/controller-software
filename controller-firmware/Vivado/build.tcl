@@ -1,6 +1,15 @@
-open_project    S:/Vivado/controller_firmware/controller_firmware.xpr
+set script_dir [file dirname [file normalize [info script]]]
 
-update_files -from_files S:/Vivado/autogen_sources/controller.v -to_files S:/Vivado/controller_firmware/controller_firmware.srcs/sources_1/imports/autogen_sources/controller.v -filesets [get_filesets *]
+open_project "$script_dir/controller_firmware/controller_firmware.xpr"
+
+update_files -from_files "$script_dir/autogen_sources/controller.v" -to_files "$script_dir/controller_firmware/controller_firmware.srcs/sources_1/imports/autogen_sources/controller.v" -filesets [get_filesets *]
+
+# add controller.v if it isn't already in the project sources
+if {[llength [get_files -quiet "*controller.v"]] == 0} {
+    add_files -fileset sources_1 "$script_dir/autogen_sources/controller.v"
+} else {
+    import_files -force -fileset sources_1 "$script_dir/autogen_sources/controller.v"
+}
 
 update_module_reference controller_firmware_Controller_0_0
 

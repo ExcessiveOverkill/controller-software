@@ -178,7 +178,7 @@ uint32_t Node_Core::load(std::string file){
     std::string fpga_config;
     j["info"]["fpga_config"].get_to(fpga_config);
     if(fpga_config != fpga_config_file){
-        std::cerr << "Error: FPGA config file does not match" << std::endl;
+        std::cerr << "Error: FPGA config file does not match " << fpga_config_file << " vs " << fpga_config << std::endl;
         return 3;
     }
 

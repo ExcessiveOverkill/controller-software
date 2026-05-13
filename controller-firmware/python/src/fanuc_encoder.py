@@ -41,19 +41,21 @@ class Fanuc_Encoders(Component):
         self.encoder_group.add(Register("multiturn_count", rw="r", type="unsigned", width=32, desc="Absolute multiturn count"))      # not scaled, typically only 16 bits are used
         self.encoder_group.add(Register("singleturn_count", rw="r", type="unsigned", width=32, desc="Absolute (after index) singleturn count"))    # scaled to 32 bits
         self.encoder_group.add(Register("commutation_count", rw="r", type="unsigned", width=16, desc="Absolute commutation count"))   # scaled to 16 bits
-        self.encoder_group.add(Register("config", rw="rw", type="unsigned", width=32, desc="Configuration register", sub_registers=[
-            Register("rs485_mode", type="bool", desc="Encoder uses 2-wire RS485 mode instead of 4-wire RS422"),
-            Register("encoder_type", type="unsigned", width=4, desc="Encoder type"),
-            """
-            rs422 mode types:
-            0: default
-
-            rs485 mode types:
-            0: ai64
-            1: ai128
-
-            """
+        self.encoder_group.add(Register("config", rw="w", type="unsigned", width=32, desc="Configuration register", sub_registers=[
+            Register("rs485_mode", rw="w", type="bool", desc="Encoder uses 2-wire RS485 mode instead of 4-wire RS422"),
+            Register("encoder_type", rw="w", type="unsigned", width=4, desc="Encoder type"),
+            
         ]))
+
+        """
+        rs422 mode types:
+        0: default
+
+        rs485 mode types:
+        0: ai64
+        1: ai128
+
+        """
         
         self.encoder_group.add(Register("status", rw="r", desc="Encoder status", sub_registers=[
             Register("battery_fail", type="bool", desc="Battery fail"),
@@ -110,6 +112,10 @@ class Fanuc_Encoders(Component):
                 m.d.comb += self.debug[3].eq(e.tx)
                 m.d.comb += self.debug[4].eq(e.tx_enable)
                 m.d.comb += self.debug[5].eq(e.rx)
+
+            m.d.comb += e.rx.eq(self.synced_rx[index])
+            m.d.comb += self.tx[index].eq(e.tx)
+            m.d.comb += self.tx_enable[index].eq(e.tx_enable)
             
             with m.If(self.bram_address[encoder_address_lsb:encoder_address_msb] == index<<encoder_address_lsb):  # selected the encoder
                 # TODO: add a way to create these switches automatically from the register map
@@ -162,10 +168,10 @@ class Request_Signal(Component):
         self.rs485_bit_ticks = int(self.clock / self.rs485_baud_rate)
         if(self.rs422_baud_rate != self.clock / self.rs422_bit_ticks):
             rs422_error = (abs(self.rs422_baud_rate - self.clock / self.rs422_bit_ticks) / self.rs422_baud_rate) * 100
-            print(f"Warning: rs422 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs422_baud_rate:.0f} vs {self.clock / self.rs422_bit_ticks:.0f}, error: {rs422_error:.1f}%)")
+            # print(f"Warning: rs422 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs422_baud_rate:.0f} vs {self.clock / self.rs422_bit_ticks:.0f}, error: {rs422_error:.1f}%)")
         if(self.rs485_baud_rate != self.clock / self.rs485_bit_ticks):
             rs485_error = (abs(self.rs485_baud_rate - self.clock / self.rs485_bit_ticks) / self.rs485_baud_rate) * 100
-            print(f"Warning: rs485 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs485_baud_rate:.0f} vs {self.clock / self.rs485_bit_ticks:.0f}, error: {rs485_error:.1f}%)")
+            # print(f"Warning: rs485 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs485_baud_rate:.0f} vs {self.clock / self.rs485_bit_ticks:.0f}, error: {rs485_error:.1f}%)")
 
 
     def elaborate(self, platform):
@@ -289,10 +295,10 @@ class Receiver(Component):
         self.rs485_bit_ticks = int(self.clock / self.rs485_baud_rate)
         if(self.rs422_baud_rate != self.clock / self.rs422_bit_ticks):
             rs422_error = (abs(self.rs422_baud_rate - self.clock / self.rs422_bit_ticks) / self.rs422_baud_rate) * 100
-            print(f"Warning: rs422 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs422_baud_rate:.0f} vs {self.clock / self.rs422_bit_ticks:.0f}, error: {rs422_error:.1f}%)")
+            # print(f"Warning: rs422 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs422_baud_rate:.0f} vs {self.clock / self.rs422_bit_ticks:.0f}, error: {rs422_error:.1f}%)")
         if(self.rs485_baud_rate != self.clock / self.rs485_bit_ticks):
             rs485_error = (abs(self.rs485_baud_rate - self.clock / self.rs485_bit_ticks) / self.rs485_baud_rate) * 100
-            print(f"Warning: rs485 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs485_baud_rate:.0f} vs {self.clock / self.rs485_bit_ticks:.0f}, error: {rs485_error:.1f}%)")
+            # print(f"Warning: rs485 baud rate is not an integer divisor of the clock, timing will be slightly off ({self.rs485_baud_rate:.0f} vs {self.clock / self.rs485_bit_ticks:.0f}, error: {rs485_error:.1f}%)")
 
 
         self.capture = Signal()

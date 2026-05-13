@@ -10,6 +10,7 @@ from global_timer import Global_Timers
 from em_serial_controller import EM_Serial_Controller
 from yaskawa_encoders import Yaskawa_Encoders
 import subprocess, os
+from pathlib import Path
 
 
 class Controller(wiring.Component):
@@ -1200,10 +1201,13 @@ if __name__ == "__main__":
 
     if (not sim):  # export
 
-        # check drive S exists for vivado project
-        if not os.path.exists("S:/Vivado"):
-            print(f"{bcolors.FAIL}Drive S subst path does not exist, please run 'create subst path vivado' task from vs code{bcolors.ENDC}")
-            exit()
+        # if on windows, check for vivado drive subst path
+        if os.name == "nt":
+            # check drive S exists for vivado project
+            if not os.path.exists("S:/Vivado"):
+                print(f"{bcolors.FAIL}Drive S subst path does not exist, please run 'create subst path vivado' task from vs code{bcolors.ENDC}")
+                exit()
+        
 
 
         top = Controller(nodes, sim)
@@ -1212,9 +1216,10 @@ if __name__ == "__main__":
         print(f"\n\n{bcolors.OKGREEN}=== GENERATING VERILOG FILE ==={bcolors.ENDC}")
         from amaranth.back import verilog
         import os
-        output_dir = "controller-firmware/Vivado/autogen_sources"
+        vivado_dir = Path(__file__).resolve().parents[2] / "Vivado"
+        output_dir = vivado_dir / "autogen_sources"
         os.makedirs(output_dir, exist_ok=True)
-        with open(os.path.join(output_dir, "controller.v"), "w") as f:
+        with open(output_dir / "controller.v", "w") as f:
             f.write(verilog.convert(top, name="Controller"))
 
 
@@ -1223,23 +1228,40 @@ if __name__ == "__main__":
         print(f"{bcolors.WARNING}=== check build.log for any issues ==={bcolors.ENDC}")
 
         # run vivado from here to generate the bitstream file
+        if os.name == "nt":
+            vivado_settings = r"C:\Xilinx\Vivado\2023.1\settings64.bat"
+            tcl_script       = "S:/Vivado/build.tcl"
+            cmd_line = (
+                f'call "{vivado_settings}" && '
+                f'vivado -mode batch -nojournal -log build.log -source "{tcl_script}"'
+            )
+            popen_command = cmd_line
+            popen_kwargs = {"shell": True}
+        else:
+            vivado_settings = os.environ.get("XILINX_VIVADO_SETTINGS", "/home/excessive/Xilinx/Vivado/2023.1/settings64.sh")
+            tcl_script = str(vivado_dir / "build.tcl")
+            build_log = str(vivado_dir / "build.log")
 
-        vivado_settings = r"C:\Xilinx\Vivado\2023.1\settings64.bat"
-        tcl_script       = "S:/Vivado/build.tcl"
+            if not os.path.exists(vivado_settings):
+                raise FileNotFoundError(
+                    f"Vivado settings script not found: {vivado_settings}. "
+                    "Set XILINX_VIVADO_SETTINGS to the correct settings64.sh path."
+                )
 
-        # Build a single command line for cmd.exe
-        cmd_line = (
-            f'call "{vivado_settings}" && '
-            f'vivado -mode batch -nojournal -log build.log -source "{tcl_script}"'
-        )
+            cmd_line = (
+                f'source "{vivado_settings}" && '
+                f'vivado -mode batch -nojournal -log "{build_log}" -source "{tcl_script}"'
+            )
+            popen_command = ["bash", "-lc", cmd_line]
+            popen_kwargs = {"shell": False}
 
         proc = subprocess.Popen(
-            cmd_line,
-            shell=True,               # needed to run .bat and use &&
+            popen_command,
             stdout=subprocess.PIPE,   # capture both streams
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,            # line buffered
+            **popen_kwargs,
         )
 
         # Print each line as it arrives:

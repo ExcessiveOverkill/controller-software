@@ -1,8 +1,8 @@
 {
-    "fpga_config_path": "controller/config/fpga_configs/test",
-    "fpga_instructions_file": "controller/config/user/test_instructions.json",
-    "fpga_driver_config_file": "controller/config/user/fpga_driver_config.json",
-    "node_config_file": "controller/config/user/new_node_config.json",
+    "fpga_config_path": "controller/config/fpga_configs/test_r2000",
+    "fpga_instructions_file": "controller/config/user/r2000/instructions_r2000.json",
+    "fpga_driver_config_file": "controller/config/user/r2000/fpga_driver_config_r2000.json",
+    "node_config_file": "controller/config/user/r2000/node_config_r2000.json",
     "temp_path": "controller/config/temp",
     "software_update_frequency_hz": 1000
 }

@@ -172,11 +172,11 @@ uint32_t Fpga_Interface::wait_for_update() {
             read(mem_update_running_fds[0].fd, &count, sizeof(count)); // clear the interrupt
             write(mem_update_done_fds[0].fd, &val, sizeof(val)); // clear the done interrupt
             ret = poll(mem_update_done_fds, 1, 1); // wait up to 1ms for the update to finish
-            read(mem_update_done_fds[0].fd, &count, sizeof(count)); // clear the interrupt
-            write(mem_update_running_fds[0].fd, &val, sizeof(val)); // clear the start interrupt
 
             if(ret > 0) {   // update detected
-                if(mem_update_running_fds->revents & POLLIN) {
+                if(mem_update_done_fds->revents & POLLIN) {
+                    read(mem_update_done_fds[0].fd, &count, sizeof(count)); // clear the interrupt
+                    write(mem_update_running_fds[0].fd, &val, sizeof(val)); // clear the start interrupt
                     first_cycle = false;
                     feed_watchdog();
                     return 0;   // update finished

@@ -297,9 +297,15 @@ void Controller::run(){
     while(!quit){
 
         // wait for update trigger
-        if(fpga.wait_for_update() != 0){
+        uint32_t ret = fpga.wait_for_update();
+        if(ret != 0){
             std::cerr << "Error: FPGA update failed" << std::endl;
             if(quit_on_fpga_update_fail){
+                quit = true;
+            }
+            if(ret == 2 || ret == 3){
+                // faults due to FPGA not running
+                std::cerr << "FPGA update failure likely due to FPGA not running" << std::endl;
                 quit = true;
             }
             continue;

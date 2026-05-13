@@ -46,7 +46,7 @@
             "label": "create vivado project",
             "type": "shell",
             "windows": { "command": "${env:xilinx_path}/vivado/${env:xilinx_version}/settings64.bat && if not exist S:vivado/controller_firmware vivado -mode batch -source ${workspaceFolder}/controller-firmware/vivado/create_project.tcl -tclargs S:Vivado"},
-            "linux": { "command": "source ${xilinx_path}/Vivado/${xilinx_version}/settings64.sh && if [ ! -d ${workspaceFolder}/controller-firmware/Vivado/controller-firmware ]; then vivado -mode batch -source ${workspaceFolder}/controller-firmware/Vivado/create_project.tcl -tclargs ${workspaceFolder}/controller-firmware/Vivado; fi"},
+            "linux": { "command": "source ${xilinx_path}/Vivado/${xilinx_version}/settings64.sh && if [ ! -d ${workspaceFolder}/controller-firmware/Vivado/controller_firmware ]; then vivado -mode batch -source ${workspaceFolder}/controller-firmware/Vivado/create_project.tcl -tclargs ${workspaceFolder}/controller-firmware/Vivado; fi"},
             "problemMatcher": [],
             "dependsOn": ["create subst path vivado"],
         },
@@ -56,6 +56,14 @@
             "command": "c:/xilinx/vivado/2023.1/settings64.bat && vivado -mode batch -source ${workspaceFolder}/controller-firmware/vivado/save_project.tcl", // TODO: make this vivado path easier to change
             "problemMatcher": [],
             "dependsOn": ["create subst path"]
+        },
+        {
+            "label": "recreate vivado project",
+            "type": "shell",
+            "linux": { "command": "rm -rf ${workspaceFolder}/controller-firmware/Vivado/controller_firmware && source ${xilinx_path}/Vivado/${xilinx_version}/settings64.sh && vivado -mode batch -source ${workspaceFolder}/controller-firmware/Vivado/create_project.tcl -tclargs ${workspaceFolder}/controller-firmware/Vivado"},
+            "windows": { "command": "rmdir /s /q S:\\Vivado\\controller_firmware && call ${env:xilinx_path}/Vivado/${env:xilinx_version}/settings64.bat && vivado -mode batch -source S:/Vivado/create_project.tcl -tclargs S:/Vivado"},
+            "problemMatcher": [],
+            "dependsOn": ["create subst path vivado"]
         },
         {
             "label": "setup project",

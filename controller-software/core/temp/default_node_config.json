@@ -1,0 +1,822 @@
+{
+    "info": {
+        "date": "2018-04-09",
+        "fpga_config": "controller/config/fpga_configs/test_r2000",
+        "time": "03:50:52",
+        "write_protected": false
+    },
+    "node_vars": {
+        "fanuc_encoders:0.total_turns": {
+            "name": "fanuc_encoders:0.total_turns",
+            "type": "DOUBLE"
+        },
+        "fanuc_encoders:1.total_turns": {
+            "name": "fanuc_encoders:1.total_turns",
+            "type": "DOUBLE"
+        },
+        "fanuc_encoders:2.total_turns": {
+            "name": "fanuc_encoders:2.total_turns",
+            "type": "DOUBLE"
+        },
+        "fanuc_encoders:3.total_turns": {
+            "name": "fanuc_encoders:3.total_turns",
+            "type": "DOUBLE"
+        },
+        "fanuc_encoders:4.total_turns": {
+            "name": "fanuc_encoders:4.total_turns",
+            "type": "DOUBLE"
+        },
+        "fanuc_encoders:5.total_turns": {
+            "name": "fanuc_encoders:5.total_turns",
+            "type": "DOUBLE"
+        },
+        "node_vars.drivers.node_1_serial_card_B.i2c_config": {
+            "name": "node_vars.drivers.node_1_serial_card_B.i2c_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_1_serial_card_B.i2c_data_rx": {
+            "name": "node_vars.drivers.node_1_serial_card_B.i2c_data_rx",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_1_serial_card_B.i2c_data_tx": {
+            "name": "node_vars.drivers.node_1_serial_card_B.i2c_data_tx",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_1_serial_card_B.i2c_status": {
+            "name": "node_vars.drivers.node_1_serial_card_B.i2c_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_1_serial_card_B.led_1": {
+            "name": "node_vars.drivers.node_1_serial_card_B.led_1",
+            "type": "BOOL"
+        },
+        "node_vars.drivers.node_1_serial_card_B.led_2": {
+            "name": "node_vars.drivers.node_1_serial_card_B.led_2",
+            "type": "BOOL"
+        },
+        "node_vars.drivers.node_1_serial_card_B.port_mode_enable": {
+            "name": "node_vars.drivers.node_1_serial_card_B.port_mode_enable",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_2_serial_card_C.i2c_config": {
+            "name": "node_vars.drivers.node_2_serial_card_C.i2c_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_2_serial_card_C.i2c_data_rx": {
+            "name": "node_vars.drivers.node_2_serial_card_C.i2c_data_rx",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_2_serial_card_C.i2c_data_tx": {
+            "name": "node_vars.drivers.node_2_serial_card_C.i2c_data_tx",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_2_serial_card_C.i2c_status": {
+            "name": "node_vars.drivers.node_2_serial_card_C.i2c_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_2_serial_card_C.led_1": {
+            "name": "node_vars.drivers.node_2_serial_card_C.led_1",
+            "type": "BOOL"
+        },
+        "node_vars.drivers.node_2_serial_card_C.led_2": {
+            "name": "node_vars.drivers.node_2_serial_card_C.led_2",
+            "type": "BOOL"
+        },
+        "node_vars.drivers.node_2_serial_card_C.port_mode_enable": {
+            "name": "node_vars.drivers.node_2_serial_card_C.port_mode_enable",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.config:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.config:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.config:1": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.config:1",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.config:2": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.config:2",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.config:3": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.config:3",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.config:4": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.config:4",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.config:5": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.config:5",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:0.multiturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:0.multiturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:0.singleturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:0.singleturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:1.multiturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:1.multiturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:1.singleturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:1.singleturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:2.multiturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:2.multiturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:2.singleturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:2.singleturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:3.multiturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:3.multiturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:3.singleturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:3.singleturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:4.multiturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:4.multiturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:4.singleturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:4.singleturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:5.multiturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:5.multiturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.encoder:5.singleturn_count:0": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.encoder:5.singleturn_count:0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_3_fanuc_encoders.trigger": {
+            "name": "node_vars.drivers.node_3_fanuc_encoders.trigger",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.bit_length": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.bit_length",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_rx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_rx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_rx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_status": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_tx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_tx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_tx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_0_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_0_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_rx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_rx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_rx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_status": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_tx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_tx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_tx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_1_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_1_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_rx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_rx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_rx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_status": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_tx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_tx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_tx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_2_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_2_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_rx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_rx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_rx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_status": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_tx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_tx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_tx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_3_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_3_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_rx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_rx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_rx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_status": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_tx_device_address": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_tx_sequential_control": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_tx_sequential_data": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.device_4_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.device_4_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_4_em_serial_controller_A.status": {
+            "name": "node_vars.drivers.node_4_em_serial_controller_A.status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.bit_length": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.bit_length",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_rx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_rx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_rx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_status": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_tx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_tx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_tx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_0_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_0_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_rx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_rx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_rx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_status": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_tx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_tx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_tx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_1_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_1_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_rx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_rx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_rx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_status": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_tx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_tx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_tx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_2_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_2_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_rx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_rx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_rx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_status": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_tx_device_address": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_tx_sequential_control": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_tx_sequential_data": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.device_3_user_cyclic_write_0": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.device_3_user_cyclic_write_0",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_5_em_serial_controller_B.status": {
+            "name": "node_vars.drivers.node_5_em_serial_controller_B.status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.bit_length": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.bit_length",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_cyclic_config": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_rx_device_address": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_rx_sequential_control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_rx_sequential_data": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_status": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_tx_device_address": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_tx_sequential_control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_0_tx_sequential_data": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_0_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_cyclic_config": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_rx_device_address": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_rx_sequential_control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_rx_sequential_data": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_status": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_tx_device_address": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_tx_sequential_control": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.device_1_tx_sequential_data": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.device_1_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_6_em_serial_controller_C.status": {
+            "name": "node_vars.drivers.node_6_em_serial_controller_C.status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.bit_length": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.bit_length",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_cyclic_config": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_rx_device_address": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_rx_sequential_control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_rx_sequential_data": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_status": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_tx_device_address": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_tx_sequential_control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_0_tx_sequential_data": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_0_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1",
+            "type": "UNDEFINED"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_cyclic_config": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_rx_device_address": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_rx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_rx_sequential_control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_rx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_rx_sequential_data": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_rx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_selected_cyclic_config": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_selected_cyclic_config",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_status": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_status",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_tx_device_address": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_tx_device_address",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_tx_sequential_control": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_tx_sequential_control",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.device_1_tx_sequential_data": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.device_1_tx_sequential_data",
+            "type": "UINT32"
+        },
+        "node_vars.drivers.node_7_em_serial_controller_D.status": {
+            "name": "node_vars.drivers.node_7_em_serial_controller_D.status",
+            "type": "UINT32"
+        }
+    }
+}
