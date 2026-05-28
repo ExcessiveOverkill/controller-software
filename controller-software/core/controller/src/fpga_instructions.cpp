@@ -423,6 +423,10 @@ uint32_t fpga_instructions::compile(){
     instructions with the smallest window of execution are placed first (providing they are not dependent on an un-placed instruction)
     */
 
+    // save created registers incase multiple instructions reference the same register
+    std::map<std::string, Register*> created_source_registers;
+    std::map<std::string, Register*> created_destination_registers;
+
     // get register and node variable data
     for(auto it = instructions.begin(); it != instructions.end(); ++it){
         copy* instruction = &(*it);
@@ -433,6 +437,15 @@ uint32_t fpga_instructions::compile(){
         std::string source_node_var = "";
         std::string destination_node_var = "";
         std::string register_index_source_node_var = "";
+
+        // if the register already exists, don't resync it
+        bool source_existed = false;
+        bool destination_existed = false;
+
+        if(instruction->time_window == 1){
+            volatile uint32_t temp = 1234;   // for debugging
+            std::cout << "instruction with time window of 1 found, source: " << instruction->source_name << ", destination: " << instruction->destination_name << std::endl;
+        }
 
         if(instruction->time_reference == -2){  // -2 means use the end of the update period as the time reference
             instruction->time_reference = full_update_counts - 2500;    // ~25us before the end of the update period to ensure there is time for the AXI transfer (~20us) to complete
@@ -449,13 +462,20 @@ uint32_t fpga_instructions::compile(){
 
         // create source
         if(instruction->source_name.substr(0, instruction->source_name.find('.')) == "fpga"){ // register
-            if(get_register_from_full_name(instruction->source_name, fpga_config, base_mem, &source_reg) != 0){
-                std::cerr << "Error: failed to get register from full name" << std::endl;
-                return 1;
+            if(created_source_registers.find(instruction->source_name) != created_source_registers.end()){  // use existing register if possible
+                source_reg = created_source_registers[instruction->source_name];
+                source_existed = true;
             }
-            if(!source_reg->pl_data.read){
-                std::cerr << "Error: FPGA instruction source register is not readable" << std::endl;
-                return 1;
+            else{   // create new register
+                if(get_register_from_full_name(instruction->source_name, fpga_config, base_mem, &source_reg) != 0){
+                    std::cerr << "Error: failed to get register from full name" << std::endl;
+                    return 1;
+                }
+                if(!source_reg->pl_data.read){
+                    std::cerr << "Error: FPGA instruction source register is not readable" << std::endl;
+                    return 1;
+                }
+                created_source_registers[instruction->source_name] = source_reg;
             }
         }
         else if(instruction->source_name.substr(0, instruction->source_name.find('.')) == "node_vars"){ // node variable
@@ -468,13 +488,21 @@ uint32_t fpga_instructions::compile(){
 
         // create destination
         if(instruction->destination_name.substr(0, instruction->destination_name.find('.')) == "fpga"){ // register
-            if(get_register_from_full_name(instruction->destination_name, fpga_config, base_mem, &destination_reg) != 0){
-                std::cerr << "Error: failed to get register from full name" << std::endl;
-                return 1;
+            if(created_destination_registers.find(instruction->destination_name) != created_destination_registers.end()){  // use existing register if possible
+                destination_reg = created_destination_registers[instruction->destination_name];
+                destination_existed = true;
             }
-            if(!destination_reg->pl_data.write){
-                std::cerr << "Error: FPGA instruction destination register is not writable" << std::endl;
-                return 1;
+            else{   // create new register
+                if(get_register_from_full_name(instruction->destination_name, fpga_config, base_mem, &destination_reg) != 0){
+                    std::cerr << "Error: failed to get register from full name" << std::endl;
+                    return 1;
+                }
+                if(!destination_reg->pl_data.write){
+                        std::cerr << "Error: FPGA instruction destination register is not writable" << std::endl;
+                    return 1;
+                }
+                created_destination_registers[instruction->destination_name] = destination_reg;
+
             }
         }
         else if(instruction->destination_name.substr(0, instruction->destination_name.find('.')) == "node_vars"){ // node variable
@@ -497,15 +525,17 @@ uint32_t fpga_instructions::compile(){
             instruction->dst_addr = destination_reg->pl_data.absolute_address;
             instruction->dst_node = destination_reg->pl_data.node_index;
 
-            delete source_reg;
-            delete destination_reg;
+            // delete source_reg;
+            // delete destination_reg;
         }
         else if(source_reg != nullptr){
             // copy from fpga reg to node var
-            sync_with_ps(source_reg, base_mem);
-            if(node_core->set_global_variable_data_ptr(destination_node_var, source_reg->ps_data.software_data_ptr)){
-                std::cerr << "Error: failed to set global variable data pointer" << std::endl;
-                return 1;
+            if(source_existed == false){    // if its new, sync it
+                sync_with_ps(source_reg, base_mem);
+                if(node_core->set_global_variable_data_ptr(destination_node_var, source_reg->ps_data.software_data_ptr)){
+                    std::cerr << "Error: failed to set global variable data pointer" << std::endl;
+                    return 1;
+                }
             }
             instruction->src_addr = source_reg->pl_data.absolute_address;
             instruction->src_node = source_reg->pl_data.node_index;
@@ -514,14 +544,16 @@ uint32_t fpga_instructions::compile(){
 
             instruction->dynamic_reg_starting_address = source_reg->pl_data.absolute_address;
 
-            delete source_reg;
+            // delete source_reg;
         }
         else if(destination_reg != nullptr){
             // copy from node var to fpga reg
-            sync_with_ps(destination_reg, base_mem);
-            if(node_core->set_global_variable_data_ptr(source_node_var, destination_reg->ps_data.software_data_ptr)){
-                std::cerr << "Error: failed to set global variable data pointer" << std::endl;
-                return 1;
+            if(destination_existed == false){    // if its new, sync it
+                sync_with_ps(destination_reg, base_mem);
+                if(node_core->set_global_variable_data_ptr(source_node_var, destination_reg->ps_data.software_data_ptr)){
+                    std::cerr << "Error: failed to set global variable data pointer" << std::endl;
+                    return 1;
+                }
             }
             instruction->src_addr = destination_reg->ps_data.hardware_data_ptr;
             instruction->src_node = 0;
@@ -530,7 +562,7 @@ uint32_t fpga_instructions::compile(){
 
             instruction->dynamic_reg_starting_address = destination_reg->pl_data.absolute_address;
 
-            delete destination_reg;
+            // delete destination_reg;
         }
         else{
             // this should never happen
@@ -588,21 +620,25 @@ uint32_t fpga_instructions::compile(){
 
     std::cout << "instructions placed" << std::endl;
 
-    // for(auto instruction : instructions){
-    //     if(instruction.block_placeholder){
-    //         continue;
-    //     }
-    //     std::cout << instruction.dma_execution_cycle << "\t" << instruction.source_name << " -> " << instruction.destination_name << std::endl;
-    // }
+    for(auto instruction : instructions){
+        if(instruction.block_placeholder){
+            continue;
+        }
+        if(instruction.dst_node == 3){
+            volatile uint32_t temp = 1234;   // for debugging
+            std::cout << instruction.dma_execution_cycle << "\t" << instruction.source_name << " -> " << instruction.destination_name << std::endl;
+        }
+
+    }
 
     condense_instructions();
 
     std::cout << "instructions condensed" << std::endl;
 
     // test print instructions
-    // for(auto instruction : condensed_instructions){
-    //     std::cout << instruction << std::endl;
-    // }
+    for(auto instruction : condensed_instructions){
+        std::cout << instruction << std::endl;
+    }
 
     return 0;
 }

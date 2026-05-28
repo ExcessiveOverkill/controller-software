@@ -4,8 +4,6 @@ Controller::Controller(){
 
     quit_nodejs();  // make sure nodejs is not running
 
-    setup_main_thread();
-
     fpga_manager.set_fpga_interface(&fpga);
     fpga_manager.set_microseconds(&microseconds);
     fpga_manager.node_core = &node_core;
@@ -133,7 +131,7 @@ uint32_t Controller::load_user_configs(){
 }
 
 uint32_t Controller::start_nodejs(){
-    auto ret = system("chrt -o 0 node controller/web/server/app.js > /dev/null 2>&1 &");
+    auto ret = system("taskset -c 1 chrt -o 0 node controller/web/server/app.js > /dev/null 2>&1 &");
     if(ret != 0){
         std::cerr << "Error: failed to start nodejs webserver" << std::endl;
         return 1;
@@ -203,7 +201,9 @@ void Controller::start(){
 
     software_update_period_us = 1e6 / software_update_frequency;
 
-    fpga.set_update_frequency(software_update_frequency);
+    // Enter RT mode immediately before the control loop to avoid scheduling
+    // non-critical startup work under FIFO policy.
+    setup_main_thread();
 
     std::cout << "Controller started" << std::endl;
 
@@ -223,7 +223,7 @@ void Controller::setup_main_thread(){
 
     // Set the scheduler policy and priority.
     struct sched_param param;
-    param.sched_priority = 99; // 1-99
+    param.sched_priority = 95; // leave headroom for IRQ threads
 
     if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
         std::cerr << "sched_setscheduler failed: " << strerror(errno) << std::endl;
@@ -232,7 +232,7 @@ void Controller::setup_main_thread(){
 
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(1, &cpuset); // pin to CPU #1
+    CPU_SET(0, &cpuset); // pin to CPU #0 — matches FPGA IRQ affinity
 
     if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) != 0) {
         std::cerr << "sched_setaffinity failed: " << strerror(errno) << std::endl;
@@ -257,41 +257,22 @@ void Controller::setup_main_thread(){
 uint32_t Controller::critical_calls(){  // realtime calls that must be completed each cycle
     // realtime loop at a set frequency
 
-    volatile int32_t cache_invalidate_us;
-    volatile int32_t cache_flush_us;
-    volatile int32_t run_fpga_driver_update_us;
-    volatile int32_t run_node_core_us;
-
     cycle_count++;
 
-    auto start_time = std::chrono::high_resolution_clock::now();
     // run low level fpga drivers
     fpga.cache_invalidate_all();    // make sure any cached memory gets updated
-    auto end_time = std::chrono::high_resolution_clock::now();
-    cache_invalidate_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
 
-    start_time = std::chrono::high_resolution_clock::now();
     fpga_manager.run_update();  // updates low level drivers
-    end_time = std::chrono::high_resolution_clock::now();
-    run_fpga_driver_update_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     
     // run node network
-    start_time = std::chrono::high_resolution_clock::now();
     node_core.run_update();
-    end_time = std::chrono::high_resolution_clock::now();
-    run_node_core_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     
-    start_time = std::chrono::high_resolution_clock::now();
     fpga.cache_flush_all(); // write any changed data to FPGA memory
-    end_time = std::chrono::high_resolution_clock::now();
-    cache_flush_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
 
     return 0;
 }
 
 void Controller::run(){
-    uint32_t ret = 0;
-
     uint64_t last_update_time = microseconds;
 
     while(!quit){
@@ -311,8 +292,7 @@ void Controller::run(){
             continue;
         }
         //quit_on_fpga_update_fail = true;    // once we get a successful update, we can quit on failure
-        
-        
+
         critical_calls();
 
 
@@ -320,12 +300,24 @@ void Controller::run(){
         api.get_new_call();
         api.run_calls();
 
-        
         update_microseconds();
         uint32_t update_duration = microseconds - last_update_time;
         last_update_time = microseconds;
         if(update_duration > software_update_period_us*2 + software_update_period_us / 10){   // if the update took longer tham +10%
-            std::cerr << "Update duration: " << update_duration << "us" << std::endl;
+            Fpga_Interface::IrqCountSnapshot irq_snapshot = fpga.get_irq_count_snapshot();
+            std::cerr << "Update duration: " << update_duration << "us"
+                      << "  run=" << irq_snapshot.run_count
+                      << " done=" << irq_snapshot.done_count
+                      << " dr=" << irq_snapshot.run_delta
+                      << " dd=" << irq_snapshot.done_delta
+                      << " delta=" << irq_snapshot.current_run_minus_done;
+            if(irq_snapshot.baseline_valid) {
+                std::cerr << " baseline=" << irq_snapshot.baseline_run_minus_done;
+            }
+            if(irq_snapshot.last_increment_anomaly) {
+                std::cerr << "  irq_increment_anomaly_event=" << irq_snapshot.increment_anomaly_events;
+            }
+            std::cerr << std::endl;
         }
     }
 

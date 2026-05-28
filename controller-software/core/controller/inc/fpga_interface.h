@@ -28,6 +28,19 @@ struct fpga_mem_layout {
 
 class Fpga_Interface {
 public:
+    struct IrqCountSnapshot {
+        uint32_t run_count = 0;
+        uint32_t done_count = 0;
+        uint32_t run_delta = 0;
+        uint32_t done_delta = 0;
+        bool baseline_valid = false;
+        int32_t baseline_run_minus_done = 0;
+        int32_t current_run_minus_done = 0;
+        uint64_t delta_change_events = 0;
+        uint64_t increment_anomaly_events = 0;
+        bool last_increment_anomaly = false;
+    };
+
     Fpga_Interface();
     ~Fpga_Interface();
 
@@ -47,6 +60,8 @@ public:
 
     uint32_t wait_for_update();   // wait for new data from the FPGA to be ready
 
+    IrqCountSnapshot get_irq_count_snapshot() const;
+
     uint32_t set_update_frequency(uint32_t frequency);    // frequency at which the FPGA will update in Hz
 
     void cache_flush_all(); // writes any changed data from CPU to memory
@@ -65,6 +80,21 @@ private:
 
     struct pollfd mem_update_running_fds[1];
     struct pollfd mem_update_done_fds[1];
+
+    uint32_t last_running_irq_count = 0;
+    uint32_t last_done_irq_count = 0;
+    bool irq_delta_baseline_valid = false;
+    int32_t irq_delta_baseline = 0;
+    bool irq_delta_last_observed_valid = false;
+    int32_t irq_delta_last_observed = 0;
+    uint64_t irq_delta_change_events = 0;
+    uint32_t prev_running_irq_count = 0;
+    uint32_t prev_done_irq_count = 0;
+    bool irq_prev_counts_valid = false;
+    uint64_t irq_increment_anomaly_events = 0;
+    bool last_irq_increment_anomaly = false;
+    uint32_t last_cycle_run_delta = 0;
+    uint32_t last_cycle_done_delta = 0;
     
     void cache_flush(void* addr, uint32_t size);
     void cache_invalidate(void* addr, uint32_t size);

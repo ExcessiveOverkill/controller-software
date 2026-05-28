@@ -197,6 +197,10 @@ uint32_t kins::run(){
 bool kins::clamp_to_limits(){
     // clamp the commanded joint positions to the limits
 
+    if(bypass_limits){
+        return false; // if bypassing limits, do nothing
+    }
+
     double tol = 1e-3; // tolerance for clamping, to avoid false triggering of flag
 
     bool modified = false; // flag to check if any joint was modified
@@ -704,6 +708,17 @@ void kins::rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* eul
 void kins::update_joint_distances_to_limit(){
     // update how far in each direction each joint is from a limit
     // uses final commanded joint positions
+
+    if(bypass_limits){
+        for(int i = 0; i < 6; i++){
+            joint_distances_to_limit[i].infinite = true;
+            joint_distances_to_limit[i].to_min = std::numeric_limits<float>::infinity();
+            joint_distances_to_limit[i].to_max = std::numeric_limits<float>::infinity();
+            joint_distances_to_limit[i].allowed_positive_vel = joint_limits[i].max_vel;
+            joint_distances_to_limit[i].allowed_negative_vel = joint_limits[i].max_vel;
+        }
+        return;
+    }
 
     // TODO: this is hardcoded for the UP6 joint congiguration, should be configurable eventually
 

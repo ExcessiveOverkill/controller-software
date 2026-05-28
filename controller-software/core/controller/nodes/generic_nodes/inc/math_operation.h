@@ -1,5 +1,7 @@
 #include "node_factory.h"
 #include <cmath>
+#include <limits>
+#include <type_traits>
 
 #pragma once
 
@@ -122,6 +124,29 @@ class math_operation: public base_node {
 
         template<typename T>
         uint32_t do_nary_operation() {
+            if (nary_op == nary_operation::AVG) {
+                long double sum = 0.0;
+                for (uint8_t i = 0; i < input_count; ++i) {
+                    sum += static_cast<long double>(*(T*)input_signals[i]->data_pointer);
+                }
+
+                const long double avg = sum / static_cast<long double>(input_count);
+                if constexpr (std::is_floating_point_v<T>) {
+                    *(T*)out = static_cast<T>(avg);
+                }
+                else {
+                    const long double min_val = static_cast<long double>(std::numeric_limits<T>::lowest());
+                    const long double max_val = static_cast<long double>(std::numeric_limits<T>::max());
+                    if (avg < min_val || avg > max_val) {
+                        std::cerr << "Error: average out of range in math_operation node" << std::endl;
+                        return 2;
+                    }
+                    *(T*)out = static_cast<T>(std::llround(avg));
+                }
+
+                return 0;
+            }
+
             T result = 0;
             for (uint8_t i = 0; i < input_count; ++i) {
                 T value = *(T*)input_signals[i]->data_pointer;
@@ -167,16 +192,10 @@ class math_operation: public base_node {
                             result = value;
                         }
                         break;
-                    case nary_operation::AVG:
-                        result += value; // will be divided by input_count later
-                        break;
                     default:
                         std::cerr << "Error: undefined nary operation" << std::endl;
                         return 2; // undefined operation error
                 }
-            }
-            if (nary_op == nary_operation::AVG) {
-                result /= input_count; // calculate average
             }
             *(T*)out = result;
             return 0; // success
@@ -189,10 +208,41 @@ class math_operation: public base_node {
             T value2 = *(T*)input_signals[1]->data_pointer;
             switch (binary_op) {
                 case binary_operation::POW:
-                    *(T*)out = pow(value1, value2);
+                    if constexpr (std::is_floating_point_v<T>) {
+                        *(T*)out = static_cast<T>(std::pow(value1, value2));
+                    }
+                    else {
+                        const double result = std::pow(static_cast<double>(value1), static_cast<double>(value2));
+                        if (!std::isfinite(result)) {
+                            std::cerr << "Error: non-finite pow result in math_operation node" << std::endl;
+                            return 2;
+                        }
+
+                        const double min_val = static_cast<double>(std::numeric_limits<T>::lowest());
+                        const double max_val = static_cast<double>(std::numeric_limits<T>::max());
+                        if (result < min_val || result > max_val) {
+                            std::cerr << "Error: pow result out of range in math_operation node" << std::endl;
+                            return 2;
+                        }
+
+                        *(T*)out = static_cast<T>(std::llround(result));
+                    }
                     break;
                 case binary_operation::ATAN2:
-                    *(T*)out = atan2(value2, value1); // atan2 expects (y, x)
+                    if constexpr (std::is_floating_point_v<T>) {
+                        *(T*)out = static_cast<T>(std::atan2(value2, value1)); // atan2 expects (y, x)
+                    }
+                    else {
+                        const double result = std::atan2(static_cast<double>(value2), static_cast<double>(value1));
+                        const double min_val = static_cast<double>(std::numeric_limits<T>::lowest());
+                        const double max_val = static_cast<double>(std::numeric_limits<T>::max());
+                        if (result < min_val || result > max_val) {
+                            std::cerr << "Error: atan2 result out of range in math_operation node" << std::endl;
+                            return 2;
+                        }
+
+                        *(T*)out = static_cast<T>(std::llround(result));
+                    }
                     break;
                 default:
                     std::cerr << "Error: undefined binary operation" << std::endl;
@@ -234,14 +284,25 @@ class math_operation: public base_node {
                     *(T*)out = -value;
                     break;
                 case unary_operation::ABS:
-                    *(T*)out = abs(value);
+                    if constexpr (std::is_unsigned_v<T>) {
+                        *(T*)out = value;
+                    }
+                    else if constexpr (std::is_floating_point_v<T>) {
+                        *(T*)out = static_cast<T>(std::abs(value));
+                    }
+                    else {
+                        if (value == std::numeric_limits<T>::lowest()) {
+                            *(T*)out = std::numeric_limits<T>::max();
+                        }
+                        else {
+                            *(T*)out = static_cast<T>(std::abs(value));
+                        }
+                    }
                     break;
                 default:
                     std::cerr << "Error: undefined unary operation" << std::endl;
                     return 2; // undefined operation error
             }
-            double d = *(double*)out;
-            float f = *(float*)out;
             return 0; // success
         }
         

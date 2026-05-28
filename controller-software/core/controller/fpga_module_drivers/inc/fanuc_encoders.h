@@ -34,6 +34,8 @@ private:
         Register* multiturn_count_reg = nullptr;
         Register* singleturn_count_reg = nullptr;
         Register* commutation_count_reg = nullptr;
+
+        Register* status_reg = nullptr;
         Register* crc_error_reg = nullptr;
         Register* no_response_reg = nullptr;
         Register* unindexed_reg = nullptr;

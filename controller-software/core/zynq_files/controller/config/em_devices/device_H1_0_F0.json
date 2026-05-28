@@ -1,5 +1,5 @@
 {
-    "generated_date": "2025-06-10 21:36:00.999577",
+    "generated_date": "2026-05-17 18:18:45.768483",
     "hw_info": {
         "type": 1,
         "version": 0,
@@ -939,42 +939,42 @@
             "brake_1_powered_when_off": {
                 "readable_name": "Brake 1 powered when off",
                 "description": "Brake 1 is powered when it should be off",
-                "time_delay_us": "50e3",
+                "time_delay_us": "150e3",
                 "severity": "critical",
                 "id": 4
             },
             "brake_2_powered_when_off": {
                 "readable_name": "Brake 2 powered when off",
                 "description": "Brake 2 is powered when it should be off",
-                "time_delay_us": "50e3",
+                "time_delay_us": "150e3",
                 "severity": "critical",
                 "id": 5
             },
             "brake_3_powered_when_off": {
                 "readable_name": "Brake 3 powered when off",
                 "description": "Brake 3 is powered when it should be off",
-                "time_delay_us": "50e3",
+                "time_delay_us": "150e3",
                 "severity": "critical",
                 "id": 6
             },
             "brake_4_powered_when_off": {
                 "readable_name": "Brake 4 powered when off",
                 "description": "Brake 4 is powered when it should be off",
-                "time_delay_us": "50e3",
+                "time_delay_us": "150e3",
                 "severity": "critical",
                 "id": 7
             },
             "brake_5_powered_when_off": {
                 "readable_name": "Brake 5 powered when off",
                 "description": "Brake 5 is powered when it should be off",
-                "time_delay_us": "50e3",
+                "time_delay_us": "150e3",
                 "severity": "critical",
                 "id": 8
             },
             "brake_6_powered_when_off": {
                 "readable_name": "Brake 6 powered when off",
                 "description": "Brake 6 is powered when it should be off",
-                "time_delay_us": "50e3",
+                "time_delay_us": "150e3",
                 "severity": "critical",
                 "id": 9
             },

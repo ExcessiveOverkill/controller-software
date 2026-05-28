@@ -348,8 +348,16 @@ uint32_t fpga_module_manager::create_global_variables(){
 }
 
 void fpga_module_manager::set_update_frequency(uint32_t frequency){
-    // set the update frequency for the FPGA
+    // set the update frequency for both software instruction scheduling and
+    // the FPGA hardware trigger counter.
     fpga_instr.set_update_frequency(frequency);
+
+    if(fpga_interface != nullptr){
+        uint32_t ret = fpga_interface->set_update_frequency(frequency);
+        if(ret != 0){
+            std::cerr << "Failed to set FPGA hardware update frequency, error: " << ret << std::endl;
+        }
+    }
 }
 
 uint32_t fpga_module_manager::compile_instructions(){

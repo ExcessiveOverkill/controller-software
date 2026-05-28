@@ -17,12 +17,15 @@ uint32_t fanuc_encoders::custom_load_config(json* user_driver_config){
 
         encoders[i].multiturn_count_reg = encoder->get_register("multiturn_count", 0);
         encoders[i].singleturn_count_reg = encoder->get_register("singleturn_count", 0);
-        // encoders[i].commutation_count_reg = encoder->get_register("commutation_count", 0);
-        // encoders[i].crc_error_reg = encoder->get_register("crc_error", 0);
-        // encoders[i].no_response_reg = encoder->get_register("no_response", 0);
-        // encoders[i].unindexed_reg = encoder->get_register("unindexed", 0);
-        // encoders[i].battery_fail_reg = encoder->get_register("battery_fail", 0);
-        // encoders[i].done_reg = encoder->get_register("done", 0);
+        encoders[i].commutation_count_reg = encoder->get_register("commutation_count", 0);
+
+        Register* status_reg = encoder->get_register("status", 0);
+        encoders[i].status_reg = status_reg;
+        encoders[i].crc_error_reg = status_reg->get_register("crc_fail");
+        encoders[i].no_response_reg = status_reg->get_register("no_response");
+        encoders[i].unindexed_reg = status_reg->get_register("unindexed");
+        encoders[i].battery_fail_reg = status_reg->get_register("battery_fail");
+        encoders[i].done_reg = status_reg->get_register("done");
 
         Register* config_reg = encoder->get_register("config", 0);
         encoders[i].config_reg = config_reg;
@@ -39,6 +42,14 @@ uint32_t fanuc_encoders::custom_load_config(json* user_driver_config){
         cpy_destination(encoder_name+"multiturn_count:0");
         cpy_add_instruction();
 
+        cpy_source(encoders[i].commutation_count_reg);
+        cpy_destination(encoder_name+"commutation_count:0");
+        cpy_add_instruction();
+
+        cpy_source(encoders[i].status_reg);
+        cpy_destination(encoder_name+"status:0");
+        cpy_add_instruction();
+
         cpy_destination(encoders[i].config_reg);
         cpy_source("config:"+std::to_string(i));
         cpy_add_instruction();
@@ -49,6 +60,8 @@ uint32_t fanuc_encoders::custom_load_config(json* user_driver_config){
         node_core->create_global_variable("fanuc_encoders:"+std::to_string(i)+".total_turns", io_type::DOUBLE);
         node_core->set_global_variable_data_ptr("fanuc_encoders:"+std::to_string(i)+".total_turns", &(encoders[i].total_turns));
 
+        node_core->create_global_variable("fanuc_encoders:"+std::to_string(i)+".unindexed", io_type::BOOL);
+        node_core->set_global_variable_data_ptr("fanuc_encoders:"+std::to_string(i)+".unindexed", &(encoders[i].unindexed));
 
         std::string rs485_mode_str = "";
         try{
@@ -132,12 +145,12 @@ uint32_t fanuc_encoders::run(){
         data.rs485_mode_reg->set_value(data.rs485_mode);
         data.encoder_type_reg->set_value(data.encoder_type);
 
-        // data.commutation_angle = data.commutation_count_reg->get_value<uint16_t>();
-        // data.crc_error = data.crc_error_reg->get_value<bool>();
-        // data.no_response = data.no_response_reg->get_value<bool>();
-        // data.unindexed = data.unindexed_reg->get_value<bool>();
-        // data.battery_fail = data.battery_fail_reg->get_value<bool>();
-        // data.done = data.done_reg->get_value<bool>();
+        data.commutation_angle = data.commutation_count_reg->get_value<uint16_t>();
+        data.crc_error = data.crc_error_reg->get_value<bool>();
+        data.no_response = data.no_response_reg->get_value<bool>();
+        data.unindexed = data.unindexed_reg->get_value<bool>();
+        data.battery_fail = data.battery_fail_reg->get_value<bool>();
+        data.done = data.done_reg->get_value<bool>();
 
         convert_turns(&data);
     }

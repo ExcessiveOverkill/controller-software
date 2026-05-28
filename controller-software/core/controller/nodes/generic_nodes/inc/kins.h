@@ -115,6 +115,8 @@ class kins: public base_node {
 
         InverseKinematics ik_solver;
 
+        bool bypass_limits = true; // if true, no limits will be applied
+
         void update_inputs();
         void create_inputs();
         void create_outputs();
@@ -294,12 +296,12 @@ class kins: public base_node {
         // };
 
         CDampedFilter pos_smoothing_filters[3] = {
-            CDampedFilter(30.0f), // X
-            CDampedFilter(30.0f), // Y
-            CDampedFilter(30.0f)  // Z
+            CDampedFilter(3.0f), // X
+            CDampedFilter(3.0f), // Y
+            CDampedFilter(3.0f)  // Z
         };
 
-        const float slerp_a = .02f;
+        const float slerp_a = .0002f;
         quat_rot quat_smoothing_filter = {1.0f, 0.0f, 0.0f, 0.0f};
 
 
