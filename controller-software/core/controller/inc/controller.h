@@ -58,8 +58,14 @@ class Controller {
         std::string user_node_config_path = "";
         std::string user_fpga_intructions_config_path = "";
 
+        uint32_t start_web_stack();
+        void quit_web_stack();
+
         uint32_t start_nodejs();
         void quit_nodejs();
+
+        uint32_t start_editor_service();
+        void quit_editor_service();
 
 
     public:

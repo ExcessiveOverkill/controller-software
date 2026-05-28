@@ -18,13 +18,13 @@
         {
             "label": "Copy Files to Zynq",
             "type": "shell",
-            "command": "scp",
+            "command": "bash",
             "args": [
-                "-rp",
-                "${workspaceFolder}/zynq_files/*",
-                "zynq:/home/em-os/"
+                "${workspaceFolder}/.vscode/copy-files-to-zynq.sh",
+                "${workspaceFolder}"
             ],
             "dependsOn": ["Build", "Copy web interface Files to local zynq folder"],
+            "dependsOrder": "sequence",
             "group": {
                 "kind": "build",
                 "isDefault": false
@@ -64,17 +64,34 @@
             },
             "problemMatcher": []
         },
+        {
+            "label": "Download Zynq Debug System Libraries",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "${workspaceFolder}/.vscode/download-zynq-debug-system-libraries.sh",
+                "${workspaceFolder}"
+            ],
+            "dependsOn": "Copy Files to Zynq",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        },
 
         {
             "label": "Stop zynq processes",
             "type": "shell",
-            "command": "ssh",
+            "command": "bash",
             "args": [
-                "zynq",
-                "sudo -S",
-                "pkill",
-                "-f",
-                "/home/em-os/controller/"
+                "${workspaceFolder}/.vscode/stop-zynq-processes.sh"
             ],
             "group": {
                 "kind": "build",
@@ -89,9 +106,13 @@
             "command": "ssh",
             "args": [
                 "zynq",
-                "chmod +x /home/em-os/controller/bin/controller_core && sudo -S /home/em-os/controller/bin/controller_core"
+                "chmod +x /home/em-os/controller/bin/controller_core && printf \"0\\n\" | sudo -S -p \"\" env CONTROLLER_WEB_MODE=editor /home/em-os/controller/bin/controller_core"
             ],
-            "dependsOn": "Copy Files to Zynq",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Stop zynq processes",
+                "Copy Files to Zynq"
+            ],
             "group": {
                 "kind": "test",
                 "isDefault": true
@@ -111,9 +132,13 @@
             "command": "ssh",
             "args": [
                 "zynq",
-                "sudo -S gdbserver :1234 /home/em-os/controller/bin/controller_core"
+                "printf \"0\\n\" | sudo -S -p \"\" env CONTROLLER_WEB_MODE=editor gdbserver :1234 /home/em-os/controller/bin/controller_core"
             ],
-            "dependsOn": "Copy Files to Zynq",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Stop zynq processes",
+                "Copy Files to Zynq"
+            ],
             "group": {
                 "kind": "test",
                 "isDefault": false

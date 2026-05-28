@@ -1,8 +1,16 @@
 #include "controller.h"
 
+#include <cstdio>
+#include <cstdlib>
+#include <csignal>
+#include <fstream>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 Controller::Controller(){
 
-    quit_nodejs();  // make sure nodejs is not running
+    quit_web_stack();  // make sure any prior web stack process is not running
 
     fpga_manager.set_fpga_interface(&fpga);
     fpga_manager.set_microseconds(&microseconds);
@@ -131,8 +139,30 @@ uint32_t Controller::load_user_configs(){
 }
 
 uint32_t Controller::start_nodejs(){
-    auto ret = system("taskset -c 1 chrt -o 0 node controller/web/server/app.js > /dev/null 2>&1 &");
-    if(ret != 0){
+    pid_t pid = fork();
+    if(pid < 0){
+        std::cerr << "Error: failed to fork for nodejs webserver" << std::endl;
+        return 1;
+    }
+
+    if(pid == 0){
+        execlp(
+            "taskset",
+            "taskset",
+            "-c",
+            "1",
+            "chrt",
+            "-o",
+            "0",
+            "node",
+            "controller/web/server/app.js",
+            static_cast<char*>(nullptr)
+        );
+
+        _exit(127);
+    }
+
+    if(pid <= 0){
         std::cerr << "Error: failed to start nodejs webserver" << std::endl;
         return 1;
     }
@@ -140,8 +170,131 @@ uint32_t Controller::start_nodejs(){
     return 0;
 }
 
+uint32_t Controller::start_editor_service(){
+    // Defensive cleanup in case a prior instance survived (e.g. interrupted debug session).
+    quit_editor_service();
+
+    pid_t pid = fork();
+    if(pid < 0){
+        std::cerr << "Error: failed to fork for editor web service" << std::endl;
+        return 1;
+    }
+
+    if(pid == 0){
+        execlp(
+            "taskset",
+            "taskset",
+            "-c",
+            "1",
+            "chrt",
+            "-o",
+            "0",
+            "controller/bin/controller_editor_service",
+            static_cast<char*>(nullptr)
+        );
+
+        _exit(127);
+    }
+
+    if(pid <= 0){
+        std::cerr << "Error: failed to start editor web service" << std::endl;
+        return 1;
+    }
+    std::cout << "Editor web service started" << std::endl;
+    return 0;
+}
+
 void Controller::quit_nodejs(){
-    system("pkill node");
+    pid_t pid = fork();
+    if(pid == 0){
+        execlp("pkill", "pkill", "node", static_cast<char*>(nullptr));
+        _exit(127);
+    }
+
+    if(pid > 0){
+        int status = 0;
+        waitpid(pid, &status, 0);
+    }
+}
+
+void Controller::quit_editor_service(){
+    // Primary: kill by PID file — reliable regardless of process name truncation on ARM
+    {
+        std::ifstream pid_file("/tmp/controller_editor_service.pid");
+        if(pid_file.is_open()){
+            pid_t target_pid = 0;
+            pid_file >> target_pid;
+            pid_file.close();
+            if(target_pid > 0){
+                if(kill(target_pid, SIGTERM) == 0){
+                    // wait up to 1 s for the process to exit
+                    for(int i = 0; i < 20; ++i){
+                        struct timespec ts{0, 50000000}; // 50 ms
+                        nanosleep(&ts, nullptr);
+                        if(kill(target_pid, 0) != 0){
+                            std::remove("/tmp/controller_editor_service.pid");
+                            return; // process gone
+                        }
+                    }
+
+                    // Last resort for an unresponsive process.
+                    kill(target_pid, SIGKILL);
+                    for(int i = 0; i < 10; ++i){
+                        struct timespec ts{0, 50000000}; // 50 ms
+                        nanosleep(&ts, nullptr);
+                        if(kill(target_pid, 0) != 0){
+                            std::remove("/tmp/controller_editor_service.pid");
+                            return; // process gone
+                        }
+                    }
+                }
+
+                // Stale PID or still running after attempts: remove stale file and fall through to pkill -f.
+                std::remove("/tmp/controller_editor_service.pid");
+            }
+        }
+    }
+
+    // Fallback: pkill -f for the case the PID file doesn't exist yet
+    pid_t pid = fork();
+    if(pid == 0){
+        execlp("pkill", "pkill", "-f", "controller_editor_service", static_cast<char*>(nullptr));
+        _exit(127);
+    }
+
+    if(pid > 0){
+        int status = 0;
+        waitpid(pid, &status, 0);
+        // brief wait to allow the kernel to release the bound port before the new instance starts
+        struct timespec ts{0, 300000000}; // 300 ms
+        nanosleep(&ts, nullptr);
+    }
+}
+
+uint32_t Controller::start_web_stack(){
+    const char* mode_env = std::getenv("CONTROLLER_WEB_MODE");
+    const std::string mode = mode_env == nullptr ? "legacy" : std::string(mode_env);
+
+    if(mode == "none"){
+        std::cout << "Web stack startup disabled (CONTROLLER_WEB_MODE=none)" << std::endl;
+        return 0;
+    }
+
+    if(mode == "editor"){
+        return start_editor_service();
+    }
+
+    if(mode == "legacy" || mode == "node"){
+        return start_nodejs();
+    }
+
+    std::cerr << "Error: unknown CONTROLLER_WEB_MODE value: " << mode << std::endl;
+    return 1;
+}
+
+void Controller::quit_web_stack(){
+    quit_nodejs();
+    quit_editor_service();
 }
 
 void Controller::start(){
@@ -151,8 +304,8 @@ void Controller::start(){
         return;
     }
 
-    if(start_nodejs()){
-        std::cerr << "Error: Failed to start nodejs" << std::endl;
+    if(start_web_stack()){
+        std::cerr << "Error: Failed to start web stack" << std::endl;
         return;
     }
 
@@ -329,5 +482,5 @@ void Controller::update_microseconds(){
 
 Controller::~Controller(){
     quit = true;
-    quit_nodejs();
+    quit_web_stack();
 }

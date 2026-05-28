@@ -66,6 +66,24 @@ in controller/web, run `npm install`
 update zynq time (required for certs to be valid)
 `sudo date -s "2025-3-21 18:37:00"` (use the current time)
 
+### Web Stack Mode (migration support)
+
+The controller now supports selecting which web stack to launch at startup using an environment variable:
+
+- `CONTROLLER_WEB_MODE=legacy` (default): launches the existing Node web server.
+- `CONTROLLER_WEB_MODE=editor`: launches the new C++ editor service binary.
+- `CONTROLLER_WEB_MODE=none`: launches no web service.
+
+On target, the editor service binary is deployed to:
+`/home/em-os/controller/bin/controller_editor_service`
+
+The editor service provides:
+- `GET /health`
+- `GET /ready`
+
+Example health check from Zynq:
+`curl http://127.0.0.1:8080/health`
+
 
 ### Petalinux Setup:
 package images:

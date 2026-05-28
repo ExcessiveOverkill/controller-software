@@ -16,6 +16,7 @@ project(controller_core)
 enable_language(C CXX ASM)
 
 set(EXECUTABLE controller_core)
+set(EDITOR_SERVICE_EXECUTABLE controller_editor_service)
 
 #
 # List of source files to compile
@@ -43,6 +44,11 @@ file(GLOB_RECURSE sources_SRCS
 # Executable files
 add_executable(${EXECUTABLE} ${sources_SRCS})
 
+# Standalone editor web service used for phased migration away from Node addon flow.
+add_executable(${EDITOR_SERVICE_EXECUTABLE}
+    ${PROJ_PATH}/editor_service/src/main.cpp
+)
+
 #
 # Include directories
 #
@@ -60,13 +66,23 @@ set(include_path_DIRS
 
 # Include paths
 target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})
+target_include_directories(${EDITOR_SERVICE_EXECUTABLE} PRIVATE
+    ${PROJ_PATH}/controller/inc
+)
 target_link_libraries(${EXECUTABLE} PRIVATE librt.so)
 target_link_libraries(${EXECUTABLE} PRIVATE libpthread.so)
+target_link_libraries(${EDITOR_SERVICE_EXECUTABLE} PRIVATE libpthread.so)
 
 # copy all required files to the zynq directory
 add_custom_command(TARGET controller_core POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:${EXECUTABLE}>
         ${CMAKE_CURRENT_SOURCE_DIR}/zynq_files/controller/bin/controller_core
+)
+
+add_custom_command(TARGET ${EDITOR_SERVICE_EXECUTABLE} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:${EDITOR_SERVICE_EXECUTABLE}>
+        ${CMAKE_CURRENT_SOURCE_DIR}/zynq_files/controller/bin/controller_editor_service
 )
 
