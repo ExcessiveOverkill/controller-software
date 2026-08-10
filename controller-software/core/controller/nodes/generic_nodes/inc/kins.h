@@ -137,6 +137,7 @@ class kins: public base_node {
         float max_jog_speed = 0.1f; // max jog speed as a portion of the joint max_vel
 
         cartesian_positions last_cmd_cartesian_positions; // these are what were used with the inverse kins
+        cartesian_positions prev_cmd_cartesian_positions; // TCP position before this cycle's jog step
 
         jog_modes last_jog_mode = jog_modes::UNDEFINED; // last jog mode used, to prevent unnecessary calculations
 
@@ -158,6 +159,8 @@ class kins: public base_node {
         bool validate_kins_solution(const std::array<float,6>* joint_angles, const cartesian_positions* cartesian_pos, const float pos_tol, const float angle_tol);
 
         void set_closest_joint_positions(std::array<float,6>* joint_angles);
+
+        float apply_cartesian_joint_rate_limit(std::array<float,6>& joint_angles); // returns min scale applied
         
         bool clamp_to_limits();
 

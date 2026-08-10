@@ -361,6 +361,7 @@ bool kins::validate_kins_solution(const std::array<float,6>* joint_angles_, cons
 }
 
 void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override){
+    prev_cmd_cartesian_positions = last_cmd_cartesian_positions;
     // jog a cartesian axis by a certain velocity (based on the joint max velocity)
     // jog_axis is 0-2 for x, y, z
     // jog_axis is 3-5 for xangle, yangle, zangle
@@ -439,6 +440,7 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
 }
 
 void kins::jog_mouse(){
+    prev_cmd_cartesian_positions = last_cmd_cartesian_positions;
     std::array<float,3> mouse_pos_delta = {
         in_sigs.cmd_cartesian_positions.x - starting_mouse_positions.x,
         in_sigs.cmd_cartesian_positions.y - starting_mouse_positions.y,
@@ -558,8 +560,6 @@ void kins::inverse_kins(){
     else{
         // update the commanded joint positions based on the solution
 
-        // TODO: limit for pos, vel, and acc here
-
         // invert j3, j4, j5 to match the robot's joint directions
         outSolution[2] = -outSolution[2];
         outSolution[3] = -outSolution[3];
@@ -567,6 +567,9 @@ void kins::inverse_kins(){
 
         // un-offset j3
         outSolution[2] -= outSolution[1];
+
+        // apply joint velocity rate limiting — all joints scale by the same factor to stay in sync
+        float rate_scale = apply_cartesian_joint_rate_limit(outSolution);
 
         // update the last commanded cartesian positions
         last_cmd_cartesian_positions.x = target_pos_tool[0];
@@ -579,6 +582,16 @@ void kins::inverse_kins(){
         bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.01f, 0.01f);
 
         if(valid){
+            // if rate limiting reduced the step, roll the cartesian integrator back proportionally
+            // TODO beware of potential drift since we are not calculating the cartesian position from the joint positions after rate limiting
+            if(rate_scale < 1.0f){
+                last_cmd_cartesian_positions.x      = prev_cmd_cartesian_positions.x      + (target_pos_tool[0]  - prev_cmd_cartesian_positions.x)      * rate_scale;
+                last_cmd_cartesian_positions.y      = prev_cmd_cartesian_positions.y      + (target_pos_tool[1]  - prev_cmd_cartesian_positions.y)      * rate_scale;
+                last_cmd_cartesian_positions.z      = prev_cmd_cartesian_positions.z      + (target_pos_tool[2]  - prev_cmd_cartesian_positions.z)      * rate_scale;
+                last_cmd_cartesian_positions.xangle = prev_cmd_cartesian_positions.xangle + (target_euler_tool[0] - prev_cmd_cartesian_positions.xangle) * rate_scale;
+                last_cmd_cartesian_positions.yangle = prev_cmd_cartesian_positions.yangle + (target_euler_tool[1] - prev_cmd_cartesian_positions.yangle) * rate_scale;
+                last_cmd_cartesian_positions.zangle = prev_cmd_cartesian_positions.zangle + (target_euler_tool[2] - prev_cmd_cartesian_positions.zangle) * rate_scale;
+            }
             set_closest_joint_positions(&outSolution);
         }
         else{
@@ -586,6 +599,44 @@ void kins::inverse_kins(){
             t = true; // set a breakpoint here to debug invalid kins solution
         }
     }
+}
+
+float kins::apply_cartesian_joint_rate_limit(std::array<float,6>& joint_angles) {
+    const double current_pos[6] = {
+        out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
+        out_sigs.cmd_joint_positions.j3, out_sigs.cmd_joint_positions.j4,
+        out_sigs.cmd_joint_positions.j5, out_sigs.cmd_joint_positions.j6
+    };
+
+    double deltas[6];
+    for(size_t i = 0; i < 6; i++){
+        deltas[i] = wrapNearest(current_pos[i], (double)joint_angles[i]) - current_pos[i];
+    }
+
+    float min_scale = 1.0f;
+    for(size_t i = 0; i < 6; i++){
+        double effective_delta = deltas[i];
+        if(i == 2) effective_delta += deltas[1]; // J3 servo sees J2 + J3 (parallelogram coupling)
+
+        double vel = effective_delta / time_step;
+        float max_vel = (vel >= 0.0)
+            ? joint_distances_to_limit[i].allowed_positive_vel
+            : joint_distances_to_limit[i].allowed_negative_vel;
+
+        if(max_vel <= 0.0f){
+            if(vel != 0.0) min_scale = 0.0f;
+        } else if(std::abs(vel) > (double)max_vel){
+            float s = max_vel / (float)std::abs(vel);
+            if(s < min_scale) min_scale = s;
+        }
+    }
+
+    if(min_scale >= 1.0f) return 1.0f;
+
+    for(size_t i = 0; i < 6; i++){
+        joint_angles[i] = (float)(current_pos[i] + deltas[i] * min_scale);
+    }
+    return min_scale;
 }
 
 void kins::set_closest_joint_positions(std::array<float,6>* joint_angles){
