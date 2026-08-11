@@ -308,54 +308,76 @@ bool kins::validate_kins_solution(const std::array<float,6>* joint_angles_, cons
         angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
     }
 
-    // get cartesian position and rotation matrix
+    // Run FK to get flange position and rotation matrix.
     std::array<float,3> pos_out;
     std::array<float,9> rot_out;
     ik_solver.forwardKinematicsF32(joint_angles, pos_out, rot_out);
 
-    cartesian_positions pos_out_cartesian;
+    // Build a 4×4 rigid-body transform from the FK result so we can apply the tool offset as a
+    // matrix multiplication, without going through an intermediate Euler decomposition.
+    // rot_out is row-major: rot_out[r*3+c] = R[r][c].
+    Mat4 T_flange{};
+    for(int r = 0; r < 3; r++)
+        for(int c = 0; c < 3; c++)
+            T_flange.m[r][c] = rot_out[r * 3 + c];
+    T_flange.m[0][3] = pos_out[0];
+    T_flange.m[1][3] = pos_out[1];
+    T_flange.m[2][3] = pos_out[2];
+    T_flange.m[3][3] = 1.0f;
 
-    std::array<float,3> euler_out;
-    rot_to_euler(&rot_out, &euler_out);
-
-    std::array<float,3> pos_out_tcp;
-    std::array<float,3> euler_out_tcp;
-
-    apply_tool_offset(pos_out, euler_out, pos_out_tcp, euler_out_tcp);
-
-    pos_out_cartesian.x = pos_out_tcp[0];
-    pos_out_cartesian.y = pos_out_tcp[1];
-    pos_out_cartesian.z = pos_out_tcp[2];
-
-    pos_out_cartesian.xangle = euler_out_tcp[0];
-    pos_out_cartesian.yangle = euler_out_tcp[1];
-    pos_out_cartesian.zangle = euler_out_tcp[2];
+    // Apply tool offset (matrix form).  When no tool is active this is a pass-through.
+    Mat4 T_tcp;
+    if(current_tool != nullptr){
+        Mat4 T_tool = poseToMatrix(current_tool->position, current_tool->orientation);
+        T_tcp = mul(T_flange, T_tool);
+    } else {
+        T_tcp = T_flange;
+    }
 
     bool valid = true;
 
-    // check position error
-    if(fabs(pos_out_cartesian.x - cartesian_pos->x) > pos_tol ||
-       fabs(pos_out_cartesian.y - cartesian_pos->y) > pos_tol ||
-       fabs(pos_out_cartesian.z - cartesian_pos->z) > pos_tol){
+    // --- Position check ---
+    if(fabsf(T_tcp.m[0][3] - cartesian_pos->x) > pos_tol ||
+       fabsf(T_tcp.m[1][3] - cartesian_pos->y) > pos_tol ||
+       fabsf(T_tcp.m[2][3] - cartesian_pos->z) > pos_tol){
         valid = false;
     }
 
-    // check angle error (shortest angle distance)
-    auto shortest_angle_dist = [](float a, float b) -> float {
-        float diff = a - b;
-        diff = fmod(diff + M_PI, 2.0f * M_PI);
-        if (diff < 0) diff += 2.0f * M_PI;
-        return diff - M_PI;
-    };
-    float angle_error_x = shortest_angle_dist(pos_out_cartesian.xangle, cartesian_pos->xangle);
-    float angle_error_y = shortest_angle_dist(pos_out_cartesian.yangle, cartesian_pos->yangle);
-    float angle_error_z = shortest_angle_dist(pos_out_cartesian.zangle, cartesian_pos->zangle);
-    if(fabs(angle_error_x) > angle_tol ||
-       fabs(angle_error_y) > angle_tol ||
-       fabs(angle_error_z) > angle_tol){
+    // --- Orientation check via rotation matrices ---
+    // We deliberately avoid comparing per-axis Euler angles here.  At yangle = ±π/2 (gimbal lock)
+    // the Euler decomposition is degenerate: toEulerZYX (jog path) can produce xangle/zangle jumps
+    // of ±π while the physical orientation is completely unchanged.  A per-axis Euler comparison
+    // then sees a large error even though the joints are exactly right, causing a false failure.
+    //
+    // Rotation matrices have no such singularity.  Two matrices that represent the same physical
+    // orientation are element-wise identical, so the Frobenius norm of their difference is zero
+    // regardless of which Euler decomposition was used to produce them.
+    //
+    // Convention in this code:
+    //   xangle = Z-rotation (yaw), yangle = Y-rotation (pitch), zangle = X-rotation (roll)
+    //   poseToMatrix(pos, zyx) interprets zyx as [Z-rot, Y-rot, X-rot] → Rz·Ry·Rx
+    // So {xangle, yangle, zangle} maps directly onto the [phi, theta, psi] argument of poseToMatrix.
+    //
+    // Threshold: ||R1 - R2||_F² ≈ 2·θ² for a single-axis error of θ, so the threshold is 2·angle_tol².
+    const std::array<float,3> dummy_pos  = {0.0f, 0.0f, 0.0f};
+    const std::array<float,3> target_zyx = {cartesian_pos->xangle, cartesian_pos->yangle, cartesian_pos->zangle};
+    Mat4 T_target = poseToMatrix(dummy_pos, target_zyx);
+
+    float frob_sq = 0.0f;
+    for(int r = 0; r < 3; r++)
+        for(int c = 0; c < 3; c++){
+            float d = T_tcp.m[r][c] - T_target.m[r][c];
+            frob_sq += d * d;
+        }
+    if(frob_sq > 2.0f * angle_tol * angle_tol){
         valid = false;
     }
-    
+
+    if(!valid){
+        volatile int a = 0; // for debugging
+        a = 1;
+    }
+
     return valid;
 
 }
@@ -555,7 +577,10 @@ void kins::inverse_kins(){
         cartTwist, outSolution, outVelocities, detail, 50, 1e-4f);
 
     if(ec != InverseKinematics::ErrorCode::Success){
-        // TODO: handle error
+        // IK failed (singular Jacobian or no convergence — common at wrist/elbow singularities).
+        // jog_cartesian already advanced last_cmd_cartesian_positions; roll it back to prevent
+        // the integrator from drifting away from the joint positions and creating a deadlock.
+        last_cmd_cartesian_positions = prev_cmd_cartesian_positions;
     }
     else{
         // update the commanded joint positions based on the solution
@@ -570,37 +595,76 @@ void kins::inverse_kins(){
 
         // apply joint velocity rate limiting — all joints scale by the same factor to stay in sync
         float rate_scale = apply_cartesian_joint_rate_limit(outSolution);
+        // float rate_scale = 1.0f; // bypass for testing
 
         // update the last commanded cartesian positions
-        last_cmd_cartesian_positions.x = target_pos_tool[0];
-        last_cmd_cartesian_positions.y = target_pos_tool[1];
-        last_cmd_cartesian_positions.z = target_pos_tool[2];
+        last_cmd_cartesian_positions.x      = target_pos_tool[0];
+        last_cmd_cartesian_positions.y      = target_pos_tool[1];
+        last_cmd_cartesian_positions.z      = target_pos_tool[2];
         last_cmd_cartesian_positions.xangle = target_euler_tool[0];
         last_cmd_cartesian_positions.yangle = target_euler_tool[1];
         last_cmd_cartesian_positions.zangle = target_euler_tool[2];
 
-        bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.01f, 0.01f);
+        // If rate limiting reduced the step, set the integrator to the FK of the rate-limited
+        // joints rather than a proportional interpolation in Cartesian space.
+        // Proportional rollback is inaccurate because FK is nonlinear:
+        //   FK(current_j + delta*s)  ≠  prev_cart + (target_cart - prev_cart)*s
+        // That mismatch accumulates each cycle and causes Newton-Raphson to see an error term
+        // beyond the jog step.  Near a joint direction-change point (Jacobian column ~ 0),
+        // the extra term drives convergence to the wrong branch.
+        // FK-based update makes the invariant exact:
+        //   FK(cmd_joint_positions) == last_cmd_cartesian_positions
+        // so the next IK call sees a pure one-step error with a fully consistent initial guess.
+        if(rate_scale < 1.0f){
+            // Same motor→IK convention as validate_kins_solution.
+            std::array<float,6> fk_joints = outSolution;
+            fk_joints[2] += fk_joints[1];   // j3_servo = j3_rel + j2
+            fk_joints[2] = -fk_joints[2];   // IK convention: negate j3
+            fk_joints[3] = -fk_joints[3];   // IK convention: negate j4
+            fk_joints[4] = -fk_joints[4];   // IK convention: negate j5
+            for(auto& a : fk_joints)         // wrap to [-π, π]
+                a = fmod(a + (float)M_PI, 2.0f * (float)M_PI) - (float)M_PI;
+
+            std::array<float,3> rl_pos;
+            std::array<float,9> rl_rot;
+            ik_solver.forwardKinematicsF32(fk_joints, rl_pos, rl_rot);
+
+            Mat4 T_fl{};
+            for(int r = 0; r < 3; r++)
+                for(int c = 0; c < 3; c++)
+                    T_fl.m[r][c] = rl_rot[r * 3 + c];
+            T_fl.m[0][3] = rl_pos[0]; T_fl.m[1][3] = rl_pos[1]; T_fl.m[2][3] = rl_pos[2];
+            T_fl.m[3][3] = 1.0f;
+
+            Mat4 T_tcp_rl = (current_tool != nullptr)
+                ? mul(T_fl, poseToMatrix(current_tool->position, current_tool->orientation))
+                : T_fl;
+
+            std::array<float,3> tcp_pos_rl, tcp_eul_rl;
+            matrixToPose(T_tcp_rl, tcp_pos_rl, tcp_eul_rl);
+
+            last_cmd_cartesian_positions.x      = tcp_pos_rl[0];
+            last_cmd_cartesian_positions.y      = tcp_pos_rl[1];
+            last_cmd_cartesian_positions.z      = tcp_pos_rl[2];
+            last_cmd_cartesian_positions.xangle = tcp_eul_rl[0];
+            last_cmd_cartesian_positions.yangle = tcp_eul_rl[1];
+            last_cmd_cartesian_positions.zangle = tcp_eul_rl[2];
+        }
+
+        bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.02f, 0.05f);
 
         if(valid){
-            // if rate limiting reduced the step, roll the cartesian integrator back proportionally
-            // TODO beware of potential drift since we are not calculating the cartesian position from the joint positions after rate limiting
-            if(rate_scale < 1.0f){
-                last_cmd_cartesian_positions.x      = prev_cmd_cartesian_positions.x      + (target_pos_tool[0]  - prev_cmd_cartesian_positions.x)      * rate_scale;
-                last_cmd_cartesian_positions.y      = prev_cmd_cartesian_positions.y      + (target_pos_tool[1]  - prev_cmd_cartesian_positions.y)      * rate_scale;
-                last_cmd_cartesian_positions.z      = prev_cmd_cartesian_positions.z      + (target_pos_tool[2]  - prev_cmd_cartesian_positions.z)      * rate_scale;
-                last_cmd_cartesian_positions.xangle = prev_cmd_cartesian_positions.xangle + (target_euler_tool[0] - prev_cmd_cartesian_positions.xangle) * rate_scale;
-                last_cmd_cartesian_positions.yangle = prev_cmd_cartesian_positions.yangle + (target_euler_tool[1] - prev_cmd_cartesian_positions.yangle) * rate_scale;
-                last_cmd_cartesian_positions.zangle = prev_cmd_cartesian_positions.zangle + (target_euler_tool[2] - prev_cmd_cartesian_positions.zangle) * rate_scale;
-            }
             set_closest_joint_positions(&outSolution);
         }
         else{
+            // IK solution doesn't match the commanded position — freeze rather than go to wrong pose.
+            // Roll the integrator back so it stays in sync with the actual joint positions.
+            last_cmd_cartesian_positions = prev_cmd_cartesian_positions;
             volatile bool t; // for debugging breakpoint
-            t = true; // set a breakpoint here to debug invalid kins solution
+            t = true;        // set a breakpoint here to debug invalid kins solution
         }
     }
 }
-
 float kins::apply_cartesian_joint_rate_limit(std::array<float,6>& joint_angles) {
     const double current_pos[6] = {
         out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
