@@ -7671,38 +7671,38 @@
                         "max_jog_speed": 1.0,
                         "cartesian_limits": {
                             "x": {
-                                "min_pos": -1000,
-                                "max_pos": 1000,
+                                "min_pos": 0.5,
+                                "max_pos": 1.5,
                                 "max_vel": 0.3,
                                 "max_acc": 1
                             },
                             "y": {
-                                "min_pos": -1000,
-                                "max_pos": 1000,
+                                "min_pos": -1.0,
+                                "max_pos": 1.0,
                                 "max_vel": 0.3,
                                 "max_acc": 1
                             },
                             "z": {
-                                "min_pos": -1000,
-                                "max_pos": 1000,
+                                "min_pos": 0.0,
+                                "max_pos": 2.0,
                                 "max_vel": 0.3,
                                 "max_acc": 1
                             },
                             "xangle": {
-                                "min_pos": -180,
-                                "max_pos": 180,
+                                "min_pos": -45,
+                                "max_pos": 45,
                                 "max_vel": 20.0,
                                 "max_acc": 100
                             },
                             "yangle": {
-                                "min_pos": -180,
-                                "max_pos": 180,
+                                "min_pos": 0,
+                                "max_pos": 0,
                                 "max_vel": 20.0,
                                 "max_acc": 100
                             },
                             "zangle": {
-                                "min_pos": -180,
-                                "max_pos": 180,
+                                "min_pos": 0,
+                                "max_pos": 0,
                                 "max_vel": 20.0,
                                 "max_acc": 100
                             }

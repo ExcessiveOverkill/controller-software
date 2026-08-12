@@ -111,11 +111,10 @@ class kins: public base_node {
         struct output_signals{
             joint_positions cmd_joint_positions;
             cartesian_positions fbk_cartesian_positions;
+            bool at_cmd_pos = false;
         } out_sigs;
 
         InverseKinematics ik_solver;
-
-        bool bypass_limits = true; // if true, no limits will be applied
 
         void update_inputs();
         void create_inputs();
@@ -123,7 +122,7 @@ class kins: public base_node {
 
         void update_forward_kinematics_outputs();
 
-        struct joint_lim_distance{
+        struct limit_distance{
             double to_min = 0.0f;   // distance to min limit, positive if within limits, negative if outside
             double to_max = 0.0f;   // distance to max limit
             float allowed_positive_vel = 0.0f; // how fast we can move in the positive direction
@@ -131,8 +130,11 @@ class kins: public base_node {
 
             bool infinite = false; // true if joint is continuous
         };
-        std::array<joint_lim_distance,6> joint_distances_to_limit;
+        std::array<limit_distance,6> joint_distances_to_limit;
         void update_joint_distances_to_limit();
+
+        std::array<limit_distance,6> cartesian_distances_to_limit;
+        void update_cartesian_distances_to_limit();
 
         float max_jog_speed = 0.1f; // max jog speed as a portion of the joint max_vel
 
@@ -162,7 +164,12 @@ class kins: public base_node {
 
         float apply_cartesian_joint_rate_limit(std::array<float,6>& joint_angles); // returns min scale applied
         
-        bool clamp_to_limits();
+        bool bypass_joint_limits = true; // if true, no joint limits will be applied
+        joint_positions last_output_joint_positions;    // save these so we can allow movement if it is in the correct direction
+        bool clamp_to_joint_limits();
+
+        bool bypass_cartesian_limits = false; // if true, no cartesian limits will be applied
+        bool clamp_to_cartesian_limits();
 
         void rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* euler);
 
@@ -401,6 +408,9 @@ class kins: public base_node {
                             joint_limits[i].max_pos = limits[std::to_string(i)]["max_pos"].get<float>() * M_PI / 180.0f;
                             joint_limits[i].max_vel = limits[std::to_string(i)]["max_vel"].get<float>() * M_PI / 180.0f;
                             joint_limits[i].max_acc = limits[std::to_string(i)]["max_acc"].get<float>() * M_PI / 180.0f;
+                            if(joint_limits[i].min_pos == 0.0f && joint_limits[i].max_pos == 0.0f){
+                                joint_distances_to_limit[i].infinite = true; // continuous joint
+                            }
                         }
                         else {
                             std::cerr << "Missing limit for joint " << i << std::endl;
@@ -445,6 +455,9 @@ class kins: public base_node {
                             cartesian_limits[i].max_pos = cartesian_limits_json[axis_name]["max_pos"].get<float>();
                             cartesian_limits[i].max_vel = cartesian_limits_json[axis_name]["max_vel"].get<float>();
                             cartesian_limits[i].max_acc = cartesian_limits_json[axis_name]["max_acc"].get<float>();
+                            if(cartesian_limits[i].min_pos == 0.0f && cartesian_limits[i].max_pos == 0.0f){
+                                cartesian_distances_to_limit[i].infinite = true; // continuous axis
+                            }
                         }
                         else {
                             std::cerr << "Missing cartesian limit for axis " << axis_name << std::endl;
