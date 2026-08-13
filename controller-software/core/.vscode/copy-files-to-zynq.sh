@@ -5,12 +5,18 @@ set -euo pipefail
 workspace_root=${1:?workspace root is required}
 local_root="${workspace_root}/zynq_files"
 remote_root="/home/em-os"
+web_client_local="${local_root}/controller/web/client"
+web_client_remote="${remote_root}/controller/web/client"
 
 declare -A remote_meta
 declare -A directories_to_create
 files_to_copy=()
 copied=0
 skipped=0
+
+if [[ -d "$web_client_local" ]]; then
+    ssh zynq "mkdir -p '$web_client_remote' && rm -f '$web_client_remote/editor.js' '$web_client_remote/editor.css' && rm -rf '$web_client_remote/login' '$web_client_remote/spa_1'"
+fi
 
 while IFS=$'\t' read -r rel_path size mtime; do
     [[ -n "$rel_path" ]] || continue

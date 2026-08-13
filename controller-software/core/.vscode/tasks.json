@@ -50,13 +50,10 @@
         {
             "label": "Copy web interface Files to local zynq folder",
             "type": "shell",
-            "command": "rsync",
+            "command": "bash",
             "args": [
-                "-av",
-                "${workspaceFolder}/../web-interface/*",
-                "${workspaceFolder}/zynq_files/controller/web",
-                "--exclude",
-                "node_modules"
+                "${workspaceFolder}/.vscode/copy-web-interface-to-local-zynq.sh",
+                "${workspaceFolder}"
             ],
             "group": {
                 "kind": "build",

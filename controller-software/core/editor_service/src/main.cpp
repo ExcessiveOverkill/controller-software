@@ -1,4 +1,6 @@
 #include <arpa/inet.h>
+#include <algorithm>
+#include <array>
 #include <csignal>
 #include <cstdlib>
 #include <ctime>
@@ -6,16 +8,21 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <netinet/in.h>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
 #include "json.hpp"
+#include "sandbox_runtime.hpp"
 
 using json = nlohmann::json;
 
@@ -52,6 +59,7 @@ struct GraphNode {
     std::string name;
     std::string type;
     json config;
+    json layout;
 };
 
 struct GraphConnection {
@@ -117,11 +125,15 @@ public:
 
         for (const auto& [name, node] : nodes_) {
             (void)name;
-            out["nodes"].push_back({
+            json node_json = {
                 {"name", node.name},
                 {"type", node.type},
                 {"config", node.config}
-            });
+            };
+            if (node.layout.is_object() && !node.layout.empty()) {
+                node_json["layout"] = node.layout;
+            }
+            out["nodes"].push_back(node_json);
         }
 
         for (const auto& c : connections_) {
@@ -162,6 +174,7 @@ public:
         node.name = name;
         node.type = type;
         node.config = body.contains("config") ? body["config"] : json::object();
+        node.layout = body.contains("layout") && body["layout"].is_object() ? body["layout"] : json::object();
         nodes_.emplace(name, node);
         return true;
     }
@@ -220,7 +233,22 @@ public:
             return false;
         }
 
-        if (src_port_type != dst_port_type) {
+        auto resolve_port_type = [](const std::string& declared_type, const GraphNode& node) {
+            if (declared_type != "dynamic") {
+                return declared_type;
+            }
+            if (node.config.contains("type") && node.config["type"].is_string()) {
+                return node.config["type"].get<std::string>();
+            }
+            return declared_type;
+        };
+
+        const std::string resolved_src_type = resolve_port_type(src_port_type, src_it->second);
+        const std::string resolved_dst_type = resolve_port_type(dst_port_type, dst_it->second);
+
+        if (resolved_src_type != resolved_dst_type &&
+            resolved_src_type != "dynamic" &&
+            resolved_dst_type != "dynamic") {
             error = "port type mismatch";
             return false;
         }
@@ -233,6 +261,166 @@ public:
         }
 
         connections_.push_back({src_node, src_port, dst_node, dst_port});
+        return true;
+    }
+
+    bool remove_node(const json& body, std::string& error, std::string& reason) {
+        if (!body.contains("name") || !body["name"].is_string()) {
+            reason = "missing_name";
+            error = "missing or invalid 'name'";
+            return false;
+        }
+
+        const std::string name = body["name"].get<std::string>();
+        const auto node_it = nodes_.find(name);
+        if (node_it == nodes_.end()) {
+            reason = "node_not_found";
+            error = "node not found";
+            return false;
+        }
+
+        nodes_.erase(node_it);
+        connections_.erase(
+            std::remove_if(connections_.begin(), connections_.end(), [&](const GraphConnection& connection) {
+                return connection.source_node == name || connection.target_node == name;
+            }),
+            connections_.end());
+        return true;
+    }
+
+    bool remove_connection(const json& body, std::string& error, std::string& reason) {
+        if (!body.contains("src_node") || !body["src_node"].is_string() ||
+            !body.contains("src_port") || !body["src_port"].is_string() ||
+            !body.contains("dst_node") || !body["dst_node"].is_string() ||
+            !body.contains("dst_port") || !body["dst_port"].is_string()) {
+            reason = "missing_connection_identity";
+            error = "connection body must include src_node, src_port, dst_node, dst_port";
+            return false;
+        }
+
+        const std::string src_node = body["src_node"].get<std::string>();
+        const std::string src_port = body["src_port"].get<std::string>();
+        const std::string dst_node = body["dst_node"].get<std::string>();
+        const std::string dst_port = body["dst_port"].get<std::string>();
+
+        const auto original_size = connections_.size();
+        connections_.erase(
+            std::remove_if(connections_.begin(), connections_.end(), [&](const GraphConnection& connection) {
+                return connection.source_node == src_node &&
+                       connection.source_port == src_port &&
+                       connection.target_node == dst_node &&
+                       connection.target_port == dst_port;
+            }),
+            connections_.end());
+
+        if (connections_.size() == original_size) {
+            reason = "connection_not_found";
+            error = "connection not found";
+            return false;
+        }
+
+        return true;
+    }
+
+    bool rename_node(const json& body, std::string& error, std::string& reason) {
+        if (!body.contains("name") || !body["name"].is_string()) {
+            reason = "missing_name";
+            error = "missing or invalid 'name'";
+            return false;
+        }
+        if (!body.contains("new_name") || !body["new_name"].is_string()) {
+            reason = "missing_new_name";
+            error = "missing or invalid 'new_name'";
+            return false;
+        }
+
+        const std::string name = body["name"].get<std::string>();
+        const std::string new_name = body["new_name"].get<std::string>();
+
+        const auto node_it = nodes_.find(name);
+        if (node_it == nodes_.end()) {
+            reason = "node_not_found";
+            error = "node not found";
+            return false;
+        }
+        if (name == new_name) {
+            reason = "unchanged";
+            error = "new name must differ from current name";
+            return false;
+        }
+        if (nodes_.find(new_name) != nodes_.end()) {
+            reason = "duplicate_node_name";
+            error = "node name already exists";
+            return false;
+        }
+
+        GraphNode renamed = node_it->second;
+        nodes_.erase(node_it);
+        renamed.name = new_name;
+        nodes_.emplace(new_name, renamed);
+
+        for (auto& connection : connections_) {
+            if (connection.source_node == name) {
+                connection.source_node = new_name;
+            }
+            if (connection.target_node == name) {
+                connection.target_node = new_name;
+            }
+        }
+        return true;
+    }
+
+    bool update_node_config(const json& body, std::string& error, std::string& reason) {
+        if (!body.contains("name") || !body["name"].is_string()) {
+            reason = "missing_name";
+            error = "missing or invalid 'name'";
+            return false;
+        }
+        if (!body.contains("config") || !body["config"].is_object()) {
+            reason = "missing_config";
+            error = "missing or invalid 'config'";
+            return false;
+        }
+
+        const std::string name = body["name"].get<std::string>();
+        const auto node_it = nodes_.find(name);
+        if (node_it == nodes_.end()) {
+            reason = "node_not_found";
+            error = "node not found";
+            return false;
+        }
+
+        if (node_types_.find(node_it->second.type) == node_types_.end()) {
+            reason = "node_type_missing";
+            error = "node type definition missing";
+            return false;
+        }
+
+        node_it->second.config = body["config"];
+        return true;
+    }
+
+    bool update_node_layout(const json& body, std::string& error, std::string& reason) {
+        if (!body.contains("name") || !body["name"].is_string()) {
+            reason = "missing_name";
+            error = "missing or invalid 'name'";
+            return false;
+        }
+        if (!body.contains("layout") || !body["layout"].is_object()) {
+            reason = "missing_layout";
+            error = "missing or invalid 'layout'";
+            return false;
+        }
+
+        const std::string name = body["name"].get<std::string>();
+        const auto node_it = nodes_.find(name);
+        if (node_it == nodes_.end()) {
+            reason = "node_not_found";
+            error = "node not found";
+            return false;
+        }
+
+        node_it->second.layout = body["layout"];
         return true;
     }
 
@@ -526,9 +714,20 @@ private:
 
 static constexpr const char* k_pid_file = "/tmp/controller_editor_service.pid";
 
+struct RuntimeWebSocketClient {
+    int fd = -1;
+    bool active = true;
+    std::mutex send_mutex;
+    std::set<std::string> active_keys;
+    std::set<std::string> promoted_keys;
+};
+
 volatile std::sig_atomic_t g_keep_running = 1;
 SandboxGraph g_sandbox;
 FileService  g_file_service;
+std::unique_ptr<SandboxRuntimeManager> g_runtime;
+std::mutex g_ws_clients_mutex;
+std::vector<std::shared_ptr<RuntimeWebSocketClient>> g_ws_clients;
 
 void write_pid_file() {
     std::ofstream f(k_pid_file);
@@ -796,6 +995,345 @@ bool read_http_request(int client_fd, HttpRequest& req) {
     return true;
 }
 
+bool write_all(int fd, const void* buffer, size_t size) {
+    const char* data = static_cast<const char*>(buffer);
+    size_t total = 0;
+    while (total < size) {
+        const ssize_t sent = send(fd, data + total, size - total, 0);
+        if (sent <= 0) {
+            return false;
+        }
+        total += static_cast<size_t>(sent);
+    }
+    return true;
+}
+
+bool read_exact(int fd, void* buffer, size_t size) {
+    char* data = static_cast<char*>(buffer);
+    size_t total = 0;
+    while (total < size) {
+        const ssize_t got = recv(fd, data + total, size - total, 0);
+        if (got <= 0) {
+            return false;
+        }
+        total += static_cast<size_t>(got);
+    }
+    return true;
+}
+
+uint32_t rotate_left(uint32_t value, uint32_t bits) {
+    return (value << bits) | (value >> (32U - bits));
+}
+
+std::array<uint8_t, 20> sha1_digest(const std::string& input) {
+    std::vector<uint8_t> message(input.begin(), input.end());
+    const uint64_t bit_length = static_cast<uint64_t>(message.size()) * 8ULL;
+    message.push_back(0x80);
+    while ((message.size() % 64U) != 56U) {
+        message.push_back(0x00);
+    }
+    for (int shift = 56; shift >= 0; shift -= 8) {
+        message.push_back(static_cast<uint8_t>((bit_length >> shift) & 0xffU));
+    }
+
+    uint32_t h0 = 0x67452301U;
+    uint32_t h1 = 0xEFCDAB89U;
+    uint32_t h2 = 0x98BADCFEU;
+    uint32_t h3 = 0x10325476U;
+    uint32_t h4 = 0xC3D2E1F0U;
+
+    for (size_t chunk = 0; chunk < message.size(); chunk += 64) {
+        uint32_t words[80]{};
+        for (size_t i = 0; i < 16; ++i) {
+            const size_t offset = chunk + i * 4;
+            words[i] = (static_cast<uint32_t>(message[offset]) << 24U) |
+                       (static_cast<uint32_t>(message[offset + 1]) << 16U) |
+                       (static_cast<uint32_t>(message[offset + 2]) << 8U) |
+                       static_cast<uint32_t>(message[offset + 3]);
+        }
+        for (size_t i = 16; i < 80; ++i) {
+            words[i] = rotate_left(words[i - 3] ^ words[i - 8] ^ words[i - 14] ^ words[i - 16], 1U);
+        }
+
+        uint32_t a = h0;
+        uint32_t b = h1;
+        uint32_t c = h2;
+        uint32_t d = h3;
+        uint32_t e = h4;
+
+        for (size_t i = 0; i < 80; ++i) {
+            uint32_t f = 0;
+            uint32_t k = 0;
+            if (i < 20) {
+                f = (b & c) | ((~b) & d);
+                k = 0x5A827999U;
+            } else if (i < 40) {
+                f = b ^ c ^ d;
+                k = 0x6ED9EBA1U;
+            } else if (i < 60) {
+                f = (b & c) | (b & d) | (c & d);
+                k = 0x8F1BBCDCU;
+            } else {
+                f = b ^ c ^ d;
+                k = 0xCA62C1D6U;
+            }
+            const uint32_t temp = rotate_left(a, 5U) + f + e + k + words[i];
+            e = d;
+            d = c;
+            c = rotate_left(b, 30U);
+            b = a;
+            a = temp;
+        }
+
+        h0 += a;
+        h1 += b;
+        h2 += c;
+        h3 += d;
+        h4 += e;
+    }
+
+    return {
+        static_cast<uint8_t>((h0 >> 24U) & 0xffU), static_cast<uint8_t>((h0 >> 16U) & 0xffU), static_cast<uint8_t>((h0 >> 8U) & 0xffU), static_cast<uint8_t>(h0 & 0xffU),
+        static_cast<uint8_t>((h1 >> 24U) & 0xffU), static_cast<uint8_t>((h1 >> 16U) & 0xffU), static_cast<uint8_t>((h1 >> 8U) & 0xffU), static_cast<uint8_t>(h1 & 0xffU),
+        static_cast<uint8_t>((h2 >> 24U) & 0xffU), static_cast<uint8_t>((h2 >> 16U) & 0xffU), static_cast<uint8_t>((h2 >> 8U) & 0xffU), static_cast<uint8_t>(h2 & 0xffU),
+        static_cast<uint8_t>((h3 >> 24U) & 0xffU), static_cast<uint8_t>((h3 >> 16U) & 0xffU), static_cast<uint8_t>((h3 >> 8U) & 0xffU), static_cast<uint8_t>(h3 & 0xffU),
+        static_cast<uint8_t>((h4 >> 24U) & 0xffU), static_cast<uint8_t>((h4 >> 16U) & 0xffU), static_cast<uint8_t>((h4 >> 8U) & 0xffU), static_cast<uint8_t>(h4 & 0xffU)
+    };
+}
+
+std::string base64_encode(const uint8_t* data, size_t size) {
+    static const char* table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string output;
+    output.reserve(((size + 2U) / 3U) * 4U);
+
+    for (size_t i = 0; i < size; i += 3U) {
+        const uint32_t octet_a = data[i];
+        const uint32_t octet_b = (i + 1U < size) ? data[i + 1U] : 0U;
+        const uint32_t octet_c = (i + 2U < size) ? data[i + 2U] : 0U;
+        const uint32_t triple = (octet_a << 16U) | (octet_b << 8U) | octet_c;
+
+        output.push_back(table[(triple >> 18U) & 0x3fU]);
+        output.push_back(table[(triple >> 12U) & 0x3fU]);
+        output.push_back((i + 1U < size) ? table[(triple >> 6U) & 0x3fU] : '=');
+        output.push_back((i + 2U < size) ? table[triple & 0x3fU] : '=');
+    }
+
+    return output;
+}
+
+std::string websocket_accept_key(const std::string& client_key) {
+    const auto digest = sha1_digest(client_key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    return base64_encode(digest.data(), digest.size());
+}
+
+bool send_websocket_frame(int fd, uint8_t opcode, const std::string& payload) {
+    std::vector<uint8_t> frame;
+    frame.push_back(static_cast<uint8_t>(0x80U | (opcode & 0x0fU)));
+    if (payload.size() < 126U) {
+        frame.push_back(static_cast<uint8_t>(payload.size()));
+    } else if (payload.size() <= 0xffffU) {
+        frame.push_back(126U);
+        frame.push_back(static_cast<uint8_t>((payload.size() >> 8U) & 0xffU));
+        frame.push_back(static_cast<uint8_t>(payload.size() & 0xffU));
+    } else {
+        frame.push_back(127U);
+        for (int shift = 56; shift >= 0; shift -= 8) {
+            frame.push_back(static_cast<uint8_t>((static_cast<uint64_t>(payload.size()) >> shift) & 0xffU));
+        }
+    }
+    frame.insert(frame.end(), payload.begin(), payload.end());
+    return write_all(fd, frame.data(), frame.size());
+}
+
+bool send_websocket_json(const std::shared_ptr<RuntimeWebSocketClient>& client, const json& payload) {
+    std::lock_guard<std::mutex> lock(client->send_mutex);
+    if (!client->active) {
+        return false;
+    }
+    const bool ok = send_websocket_frame(client->fd, 0x1U, payload.dump());
+    if (!ok) {
+        client->active = false;
+    }
+    return ok;
+}
+
+bool read_websocket_frame(int fd, uint8_t& opcode, std::string& payload) {
+    uint8_t header[2];
+    if (!read_exact(fd, header, sizeof(header))) {
+        return false;
+    }
+    const bool fin = (header[0] & 0x80U) != 0;
+    opcode = static_cast<uint8_t>(header[0] & 0x0fU);
+    const bool masked = (header[1] & 0x80U) != 0;
+    uint64_t length = static_cast<uint64_t>(header[1] & 0x7fU);
+    if (!fin) {
+        return false;
+    }
+    if (length == 126U) {
+        uint8_t ext[2];
+        if (!read_exact(fd, ext, sizeof(ext))) {
+            return false;
+        }
+        length = (static_cast<uint64_t>(ext[0]) << 8U) | static_cast<uint64_t>(ext[1]);
+    } else if (length == 127U) {
+        uint8_t ext[8];
+        if (!read_exact(fd, ext, sizeof(ext))) {
+            return false;
+        }
+        length = 0;
+        for (uint8_t byte : ext) {
+            length = (length << 8U) | static_cast<uint64_t>(byte);
+        }
+    }
+    if (length > (1024U * 256U)) {
+        return false;
+    }
+
+    uint8_t mask[4] = {0, 0, 0, 0};
+    if (masked && !read_exact(fd, mask, sizeof(mask))) {
+        return false;
+    }
+    std::vector<uint8_t> data(length);
+    if (length > 0 && !read_exact(fd, data.data(), static_cast<size_t>(length))) {
+        return false;
+    }
+    if (masked) {
+        for (size_t i = 0; i < data.size(); ++i) {
+            data[i] ^= mask[i % 4U];
+        }
+    }
+    payload.assign(data.begin(), data.end());
+    return true;
+}
+
+void prune_inactive_websocket_clients() {
+    std::lock_guard<std::mutex> lock(g_ws_clients_mutex);
+    for (auto it = g_ws_clients.begin(); it != g_ws_clients.end();) {
+        if (!(*it)->active) {
+            it = g_ws_clients.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void send_runtime_payload(const std::shared_ptr<RuntimeWebSocketClient>& client) {
+    if (!g_runtime || !client->active) {
+        return;
+    }
+    send_websocket_json(client, g_runtime->build_stream_payload(client->active_keys, client->promoted_keys));
+}
+
+void broadcast_runtime_event() {
+    std::vector<std::shared_ptr<RuntimeWebSocketClient>> clients;
+    {
+        std::lock_guard<std::mutex> lock(g_ws_clients_mutex);
+        clients = g_ws_clients;
+    }
+    for (const auto& client : clients) {
+        send_runtime_payload(client);
+    }
+    prune_inactive_websocket_clients();
+}
+
+void websocket_client_loop(const std::shared_ptr<RuntimeWebSocketClient>& client) {
+    {
+        std::lock_guard<std::mutex> lock(g_ws_clients_mutex);
+        g_ws_clients.push_back(client);
+    }
+
+    if (g_runtime) {
+        send_websocket_json(client, {{"type", "hello"}, {"status", g_runtime->status()}});
+        send_runtime_payload(client);
+    }
+
+    while (client->active && g_keep_running) {
+        uint8_t opcode = 0;
+        std::string payload;
+        if (!read_websocket_frame(client->fd, opcode, payload)) {
+            break;
+        }
+        if (opcode == 0x8U) {
+            break;
+        }
+        if (opcode == 0x9U) {
+            if (!send_websocket_frame(client->fd, 0xAU, payload)) {
+                break;
+            }
+            continue;
+        }
+        if (opcode != 0x1U) {
+            continue;
+        }
+
+        try {
+            const json message = payload.empty() ? json::object() : json::parse(payload);
+            if (message.value("type", std::string("")) == "watch_config") {
+                client->active_keys.clear();
+                client->promoted_keys.clear();
+                if (message.contains("active_keys") && message["active_keys"].is_array()) {
+                    for (const auto& key : message["active_keys"]) {
+                        if (key.is_string()) {
+                            client->active_keys.insert(key.get<std::string>());
+                        }
+                    }
+                }
+                if (message.contains("promoted_keys") && message["promoted_keys"].is_array()) {
+                    for (const auto& key : message["promoted_keys"]) {
+                        if (key.is_string()) {
+                            client->promoted_keys.insert(key.get<std::string>());
+                        }
+                    }
+                }
+                send_runtime_payload(client);
+            } else if (message.value("type", std::string("")) == "status_request" && g_runtime) {
+                send_websocket_json(client, {{"type", "hello"}, {"status", g_runtime->status()}});
+                send_runtime_payload(client);
+            }
+        } catch (...) {
+            send_websocket_json(client, {{"type", "error"}, {"message", "invalid websocket message"}});
+        }
+    }
+
+    client->active = false;
+    prune_inactive_websocket_clients();
+    close(client->fd);
+}
+
+bool handle_websocket_upgrade(int client_fd, const HttpRequest& req) {
+    if (target_path(req.target) != "/ws/runtime") {
+        return false;
+    }
+
+    const auto upgrade_it = req.headers.find("upgrade");
+    const auto connection_it = req.headers.find("connection");
+    const auto key_it = req.headers.find("sec-websocket-key");
+    if (upgrade_it == req.headers.end() || connection_it == req.headers.end() || key_it == req.headers.end()) {
+        send_response(client_fd, 400, "Bad Request", "text/plain; charset=utf-8", "Bad WebSocket upgrade\n");
+        return true;
+    }
+    if (to_lower(upgrade_it->second) != "websocket" || to_lower(connection_it->second).find("upgrade") == std::string::npos) {
+        send_response(client_fd, 400, "Bad Request", "text/plain; charset=utf-8", "Bad WebSocket upgrade\n");
+        return true;
+    }
+
+    std::ostringstream response;
+    response << "HTTP/1.1 101 Switching Protocols\r\n";
+    response << "Upgrade: websocket\r\n";
+    response << "Connection: Upgrade\r\n";
+    response << "Sec-WebSocket-Accept: " << websocket_accept_key(key_it->second) << "\r\n\r\n";
+
+    const std::string raw = response.str();
+    if (!write_all(client_fd, raw.data(), raw.size())) {
+        return true;
+    }
+
+    auto client = std::make_shared<RuntimeWebSocketClient>();
+    client->fd = client_fd;
+    std::thread(websocket_client_loop, client).detach();
+    return false;
+}
+
 bool handle_api_request(int client_fd, const HttpRequest& req, const std::filesystem::path& static_root) {
     (void)static_root;
 
@@ -818,8 +1356,12 @@ bool handle_api_request(int client_fd, const HttpRequest& req, const std::filesy
         send_json_response(client_fd, 200, "OK", {
             {"mode", "sandbox"},
             {"supported_node_types", {"constant", "logic_gate", "print", "edge_delay"}},
-            {"supports_live_apply", false},
+            {"supports_live_apply", true},
             {"supports_file_io", true},
+            {"supports_runtime", true},
+            {"supports_websocket_stream", true},
+            {"supports_graph_layout", true},
+            {"runtime_stream_path", "/ws/runtime"},
             {"file_root", g_file_service.root()}
         });
         return true;
@@ -837,7 +1379,11 @@ bool handle_api_request(int client_fd, const HttpRequest& req, const std::filesy
 
     if (req.target == "/api/v1/graph/new" && req.method == "POST") {
         g_sandbox.reset();
+        if (g_runtime) {
+            g_runtime->sync_from_graph(g_sandbox.get_graph_json(), true);
+        }
         send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+        broadcast_runtime_event();
         return true;
     }
 
@@ -849,7 +1395,11 @@ bool handle_api_request(int client_fd, const HttpRequest& req, const std::filesy
                 send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"message", error}});
                 return true;
             }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
             send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
             return true;
         } catch (const std::exception& e) {
             send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"message", std::string("invalid json: ") + e.what()}});
@@ -865,12 +1415,181 @@ bool handle_api_request(int client_fd, const HttpRequest& req, const std::filesy
                 send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"message", error}});
                 return true;
             }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
             send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
             return true;
         } catch (const std::exception& e) {
             send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"message", std::string("invalid json: ") + e.what()}});
             return true;
         }
+    }
+
+    if (req.target == "/api/v1/graph/nodes" && req.method == "DELETE") {
+        try {
+            const json body = req.body.empty() ? json::object() : json::parse(req.body);
+            std::string error;
+            std::string reason;
+            if (!g_sandbox.remove_node(body, error, reason)) {
+                send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", reason}, {"message", error}});
+                return true;
+            }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
+            send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
+            return true;
+        } catch (const std::exception& e) {
+            send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", "invalid_json"}, {"message", std::string("invalid json: ") + e.what()}});
+            return true;
+        }
+    }
+
+    if (req.target == "/api/v1/graph/connections" && req.method == "DELETE") {
+        try {
+            const json body = req.body.empty() ? json::object() : json::parse(req.body);
+            std::string error;
+            std::string reason;
+            if (!g_sandbox.remove_connection(body, error, reason)) {
+                send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", reason}, {"message", error}});
+                return true;
+            }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
+            send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
+            return true;
+        } catch (const std::exception& e) {
+            send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", "invalid_json"}, {"message", std::string("invalid json: ") + e.what()}});
+            return true;
+        }
+    }
+
+    if (req.target == "/api/v1/graph/nodes/config" && req.method == "PATCH") {
+        try {
+            const json body = req.body.empty() ? json::object() : json::parse(req.body);
+            std::string error;
+            std::string reason;
+            if (!g_sandbox.update_node_config(body, error, reason)) {
+                send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", reason}, {"message", error}});
+                return true;
+            }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
+            send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
+            return true;
+        } catch (const std::exception& e) {
+            send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", "invalid_json"}, {"message", std::string("invalid json: ") + e.what()}});
+            return true;
+        }
+    }
+
+    if (req.target == "/api/v1/graph/nodes/layout" && req.method == "PATCH") {
+        try {
+            const json body = req.body.empty() ? json::object() : json::parse(req.body);
+            std::string error;
+            std::string reason;
+            if (!g_sandbox.update_node_layout(body, error, reason)) {
+                send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", reason}, {"message", error}});
+                return true;
+            }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
+            send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
+            return true;
+        } catch (const std::exception& e) {
+            send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", "invalid_json"}, {"message", std::string("invalid json: ") + e.what()}});
+            return true;
+        }
+    }
+
+    if (req.target == "/api/v1/graph/nodes/rename" && req.method == "POST") {
+        try {
+            const json body = req.body.empty() ? json::object() : json::parse(req.body);
+            std::string error;
+            std::string reason;
+            if (!g_sandbox.rename_node(body, error, reason)) {
+                send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", reason}, {"message", error}});
+                return true;
+            }
+            if (g_runtime) {
+                g_runtime->sync_from_graph(g_sandbox.get_graph_json(), false);
+            }
+            send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+            broadcast_runtime_event();
+            return true;
+        } catch (const std::exception& e) {
+            send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"reason", "invalid_json"}, {"message", std::string("invalid json: ") + e.what()}});
+            return true;
+        }
+    }
+
+    if (req.target == "/api/v1/runtime/status" && req.method == "GET") {
+        send_json_response(client_fd, 200, "OK", g_runtime ? g_runtime->status() : json::object());
+        return true;
+    }
+
+    if (req.target == "/api/v1/runtime/run" && req.method == "POST") {
+        std::string error;
+        if (!g_runtime || !g_runtime->run(error)) {
+            send_json_response(client_fd, 409, "Conflict", {{"status", "error"}, {"message", error.empty() ? "runtime unavailable" : error}});
+            return true;
+        }
+        send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"runtime", g_runtime->status()["runtime"]}});
+        broadcast_runtime_event();
+        return true;
+    }
+
+    if (req.target == "/api/v1/runtime/pause" && req.method == "POST") {
+        std::string error;
+        if (!g_runtime || !g_runtime->pause(error)) {
+            send_json_response(client_fd, 409, "Conflict", {{"status", "error"}, {"message", error.empty() ? "runtime unavailable" : error}});
+            return true;
+        }
+        send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"runtime", g_runtime->status()["runtime"]}});
+        broadcast_runtime_event();
+        return true;
+    }
+
+    if (req.target == "/api/v1/runtime/reset" && req.method == "POST") {
+        std::string error;
+        if (!g_runtime || !g_runtime->reset(error)) {
+            send_json_response(client_fd, 409, "Conflict", {{"status", "error"}, {"message", error.empty() ? "runtime unavailable" : error}});
+            return true;
+        }
+        send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"runtime", g_runtime->status()["runtime"]}});
+        broadcast_runtime_event();
+        return true;
+    }
+
+    if (req.target == "/api/v1/runtime/step" && req.method == "POST") {
+        std::string error;
+        if (!g_runtime || !g_runtime->step(error)) {
+            send_json_response(client_fd, 409, "Conflict", {{"status", "error"}, {"message", error.empty() ? "runtime unavailable" : error}});
+            return true;
+        }
+        send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"runtime", g_runtime->status()["runtime"]}});
+        broadcast_runtime_event();
+        return true;
+    }
+
+    if (req.target == "/api/v1/runtime/rebuild" && req.method == "POST") {
+        std::string error;
+        if (!g_runtime || !g_runtime->rebuild(error)) {
+            send_json_response(client_fd, 409, "Conflict", {{"status", "error"}, {"message", error.empty() ? "runtime unavailable" : error}});
+            return true;
+        }
+        send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"runtime", g_runtime->status()["runtime"]}});
+        broadcast_runtime_event();
+        return true;
     }
 
     // -----------------------------------------------------------------------
@@ -1048,7 +1767,11 @@ bool handle_api_request(int client_fd, const HttpRequest& req, const std::filesy
             send_json_response(client_fd, 400, "Bad Request", {{"status", "error"}, {"message", load_err}});
             return true;
         }
+        if (g_runtime) {
+            g_runtime->sync_from_graph(g_sandbox.get_graph_json(), true);
+        }
         send_json_response(client_fd, 200, "OK", {{"status", "ok"}, {"graph", g_sandbox.get_graph_json()}});
+        broadcast_runtime_event();
         return true;
     }
 
@@ -1135,18 +1858,23 @@ void handle_static_request(int client_fd, const HttpRequest& req, const std::fil
     send_response(client_fd, 200, "OK", mime_type_for_path(requested_path), body);
 }
 
-void handle_client(int client_fd, const std::filesystem::path& static_root) {
+bool handle_client(int client_fd, const std::filesystem::path& static_root) {
     HttpRequest req;
     if (!read_http_request(client_fd, req)) {
         send_response(client_fd, 400, "Bad Request", "text/plain; charset=utf-8", "Bad Request\n");
-        return;
+        return true;
+    }
+
+    if (target_path(req.target) == "/ws/runtime") {
+        return handle_websocket_upgrade(client_fd, req);
     }
 
     if (handle_api_request(client_fd, req, static_root)) {
-        return;
+        return true;
     }
 
     handle_static_request(client_fd, req, static_root);
+    return true;
 }
 
 }  // namespace
@@ -1166,6 +1894,11 @@ int main() {
             return 1;
         }
     }
+
+    g_runtime = std::make_unique<SandboxRuntimeManager>(g_sandbox.get_node_types_json());
+    g_runtime->sync_from_graph(g_sandbox.get_graph_json(), true);
+    g_runtime->set_update_callback(broadcast_runtime_event);
+    g_runtime->start_worker();
 
     std::cout << "[editor_service] static root: " << static_root << std::endl;
     std::cout << "[editor_service] listening on 0.0.0.0:" << port << std::endl;
@@ -1215,10 +1948,15 @@ int main() {
             continue;
         }
 
-        handle_client(client_fd, static_root);
-        close(client_fd);
+        const bool should_close = handle_client(client_fd, static_root);
+        if (should_close) {
+            close(client_fd);
+        }
     }
 
+    if (g_runtime) {
+        g_runtime->shutdown();
+    }
     close(server_fd);
     remove_pid_file();
     std::cout << "[editor_service] shutting down" << std::endl;
