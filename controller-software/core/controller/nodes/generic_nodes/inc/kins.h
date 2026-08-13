@@ -110,7 +110,7 @@ class kins: public base_node {
 
         struct output_signals{
             joint_positions cmd_joint_positions;
-            cartesian_positions fbk_cartesian_positions;
+            cartesian_positions fbk_cartesian_positions;    // commanded cartesian position, not raw feedback from the robot
             bool at_cmd_pos = false;
         } out_sigs;
 
@@ -155,6 +155,12 @@ class kins: public base_node {
         quat_rot starting_robot_quat;
         
         void jog_mouse();
+
+        joint_positions move_joint_cmd_positions;      // active synchronized-move target (clamped to joint limits by the setter below)
+        bool move_joint_target_valid = false;          // true once a target has been set via set_move_joint_cmd_positions()
+        std::array<float,6> move_joint_last_vel = {0,0,0,0,0,0}; // last commanded velocity per joint (for accel limiting)
+        uint32_t set_move_joint_cmd_positions(const joint_positions& new_target); // called by the JSON command handler to set a new synchronized-move target
+        void move_joints();
 
         void inverse_kins();
 
@@ -334,7 +340,7 @@ class kins: public base_node {
                         "theta": 0
                     }
                     // other joints...
-            ],
+                ],
 
                 "limits":{
                     0:{
@@ -370,7 +376,21 @@ class kins: public base_node {
                         "orientation": [0.0, 0.0, 0.0] // offset from flange to TCP in radians
                     }
                     // other tools...
-                ]
+                ],
+
+                "joint_commands":{
+                    "j1_cmd_pos": 0.0,
+                    "j2_cmd_pos": 0.0,
+                    "j3_cmd_pos": 0.0,
+                    "j4_cmd_pos": 0.0,
+                    "j5_cmd_pos": 0.0,
+                    "j6_cmd_pos": 0.0
+                },
+
+                "get":{
+                    "cmd_joint_pos": {}
+                }
+
             }
             */
             bool dh_set = false;
@@ -513,6 +533,108 @@ class kins: public base_node {
             if(!configured){
                 std::cerr << "Kins node initial configuration failed, missing required parameters." << std::endl;
                 return 1; // error code for configuration failure
+            }
+
+            if(json->find("set") != json->end()){
+                auto& set_json = (*json)["set"];
+                if(set_json.find("joints") != set_json.end()){
+                    auto& joint_cmds = set_json["joints"];
+                    if(joint_cmds.is_object()){
+                        bool absolute = true;
+                        if(joint_cmds.find("absolute") != joint_cmds.end() && joint_cmds["absolute"].is_boolean()){
+                            absolute = joint_cmds["absolute"].get<bool>();
+                        }
+                        else {
+                            std::cerr << "Missing or invalid 'absolute' field in joint_command." << std::endl;
+                            return 1; // error code for configuration failure
+                        }
+                        joint_positions new_cmd_positions = move_joint_cmd_positions; // start with existing values
+                        for(int i = 0; i < 6; i++){
+                            std::string joint_name = "j" + std::to_string(i+1) + "_cmd_pos";
+                            if(joint_cmds.find(joint_name) == joint_cmds.end()){
+                                // joint not found, use existing value
+                                continue;
+                            }
+                            double pos = joint_cmds[joint_name].get<float>() * M_PI / 180.0f; // convert degrees to radians
+                            if(absolute){
+                                // absolute position, set directly
+                                switch(i){
+                                    case 0: new_cmd_positions.j1 = pos; break;
+                                    case 1: new_cmd_positions.j2 = pos; break;
+                                    case 2: new_cmd_positions.j3 = pos; break;
+                                    case 3: new_cmd_positions.j4 = pos; break;
+                                    case 4: new_cmd_positions.j5 = pos; break;
+                                    case 5: new_cmd_positions.j6 = pos; break;
+                                }
+                            }
+                            else {
+                                // relative position, add to existing
+                                switch(i){
+                                    case 0: new_cmd_positions.j1 += pos; break;
+                                    case 1: new_cmd_positions.j2 += pos; break;
+                                    case 2: new_cmd_positions.j3 += pos; break;
+                                    case 3: new_cmd_positions.j4 += pos; break;
+                                    case 4: new_cmd_positions.j5 += pos; break;
+                                    case 5: new_cmd_positions.j6 += pos; break;
+                                }
+                            }
+                            
+                        }
+                        uint32_t ret = set_move_joint_cmd_positions(new_cmd_positions);
+                    }
+                    else {
+                        std::cerr << "Invalid joint_commands format, expected an object." << std::endl;
+                        return 1; // error code for configuration failure
+                    }
+                }
+            }
+            
+
+            if(json->find("get") != json->end()){
+                auto& get_json = (*json)["get"];
+                if(get_json.is_object()){
+                    if(get_json.find("cmd_joint_pos") != get_json.end()){
+                        // return the current commanded joint positions to the robot
+                        (*json)["get"]["cmd_joint_pos"]["j1"] = out_sigs.cmd_joint_positions.j1 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos"]["j2"] = out_sigs.cmd_joint_positions.j2 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos"]["j3"] = out_sigs.cmd_joint_positions.j3 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos"]["j4"] = out_sigs.cmd_joint_positions.j4 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos"]["j5"] = out_sigs.cmd_joint_positions.j5 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos"]["j6"] = out_sigs.cmd_joint_positions.j6 * 180.0f / M_PI; // convert radians to degrees
+                    }
+                    if(get_json.find("fbk_joint_pos") != get_json.end()){
+                        // return the current feedback joint positions from the robot
+                        (*json)["get"]["fbk_joint_pos"]["j1"] = in_sigs.fbk_joint_positions.j1 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["fbk_joint_pos"]["j2"] = in_sigs.fbk_joint_positions.j2 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["fbk_joint_pos"]["j3"] = in_sigs.fbk_joint_positions.j3 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["fbk_joint_pos"]["j4"] = in_sigs.fbk_joint_positions.j4 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["fbk_joint_pos"]["j5"] = in_sigs.fbk_joint_positions.j5 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["fbk_joint_pos"]["j6"] = in_sigs.fbk_joint_positions.j6 * 180.0f / M_PI; // convert radians to degrees
+                    }
+                    if(get_json.find("cmd_cartesian_pos") != get_json.end()){
+                        // return the current commanded cartesian positions to the robot
+                        (*json)["get"]["cmd_cartesian_pos"]["x"] = out_sigs.fbk_cartesian_positions.x;
+                        (*json)["get"]["cmd_cartesian_pos"]["y"] = out_sigs.fbk_cartesian_positions.y;
+                        (*json)["get"]["cmd_cartesian_pos"]["z"] = out_sigs.fbk_cartesian_positions.z;
+                        (*json)["get"]["cmd_cartesian_pos"]["xangle"] = out_sigs.fbk_cartesian_positions.xangle;
+                        (*json)["get"]["cmd_cartesian_pos"]["yangle"] = out_sigs.fbk_cartesian_positions.yangle;
+                        (*json)["get"]["cmd_cartesian_pos"]["zangle"] = out_sigs.fbk_cartesian_positions.zangle;
+                    }
+                    if(get_json.find("cmd_joint_pos_target") != get_json.end()){
+                        // return the current commanded joint position target (synchronized move target)
+                        // only valid in joint control mode
+                        (*json)["get"]["cmd_joint_pos_target"]["j1"] = move_joint_cmd_positions.j1 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos_target"]["j2"] = move_joint_cmd_positions.j2 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos_target"]["j3"] = move_joint_cmd_positions.j3 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos_target"]["j4"] = move_joint_cmd_positions.j4 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos_target"]["j5"] = move_joint_cmd_positions.j5 * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_joint_pos_target"]["j6"] = move_joint_cmd_positions.j6 * 180.0f / M_PI; // convert radians to degrees
+                    }
+                }
+                else {
+                    std::cerr << "Invalid get format, expected an object." << std::endl;
+                    return 1; // error code for configuration failure
+                }
             }
             
             return 0;

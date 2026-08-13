@@ -181,6 +181,13 @@ uint32_t kins::run(){
 
             last_jog_mode = in_sigs.jog_mode;
             break;
+        
+        case control_modes::JOINT:
+            // commanded joint positions are directly set by the API
+            // accel, vel, and position limits are applied, speed is scaled
+            // joints move in sync
+            move_joints();
+            break;
     }
 
     if(in_sigs.reset){
@@ -575,6 +582,143 @@ void kins::jog_mouse(){
 
     inverse_kins(); // calculate the joint positions based on the new cartesian positions
 
+}
+
+uint32_t kins::set_move_joint_cmd_positions(const joint_positions& new_target){
+    // prev = each joint's current setpoint register; req = what this call is asking it to
+    // become (the caller merges in unspecified joints from the previous target before calling
+    // this, so an untouched joint arrives with req[i] == prev[i]). Clamp/scale math is relative
+    // to prev, not the live position, so a joint that didn't change this call is mathematically
+    // unaffected no matter what other joints in the same call need to be scaled back for.
+    double prev[6] = {
+        move_joint_cmd_positions.j1, move_joint_cmd_positions.j2, move_joint_cmd_positions.j3,
+        move_joint_cmd_positions.j4, move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
+    };
+    double req[6] = {
+        new_target.j1, new_target.j2, new_target.j3,
+        new_target.j4, new_target.j5, new_target.j6
+    };
+
+    // largest fraction of this call's requested move that every constrained channel can tolerate
+    float s = 1.0f;
+    auto constrain = [&](double base, double target_val, double min_pos, double max_pos){
+        if(target_val >= min_pos && target_val <= max_pos) return; // already in range
+        double delta = target_val - base;
+        if(delta == 0.0) return;                                   // this channel isn't moving
+        double limit = (target_val > max_pos) ? max_pos : min_pos;
+        s = fminf(s, (float)std::clamp((limit - base) / delta, 0.0, 1.0));
+    };
+
+    if(!joint_distances_to_limit[0].infinite) constrain(prev[0], req[0], joint_limits[0].min_pos, joint_limits[0].max_pos);
+    if(!joint_distances_to_limit[1].infinite) constrain(prev[1], req[1], joint_limits[1].min_pos, joint_limits[1].max_pos);
+    // j3 is commanded relative to j2 (servo coupling); constrain the combined angle, same
+    // convention as clamp_to_joint_limits()/update_joint_distances_to_limit().
+    if(!joint_distances_to_limit[2].infinite) constrain(prev[1]+prev[2], req[1]+req[2], joint_limits[2].min_pos, joint_limits[2].max_pos);
+    if(!joint_distances_to_limit[4].infinite) constrain(prev[4], req[4], joint_limits[4].min_pos, joint_limits[4].max_pos);
+    // j4, j6 are continuous -- no clamp needed
+
+    double result[6];
+    for(int i = 0; i < 6; i++) result[i] = prev[i] + s * (req[i] - prev[i]); // req==prev -> result==prev, untouched
+
+    move_joint_cmd_positions = {result[0], result[1], result[2], result[3], result[4], result[5]};
+    move_joint_target_valid = true;
+
+    return 0; // success
+}
+
+void kins::move_joints(){
+    // synchronized joint-space point-to-point move: ramp all 6 joints toward
+    // move_joint_cmd_positions together, respecting each joint's max velocity, max
+    // acceleration, and position limits. The target may change at any time (via
+    // set_move_joint_cmd_positions()); motion replans from the current position/velocity
+    // every cycle.
+
+    if(in_sigs.reset){
+        // cancel any in-flight move -- run() overwrites cmd_joint_positions with the fbk
+        // position right after this call, so match that here.
+        move_joint_cmd_positions = in_sigs.fbk_joint_positions;
+        move_joint_target_valid = true;
+        move_joint_last_vel.fill(0.0f);
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    if(!move_joint_target_valid){
+        // no commanded target has been set yet -- nothing to do
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    std::array<double,6> current = {
+        out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
+        out_sigs.cmd_joint_positions.j3, out_sigs.cmd_joint_positions.j4,
+        out_sigs.cmd_joint_positions.j5, out_sigs.cmd_joint_positions.j6
+    };
+    std::array<double,6> target = {
+        move_joint_cmd_positions.j1, move_joint_cmd_positions.j2,
+        move_joint_cmd_positions.j3, move_joint_cmd_positions.j4,
+        move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
+    };
+
+    const double pos_tol = 1e-5; // position tolerance for considering a joint "at target"
+
+    std::array<double,6> dist;  // signed distance remaining, per joint
+    std::array<float,6> v_cap;  // this joint's own max safe speed toward target this cycle
+    for(int i = 0; i < 6; i++){
+        dist[i] = target[i] - current[i];
+
+        float acc = joint_limits[i].max_acc;
+        float stop_vel = sqrtf(2.0f * acc * (float)fabs(dist[i])); // v such that we can still stop exactly at target
+        float v = fminf(joint_limits[i].max_vel, stop_vel);
+
+        if(dist[i] > 0)      v = fminf(v, joint_distances_to_limit[i].allowed_positive_vel);
+        else if(dist[i] < 0) v = fminf(v, joint_distances_to_limit[i].allowed_negative_vel);
+        else                 v = 0.0f;
+
+        v_cap[i] = fmaxf(v, 0.0f);
+    }
+
+    // find the slowest joint (longest time to arrive at its own capped speed) and synchronize
+    // every other joint's speed to match that time, so all 6 arrive together.
+    float t_sync = 0.0f;
+    for(int i = 0; i < 6; i++){
+        if(fabs(dist[i]) > pos_tol && v_cap[i] > 1e-6f){
+            t_sync = fmaxf(t_sync, (float)fabs(dist[i]) / v_cap[i]);
+        }
+    }
+
+    std::array<double,6> new_pos;
+    for(int i = 0; i < 6; i++){
+        float v_target = 0.0f;
+        if(fabs(dist[i]) > pos_tol){
+            v_target = (t_sync > 1e-6f) ? (float)fabs(dist[i]) / t_sync : v_cap[i];
+            v_target = fminf(v_target, v_cap[i]); // never exceed this joint's own safe speed
+            v_target = copysignf(v_target, (float)dist[i]);
+        }
+
+        // accel-limit the change from last cycle's commanded velocity
+        float max_dv = joint_limits[i].max_acc * time_step;
+        float dv = v_target - move_joint_last_vel[i];
+        if(fabs(dv) > max_dv) v_target = move_joint_last_vel[i] + copysignf(max_dv, dv);
+        move_joint_last_vel[i] = v_target;
+
+        double step = (double)v_target * time_step;
+        new_pos[i] = current[i] + step;
+
+        // don't overshoot the target
+        if((dist[i] >= 0 && new_pos[i] > target[i]) || (dist[i] < 0 && new_pos[i] < target[i])){
+            new_pos[i] = target[i];
+            move_joint_last_vel[i] = 0.0f;
+        }
+    }
+
+    out_sigs.cmd_joint_positions = {new_pos[0], new_pos[1], new_pos[2], new_pos[3], new_pos[4], new_pos[5]};
+
+    bool all_at_target = true;
+    for(int i = 0; i < 6; i++){
+        if(fabs(target[i] - new_pos[i]) > pos_tol) all_at_target = false;
+    }
+    out_sigs.at_cmd_pos = all_at_target;
 }
 
 void kins::inverse_kins(){
