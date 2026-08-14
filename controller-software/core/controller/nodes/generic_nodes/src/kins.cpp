@@ -89,6 +89,7 @@ void kins::create_outputs(){
     outputs.emplace("xangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.xangle), &execution_number));
     outputs.emplace("yangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.yangle), &execution_number));
     outputs.emplace("zangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.zangle), &execution_number));
+    outputs.emplace("at_cmd_pos", output(io_type::BOOL, &(out_sigs.at_cmd_pos), &execution_number));
 }
 
 void kins::update_inputs(){
@@ -129,6 +130,7 @@ uint32_t kins::run(){
     update_forward_kinematics_outputs();
 
     update_joint_distances_to_limit();
+    update_cartesian_distances_to_limit();
 
     switch(in_sigs.control_mode){
         case control_modes::JOG:
@@ -179,63 +181,117 @@ uint32_t kins::run(){
 
             last_jog_mode = in_sigs.jog_mode;
             break;
+        
+        case control_modes::JOINT:
+            // commanded joint positions are directly set by the API
+            // accel, vel, and position limits are applied, speed is scaled
+            // joints move in sync
+            move_joints();
+            break;
     }
 
     if(in_sigs.reset){
         // reset the commanded joint positions to the current positions
         out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
+        last_output_joint_positions = out_sigs.cmd_joint_positions;
     }
     
-    // TODO: fix this possibly causing motion on starup if past a limit
-    bool on_limit = clamp_to_limits();  // clamp the commanded joint positions to the limits as a failsafe
+    bool on_joint_limit = clamp_to_joint_limits();  // clamp the commanded joint positions to the limits as a failsafe
 
 
 
     return 0; // no errors
 }
 
-bool kins::clamp_to_limits(){
+bool kins::clamp_to_joint_limits(){
     // clamp the commanded joint positions to the limits
 
-    if(bypass_limits){
+    if(bypass_joint_limits){
+        last_output_joint_positions = out_sigs.cmd_joint_positions;
         return false; // if bypassing limits, do nothing
     }
 
     double tol = 1e-3; // tolerance for clamping, to avoid false triggering of flag
 
-    bool modified = false; // flag to check if any joint was modified
+    bool outside_limit = false; // flag to check if any joint was outside_limit
+    
+    // positive if within limits, negative if outside
+    double error_distance = 0.0f;
+    double last_error_distance = 0.0f;
+
     for(int i = 0; i < 6; i++){
-        double zero = 0.0;
-        double* cmd_pos = nullptr;
-        double* relative_cmd_pos = &zero;
+        double *cmd_pos = nullptr;
+        double last_cmd_pos = 0.0f;
+        double relative_cmd_pos = 0.0f;
+        double last_relative_cmd_pos = 0.0f;
+        double clamped_pos = 0.0f;
         switch(i){
-            case 0: cmd_pos = &out_sigs.cmd_joint_positions.j1; break;
-            case 1: cmd_pos = &out_sigs.cmd_joint_positions.j2; break;
+            case 0:
+                cmd_pos = &out_sigs.cmd_joint_positions.j1;
+                last_cmd_pos = last_output_joint_positions.j1;
+                break;
+            case 1:
+                cmd_pos = &out_sigs.cmd_joint_positions.j2;
+                last_cmd_pos = last_output_joint_positions.j2;
+                break;
             case 2:
                 cmd_pos = &out_sigs.cmd_joint_positions.j3;
-                relative_cmd_pos = &out_sigs.cmd_joint_positions.j2;
+                last_cmd_pos = last_output_joint_positions.j3;
+                relative_cmd_pos = out_sigs.cmd_joint_positions.j2;
+                last_relative_cmd_pos = last_output_joint_positions.j2;
                 break;
-            case 3: cmd_pos = &out_sigs.cmd_joint_positions.j4; break;
-            case 4: cmd_pos = &out_sigs.cmd_joint_positions.j5; break;
-            case 5: cmd_pos = &out_sigs.cmd_joint_positions.j6; break;
+            case 3:
+                cmd_pos = &out_sigs.cmd_joint_positions.j4;
+                last_cmd_pos = last_output_joint_positions.j4;
+                break;
+            case 4:
+                cmd_pos = &out_sigs.cmd_joint_positions.j5;
+                last_cmd_pos = last_output_joint_positions.j5;
+                break;
+            case 5:
+                cmd_pos = &out_sigs.cmd_joint_positions.j6;
+                last_cmd_pos = last_output_joint_positions.j6;
+                break;
         }
 
         if(joint_limits[i].min_pos != joint_limits[i].max_pos){ // if the joint is not continuous
 
-            if(*cmd_pos + *relative_cmd_pos < joint_limits[i].min_pos - tol){
-                *cmd_pos = joint_limits[i].min_pos - *relative_cmd_pos;
-                modified = true;
+            // check if in limits, then find nearest limit
+            if(*cmd_pos + relative_cmd_pos < joint_limits[i].min_pos - tol){
+                clamped_pos = joint_limits[i].min_pos - relative_cmd_pos - tol;
+                error_distance = joint_limits[i].min_pos - (*cmd_pos + relative_cmd_pos);
+                last_error_distance = joint_limits[i].min_pos - (last_cmd_pos + last_relative_cmd_pos);
+                
+                // should be negative if outside the limit
+                error_distance = -error_distance;
+                last_error_distance = -last_error_distance;
             }
-            else if(*cmd_pos + *relative_cmd_pos > joint_limits[i].max_pos + tol){
-                *cmd_pos = joint_limits[i].max_pos - *relative_cmd_pos;
-                modified = true;
+            else if(*cmd_pos + relative_cmd_pos > joint_limits[i].max_pos + tol){
+                clamped_pos = joint_limits[i].max_pos - relative_cmd_pos + tol;
+                error_distance = joint_limits[i].max_pos - (*cmd_pos + relative_cmd_pos);
+                last_error_distance = joint_limits[i].max_pos - (last_cmd_pos + last_relative_cmd_pos);
             }
+            else{
+                continue;
+            }
+
+            outside_limit = true;
+
+            if(error_distance < last_error_distance){
+                // moving towards the limit (good), allow movement
+            }
+            else{
+                // moving away from the limit (bad), clamp position
+                *cmd_pos = clamped_pos;
+            }
+
         }
     }
 
-    return modified; // return true if any joint was modified
-}
+    last_output_joint_positions = out_sigs.cmd_joint_positions;
 
+    return outside_limit; // return true if any joint was outside_limit
+}
 
 void kins::update_forward_kinematics_outputs(){
     // convert joint positions to cartesian positions
@@ -308,59 +364,82 @@ bool kins::validate_kins_solution(const std::array<float,6>* joint_angles_, cons
         angle = fmod(angle + M_PI, 2.0f * M_PI) - M_PI; // wrap to [-pi, pi]
     }
 
-    // get cartesian position and rotation matrix
+    // Run FK to get flange position and rotation matrix.
     std::array<float,3> pos_out;
     std::array<float,9> rot_out;
     ik_solver.forwardKinematicsF32(joint_angles, pos_out, rot_out);
 
-    cartesian_positions pos_out_cartesian;
+    // Build a 4×4 rigid-body transform from the FK result so we can apply the tool offset as a
+    // matrix multiplication, without going through an intermediate Euler decomposition.
+    // rot_out is row-major: rot_out[r*3+c] = R[r][c].
+    Mat4 T_flange{};
+    for(int r = 0; r < 3; r++)
+        for(int c = 0; c < 3; c++)
+            T_flange.m[r][c] = rot_out[r * 3 + c];
+    T_flange.m[0][3] = pos_out[0];
+    T_flange.m[1][3] = pos_out[1];
+    T_flange.m[2][3] = pos_out[2];
+    T_flange.m[3][3] = 1.0f;
 
-    std::array<float,3> euler_out;
-    rot_to_euler(&rot_out, &euler_out);
-
-    std::array<float,3> pos_out_tcp;
-    std::array<float,3> euler_out_tcp;
-
-    apply_tool_offset(pos_out, euler_out, pos_out_tcp, euler_out_tcp);
-
-    pos_out_cartesian.x = pos_out_tcp[0];
-    pos_out_cartesian.y = pos_out_tcp[1];
-    pos_out_cartesian.z = pos_out_tcp[2];
-
-    pos_out_cartesian.xangle = euler_out_tcp[0];
-    pos_out_cartesian.yangle = euler_out_tcp[1];
-    pos_out_cartesian.zangle = euler_out_tcp[2];
+    // Apply tool offset (matrix form).  When no tool is active this is a pass-through.
+    Mat4 T_tcp;
+    if(current_tool != nullptr){
+        Mat4 T_tool = poseToMatrix(current_tool->position, current_tool->orientation);
+        T_tcp = mul(T_flange, T_tool);
+    } else {
+        T_tcp = T_flange;
+    }
 
     bool valid = true;
 
-    // check position error
-    if(fabs(pos_out_cartesian.x - cartesian_pos->x) > pos_tol ||
-       fabs(pos_out_cartesian.y - cartesian_pos->y) > pos_tol ||
-       fabs(pos_out_cartesian.z - cartesian_pos->z) > pos_tol){
+    // --- Position check ---
+    if(fabsf(T_tcp.m[0][3] - cartesian_pos->x) > pos_tol ||
+       fabsf(T_tcp.m[1][3] - cartesian_pos->y) > pos_tol ||
+       fabsf(T_tcp.m[2][3] - cartesian_pos->z) > pos_tol){
         valid = false;
     }
 
-    // check angle error (shortest angle distance)
-    auto shortest_angle_dist = [](float a, float b) -> float {
-        float diff = a - b;
-        diff = fmod(diff + M_PI, 2.0f * M_PI);
-        if (diff < 0) diff += 2.0f * M_PI;
-        return diff - M_PI;
-    };
-    float angle_error_x = shortest_angle_dist(pos_out_cartesian.xangle, cartesian_pos->xangle);
-    float angle_error_y = shortest_angle_dist(pos_out_cartesian.yangle, cartesian_pos->yangle);
-    float angle_error_z = shortest_angle_dist(pos_out_cartesian.zangle, cartesian_pos->zangle);
-    if(fabs(angle_error_x) > angle_tol ||
-       fabs(angle_error_y) > angle_tol ||
-       fabs(angle_error_z) > angle_tol){
+    // --- Orientation check via rotation matrices ---
+    // We deliberately avoid comparing per-axis Euler angles here.  At yangle = ±π/2 (gimbal lock)
+    // the Euler decomposition is degenerate: toEulerZYX (jog path) can produce xangle/zangle jumps
+    // of ±π while the physical orientation is completely unchanged.  A per-axis Euler comparison
+    // then sees a large error even though the joints are exactly right, causing a false failure.
+    //
+    // Rotation matrices have no such singularity.  Two matrices that represent the same physical
+    // orientation are element-wise identical, so the Frobenius norm of their difference is zero
+    // regardless of which Euler decomposition was used to produce them.
+    //
+    // Convention in this code:
+    //   xangle = Z-rotation (yaw), yangle = Y-rotation (pitch), zangle = X-rotation (roll)
+    //   poseToMatrix(pos, zyx) interprets zyx as [Z-rot, Y-rot, X-rot] → Rz·Ry·Rx
+    // So {xangle, yangle, zangle} maps directly onto the [phi, theta, psi] argument of poseToMatrix.
+    //
+    // Threshold: ||R1 - R2||_F² ≈ 2·θ² for a single-axis error of θ, so the threshold is 2·angle_tol².
+    const std::array<float,3> dummy_pos  = {0.0f, 0.0f, 0.0f};
+    const std::array<float,3> target_zyx = {cartesian_pos->xangle, cartesian_pos->yangle, cartesian_pos->zangle};
+    Mat4 T_target = poseToMatrix(dummy_pos, target_zyx);
+
+    float frob_sq = 0.0f;
+    for(int r = 0; r < 3; r++)
+        for(int c = 0; c < 3; c++){
+            float d = T_tcp.m[r][c] - T_target.m[r][c];
+            frob_sq += d * d;
+        }
+    if(frob_sq > 2.0f * angle_tol * angle_tol){
         valid = false;
     }
-    
+
+    if(!valid){
+        volatile int a = 0; // for debugging
+        a = 1;
+    }
+
     return valid;
 
 }
 
 void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override){
+    prev_cmd_cartesian_positions = last_cmd_cartesian_positions;
     // jog a cartesian axis by a certain velocity (based on the joint max velocity)
     // jog_axis is 0-2 for x, y, z
     // jog_axis is 3-5 for xangle, yangle, zangle
@@ -384,6 +463,21 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
         }
         jog_vel = last_cartesian_jog_vel; // use the limited jog vel for the rest of the function
     }
+
+    // limit the jog speed to the allowed positive and negative velocities
+    if(copysign(1.0f, jog_vel) < 0){
+        // jog speed is negative, so we need to limit it to the allowed negative velocity
+        jog_vel = fmax(jog_vel, -cartesian_distances_to_limit[jog_axis].allowed_negative_vel);
+    } else {
+        // positive jog speed, so we need to limit it to the allowed positive velocity
+        jog_vel = fmin(jog_vel, cartesian_distances_to_limit[jog_axis].allowed_positive_vel);
+    }
+
+    if(jog_vel == 0.0f){    // no movement
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+    out_sigs.at_cmd_pos = false;
 
 
     jog_vel *= time_step; // convert to position change in this time step
@@ -439,6 +533,7 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
 }
 
 void kins::jog_mouse(){
+    prev_cmd_cartesian_positions = last_cmd_cartesian_positions;
     std::array<float,3> mouse_pos_delta = {
         in_sigs.cmd_cartesian_positions.x - starting_mouse_positions.x,
         in_sigs.cmd_cartesian_positions.y - starting_mouse_positions.y,
@@ -487,6 +582,143 @@ void kins::jog_mouse(){
 
     inverse_kins(); // calculate the joint positions based on the new cartesian positions
 
+}
+
+uint32_t kins::set_move_joint_cmd_positions(const joint_positions& new_target){
+    // prev = each joint's current setpoint register; req = what this call is asking it to
+    // become (the caller merges in unspecified joints from the previous target before calling
+    // this, so an untouched joint arrives with req[i] == prev[i]). Clamp/scale math is relative
+    // to prev, not the live position, so a joint that didn't change this call is mathematically
+    // unaffected no matter what other joints in the same call need to be scaled back for.
+    double prev[6] = {
+        move_joint_cmd_positions.j1, move_joint_cmd_positions.j2, move_joint_cmd_positions.j3,
+        move_joint_cmd_positions.j4, move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
+    };
+    double req[6] = {
+        new_target.j1, new_target.j2, new_target.j3,
+        new_target.j4, new_target.j5, new_target.j6
+    };
+
+    // largest fraction of this call's requested move that every constrained channel can tolerate
+    float s = 1.0f;
+    auto constrain = [&](double base, double target_val, double min_pos, double max_pos){
+        if(target_val >= min_pos && target_val <= max_pos) return; // already in range
+        double delta = target_val - base;
+        if(delta == 0.0) return;                                   // this channel isn't moving
+        double limit = (target_val > max_pos) ? max_pos : min_pos;
+        s = fminf(s, (float)std::clamp((limit - base) / delta, 0.0, 1.0));
+    };
+
+    if(!joint_distances_to_limit[0].infinite) constrain(prev[0], req[0], joint_limits[0].min_pos, joint_limits[0].max_pos);
+    if(!joint_distances_to_limit[1].infinite) constrain(prev[1], req[1], joint_limits[1].min_pos, joint_limits[1].max_pos);
+    // j3 is commanded relative to j2 (servo coupling); constrain the combined angle, same
+    // convention as clamp_to_joint_limits()/update_joint_distances_to_limit().
+    if(!joint_distances_to_limit[2].infinite) constrain(prev[1]+prev[2], req[1]+req[2], joint_limits[2].min_pos, joint_limits[2].max_pos);
+    if(!joint_distances_to_limit[4].infinite) constrain(prev[4], req[4], joint_limits[4].min_pos, joint_limits[4].max_pos);
+    // j4, j6 are continuous -- no clamp needed
+
+    double result[6];
+    for(int i = 0; i < 6; i++) result[i] = prev[i] + s * (req[i] - prev[i]); // req==prev -> result==prev, untouched
+
+    move_joint_cmd_positions = {result[0], result[1], result[2], result[3], result[4], result[5]};
+    move_joint_target_valid = true;
+
+    return 0; // success
+}
+
+void kins::move_joints(){
+    // synchronized joint-space point-to-point move: ramp all 6 joints toward
+    // move_joint_cmd_positions together, respecting each joint's max velocity, max
+    // acceleration, and position limits. The target may change at any time (via
+    // set_move_joint_cmd_positions()); motion replans from the current position/velocity
+    // every cycle.
+
+    if(in_sigs.reset){
+        // cancel any in-flight move -- run() overwrites cmd_joint_positions with the fbk
+        // position right after this call, so match that here.
+        move_joint_cmd_positions = in_sigs.fbk_joint_positions;
+        move_joint_target_valid = true;
+        move_joint_last_vel.fill(0.0f);
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    if(!move_joint_target_valid){
+        // no commanded target has been set yet -- nothing to do
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    std::array<double,6> current = {
+        out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
+        out_sigs.cmd_joint_positions.j3, out_sigs.cmd_joint_positions.j4,
+        out_sigs.cmd_joint_positions.j5, out_sigs.cmd_joint_positions.j6
+    };
+    std::array<double,6> target = {
+        move_joint_cmd_positions.j1, move_joint_cmd_positions.j2,
+        move_joint_cmd_positions.j3, move_joint_cmd_positions.j4,
+        move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
+    };
+
+    const double pos_tol = 1e-5; // position tolerance for considering a joint "at target"
+
+    std::array<double,6> dist;  // signed distance remaining, per joint
+    std::array<float,6> v_cap;  // this joint's own max safe speed toward target this cycle
+    for(int i = 0; i < 6; i++){
+        dist[i] = target[i] - current[i];
+
+        float acc = joint_limits[i].max_acc;
+        float stop_vel = sqrtf(2.0f * acc * (float)fabs(dist[i])); // v such that we can still stop exactly at target
+        float v = fminf(joint_limits[i].max_vel, stop_vel);
+
+        if(dist[i] > 0)      v = fminf(v, joint_distances_to_limit[i].allowed_positive_vel);
+        else if(dist[i] < 0) v = fminf(v, joint_distances_to_limit[i].allowed_negative_vel);
+        else                 v = 0.0f;
+
+        v_cap[i] = fmaxf(v, 0.0f);
+    }
+
+    // find the slowest joint (longest time to arrive at its own capped speed) and synchronize
+    // every other joint's speed to match that time, so all 6 arrive together.
+    float t_sync = 0.0f;
+    for(int i = 0; i < 6; i++){
+        if(fabs(dist[i]) > pos_tol && v_cap[i] > 1e-6f){
+            t_sync = fmaxf(t_sync, (float)fabs(dist[i]) / v_cap[i]);
+        }
+    }
+
+    std::array<double,6> new_pos;
+    for(int i = 0; i < 6; i++){
+        float v_target = 0.0f;
+        if(fabs(dist[i]) > pos_tol){
+            v_target = (t_sync > 1e-6f) ? (float)fabs(dist[i]) / t_sync : v_cap[i];
+            v_target = fminf(v_target, v_cap[i]); // never exceed this joint's own safe speed
+            v_target = copysignf(v_target, (float)dist[i]);
+        }
+
+        // accel-limit the change from last cycle's commanded velocity
+        float max_dv = joint_limits[i].max_acc * time_step;
+        float dv = v_target - move_joint_last_vel[i];
+        if(fabs(dv) > max_dv) v_target = move_joint_last_vel[i] + copysignf(max_dv, dv);
+        move_joint_last_vel[i] = v_target;
+
+        double step = (double)v_target * time_step;
+        new_pos[i] = current[i] + step;
+
+        // don't overshoot the target
+        if((dist[i] >= 0 && new_pos[i] > target[i]) || (dist[i] < 0 && new_pos[i] < target[i])){
+            new_pos[i] = target[i];
+            move_joint_last_vel[i] = 0.0f;
+        }
+    }
+
+    out_sigs.cmd_joint_positions = {new_pos[0], new_pos[1], new_pos[2], new_pos[3], new_pos[4], new_pos[5]};
+
+    bool all_at_target = true;
+    for(int i = 0; i < 6; i++){
+        if(fabs(target[i] - new_pos[i]) > pos_tol) all_at_target = false;
+    }
+    out_sigs.at_cmd_pos = all_at_target;
 }
 
 void kins::inverse_kins(){
@@ -553,12 +785,13 @@ void kins::inverse_kins(){
         cartTwist, outSolution, outVelocities, detail, 50, 1e-4f);
 
     if(ec != InverseKinematics::ErrorCode::Success){
-        // TODO: handle error
+        // IK failed (singular Jacobian or no convergence — common at wrist/elbow singularities).
+        // jog_cartesian already advanced last_cmd_cartesian_positions; roll it back to prevent
+        // the integrator from drifting away from the joint positions and creating a deadlock.
+        last_cmd_cartesian_positions = prev_cmd_cartesian_positions;
     }
     else{
         // update the commanded joint positions based on the solution
-
-        // TODO: limit for pos, vel, and acc here
 
         // invert j3, j4, j5 to match the robot's joint directions
         outSolution[2] = -outSolution[2];
@@ -568,24 +801,115 @@ void kins::inverse_kins(){
         // un-offset j3
         outSolution[2] -= outSolution[1];
 
+        // apply joint velocity rate limiting — all joints scale by the same factor to stay in sync
+        float rate_scale = apply_cartesian_joint_rate_limit(outSolution);
+        // float rate_scale = 1.0f; // bypass for testing
+
         // update the last commanded cartesian positions
-        last_cmd_cartesian_positions.x = target_pos_tool[0];
-        last_cmd_cartesian_positions.y = target_pos_tool[1];
-        last_cmd_cartesian_positions.z = target_pos_tool[2];
+        last_cmd_cartesian_positions.x      = target_pos_tool[0];
+        last_cmd_cartesian_positions.y      = target_pos_tool[1];
+        last_cmd_cartesian_positions.z      = target_pos_tool[2];
         last_cmd_cartesian_positions.xangle = target_euler_tool[0];
         last_cmd_cartesian_positions.yangle = target_euler_tool[1];
         last_cmd_cartesian_positions.zangle = target_euler_tool[2];
 
-        bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.01f, 0.01f);
+        // If rate limiting reduced the step, set the integrator to the FK of the rate-limited
+        // joints rather than a proportional interpolation in Cartesian space.
+        // Proportional rollback is inaccurate because FK is nonlinear:
+        //   FK(current_j + delta*s)  ≠  prev_cart + (target_cart - prev_cart)*s
+        // That mismatch accumulates each cycle and causes Newton-Raphson to see an error term
+        // beyond the jog step.  Near a joint direction-change point (Jacobian column ~ 0),
+        // the extra term drives convergence to the wrong branch.
+        // FK-based update makes the invariant exact:
+        //   FK(cmd_joint_positions) == last_cmd_cartesian_positions
+        // so the next IK call sees a pure one-step error with a fully consistent initial guess.
+        if(rate_scale < 1.0f){
+            // Same motor→IK convention as validate_kins_solution.
+            std::array<float,6> fk_joints = outSolution;
+            fk_joints[2] += fk_joints[1];   // j3_servo = j3_rel + j2
+            fk_joints[2] = -fk_joints[2];   // IK convention: negate j3
+            fk_joints[3] = -fk_joints[3];   // IK convention: negate j4
+            fk_joints[4] = -fk_joints[4];   // IK convention: negate j5
+            for(auto& a : fk_joints)         // wrap to [-π, π]
+                a = fmod(a + (float)M_PI, 2.0f * (float)M_PI) - (float)M_PI;
+
+            std::array<float,3> rl_pos;
+            std::array<float,9> rl_rot;
+            ik_solver.forwardKinematicsF32(fk_joints, rl_pos, rl_rot);
+
+            Mat4 T_fl{};
+            for(int r = 0; r < 3; r++)
+                for(int c = 0; c < 3; c++)
+                    T_fl.m[r][c] = rl_rot[r * 3 + c];
+            T_fl.m[0][3] = rl_pos[0]; T_fl.m[1][3] = rl_pos[1]; T_fl.m[2][3] = rl_pos[2];
+            T_fl.m[3][3] = 1.0f;
+
+            Mat4 T_tcp_rl = (current_tool != nullptr)
+                ? mul(T_fl, poseToMatrix(current_tool->position, current_tool->orientation))
+                : T_fl;
+
+            std::array<float,3> tcp_pos_rl, tcp_eul_rl;
+            matrixToPose(T_tcp_rl, tcp_pos_rl, tcp_eul_rl);
+
+            last_cmd_cartesian_positions.x      = tcp_pos_rl[0];
+            last_cmd_cartesian_positions.y      = tcp_pos_rl[1];
+            last_cmd_cartesian_positions.z      = tcp_pos_rl[2];
+            last_cmd_cartesian_positions.xangle = tcp_eul_rl[0];
+            last_cmd_cartesian_positions.yangle = tcp_eul_rl[1];
+            last_cmd_cartesian_positions.zangle = tcp_eul_rl[2];
+        }
+
+        bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.02f, 0.05f);
 
         if(valid){
             set_closest_joint_positions(&outSolution);
         }
         else{
+            // IK solution doesn't match the commanded position — freeze rather than go to wrong pose.
+            // Roll the integrator back so it stays in sync with the actual joint positions.
+            last_cmd_cartesian_positions = prev_cmd_cartesian_positions;
             volatile bool t; // for debugging breakpoint
-            t = true; // set a breakpoint here to debug invalid kins solution
+            t = true;        // set a breakpoint here to debug invalid kins solution
         }
     }
+}
+
+float kins::apply_cartesian_joint_rate_limit(std::array<float,6>& joint_angles) {
+    const double current_pos[6] = {
+        out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
+        out_sigs.cmd_joint_positions.j3, out_sigs.cmd_joint_positions.j4,
+        out_sigs.cmd_joint_positions.j5, out_sigs.cmd_joint_positions.j6
+    };
+
+    double deltas[6];
+    for(size_t i = 0; i < 6; i++){
+        deltas[i] = wrapNearest(current_pos[i], (double)joint_angles[i]) - current_pos[i];
+    }
+
+    float min_scale = 1.0f;
+    for(size_t i = 0; i < 6; i++){
+        double effective_delta = deltas[i];
+        if(i == 2) effective_delta += deltas[1]; // J3 servo sees J2 + J3 (parallelogram coupling)
+
+        double vel = effective_delta / time_step;
+        float max_vel = (vel >= 0.0)
+            ? joint_distances_to_limit[i].allowed_positive_vel
+            : joint_distances_to_limit[i].allowed_negative_vel;
+
+        if(max_vel <= 0.0f){
+            if(vel != 0.0) min_scale = 0.0f;
+        } else if(std::abs(vel) > (double)max_vel){
+            float s = max_vel / (float)std::abs(vel);
+            if(s < min_scale) min_scale = s;
+        }
+    }
+
+    if(min_scale >= 1.0f) return 1.0f;
+
+    for(size_t i = 0; i < 6; i++){
+        joint_angles[i] = (float)(current_pos[i] + deltas[i] * min_scale);
+    }
+    return min_scale;
 }
 
 void kins::set_closest_joint_positions(std::array<float,6>* joint_angles){
@@ -660,6 +984,12 @@ void kins::jog_joint(uint8_t jog_axis, float jog_vel_, float speed_override){
         jog_vel = fmin(jog_vel, joint_distances_to_limit[jog_axis].allowed_positive_vel);
     }
 
+    if(jog_vel == 0.0f){    // no movement
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+    out_sigs.at_cmd_pos = false;
+
     // update the commanded joint position based on the jog speed
     switch(jog_axis){
         case 0:
@@ -709,17 +1039,6 @@ void kins::update_joint_distances_to_limit(){
     // update how far in each direction each joint is from a limit
     // uses final commanded joint positions
 
-    if(bypass_limits){
-        for(int i = 0; i < 6; i++){
-            joint_distances_to_limit[i].infinite = true;
-            joint_distances_to_limit[i].to_min = std::numeric_limits<float>::infinity();
-            joint_distances_to_limit[i].to_max = std::numeric_limits<float>::infinity();
-            joint_distances_to_limit[i].allowed_positive_vel = joint_limits[i].max_vel;
-            joint_distances_to_limit[i].allowed_negative_vel = joint_limits[i].max_vel;
-        }
-        return;
-    }
-
     // TODO: this is hardcoded for the UP6 joint congiguration, should be configurable eventually
 
     // j4 and 6 are continuous
@@ -764,9 +1083,11 @@ void kins::update_joint_distances_to_limit(){
         float acc = joint_limits[i].max_acc;
         float vel = joint_limits[i].max_vel;
 
-        if(joint_distances_to_limit[i].infinite){
+        if(joint_distances_to_limit[i].infinite || bypass_joint_limits){
             joint_distances_to_limit[i].allowed_positive_vel = vel; // infinite joint, can move at full speed
             joint_distances_to_limit[i].allowed_negative_vel = vel; // infinite joint, can move at full speed
+            joint_distances_to_limit[i].to_min = std::numeric_limits<float>::infinity();
+            joint_distances_to_limit[i].to_max = std::numeric_limits<float>::infinity();
         } else {
 
             // calculate the distance we need to stop from full speed
@@ -802,6 +1123,72 @@ void kins::update_joint_distances_to_limit(){
         }
     }
 
+}
+
+void kins::update_cartesian_distances_to_limit(){
+    // update how far in each direction each cartesian axis is from a limit
+    // uses final commanded cartesian positions
+
+    // x, y, z and xangle, yangle, zangle are all limited
+    for(int i = 0; i < 6; i++){
+
+        if(cartesian_distances_to_limit[i].infinite || bypass_cartesian_limits){
+            cartesian_distances_to_limit[i].to_min = std::numeric_limits<float>::infinity();
+            cartesian_distances_to_limit[i].to_max = std::numeric_limits<float>::infinity();
+            cartesian_distances_to_limit[i].allowed_positive_vel = cartesian_limits[i].max_vel;
+            cartesian_distances_to_limit[i].allowed_negative_vel = cartesian_limits[i].max_vel;
+            continue;
+        }
+
+        float pos = 0.0f;
+        switch(i){
+            case 0: pos = last_cmd_cartesian_positions.x; break;
+            case 1: pos = last_cmd_cartesian_positions.y; break;
+            case 2: pos = last_cmd_cartesian_positions.z; break;
+            case 3: pos = last_cmd_cartesian_positions.xangle; break;
+            case 4: pos = last_cmd_cartesian_positions.yangle; break;
+            case 5: pos = last_cmd_cartesian_positions.zangle; break;
+        }
+        cartesian_distances_to_limit[i].to_min = pos - cartesian_limits[i].min_pos;
+        cartesian_distances_to_limit[i].to_max = cartesian_limits[i].max_pos - pos;
+
+        // calculate allowed speeds based on the distances to the limits
+        float acc = cartesian_limits[i].max_acc;
+        float vel = cartesian_limits[i].max_vel;
+
+        // calculate the distance we need to stop from full speed
+        float stop_distance = (vel * vel) / (2.0 * acc); // d = v^2 / (2 * a)
+
+        float pos_speed = 0.0f;
+        float neg_speed = 0.0f;
+
+        // calculate the velocity based on the distance to the limit
+        if(cartesian_distances_to_limit[i].to_min > stop_distance){
+            // not close to limit
+            neg_speed = vel; // we can move at full speed
+        } else if(cartesian_distances_to_limit[i].to_min < 0){
+            // outside the limit, we cannot move in this direction
+            neg_speed = 0.0f;
+        } else {
+            // close to limit, we need to slow down
+            neg_speed = sqrt(2.0 * acc * cartesian_distances_to_limit[i].to_min); // v = sqrt(2 * a * d)
+        }
+
+        if(cartesian_distances_to_limit[i].to_max > stop_distance){
+            // not close to limit
+            pos_speed = vel; // we can move at full speed
+        } else if(cartesian_distances_to_limit[i].to_max < 0){
+            // outside the limit, we cannot move in this direction
+            pos_speed = 0.0f;
+        } else {
+            // close to limit, we need to slow down
+                pos_speed = sqrt(2.0 * acc * cartesian_distances_to_limit[i].to_max); // v = sqrt(2 * a * d)
+            }
+
+        cartesian_distances_to_limit[i].allowed_positive_vel = pos_speed;
+        cartesian_distances_to_limit[i].allowed_negative_vel = neg_speed;
+
+    }
 }
 
 uint32_t kins::select_tool(uint8_t tool_index) {
