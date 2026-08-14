@@ -2,6 +2,7 @@
 /build
 zynq_files/controller/bin
 zynq_files/controller/web
+/.debug
 
 # not using this yet, no need to track
 controller/inc/simdjson.h
