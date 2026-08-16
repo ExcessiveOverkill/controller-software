@@ -14,31 +14,10 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb-multiarch", // Ensure gdb-multiarch is installed in WSL
-            "additionalSOLibSearchPath": "${workspaceFolder}/.debug/zynq-sysroot/lib;${workspaceFolder}/.debug/zynq-sysroot/lib/arm-linux-gnueabihf;${workspaceFolder}/.debug/zynq-sysroot/usr/lib;${workspaceFolder}/.debug/zynq-sysroot/usr/lib/arm-linux-gnueabihf;${workspaceFolder}/.debug/zynq-sysroot/usr/local/lib",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Use the cached Zynq sysroot for absolute shared-library paths",
-                    "text": "set sysroot ${workspaceFolder}/.debug/zynq-sysroot",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Resolve absolute shared-library paths inside the cached Zynq sysroot",
-                    "text": "set solib-absolute-prefix ${workspaceFolder}/.debug/zynq-sysroot",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Prefer downloaded Zynq shared libraries when symbols are loaded",
-                    "text": "set solib-search-path ${workspaceFolder}/.debug/zynq-sysroot/lib:${workspaceFolder}/.debug/zynq-sysroot/lib/arm-linux-gnueabihf:${workspaceFolder}/.debug/zynq-sysroot/usr/lib:${workspaceFolder}/.debug/zynq-sysroot/usr/lib/arm-linux-gnueabihf:${workspaceFolder}/.debug/zynq-sysroot/usr/local/lib",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Use cached Zynq split debug symbols when available",
-                    "text": "set debug-file-directory ${workspaceFolder}/.debug/zynq-sysroot/lib/.debug:${workspaceFolder}/.debug/zynq-sysroot/lib/debug:${workspaceFolder}/.debug/zynq-sysroot/usr/lib/.debug:${workspaceFolder}/.debug/zynq-sysroot/usr/lib/debug:${workspaceFolder}/.debug/zynq-sysroot/usr/local/lib/.debug:${workspaceFolder}/.debug/zynq-sysroot/usr/local/lib/debug",
                     "ignoreFailures": true
                 }
             ],
