@@ -143,6 +143,8 @@ class kins: public base_node {
 
         jog_modes last_jog_mode = jog_modes::UNDEFINED; // last jog mode used, to prevent unnecessary calculations
 
+        control_modes last_control_mode = control_modes::UNDEFINED; // last control mode used, to detect CARTESIAN-mode entry and resync last_cmd_cartesian_positions
+
         float last_joint_jog_vel = 0.0f; // last jog vel used, to limit acceleration
         void jog_joint(uint8_t jog_axis, float jog_vel, float speed_override);
 
@@ -161,6 +163,12 @@ class kins: public base_node {
         std::array<float,6> move_joint_last_vel = {0,0,0,0,0,0}; // last commanded velocity per joint (for accel limiting)
         uint32_t set_move_joint_cmd_positions(const joint_positions& new_target); // called by the JSON command handler to set a new synchronized-move target
         void move_joints();
+
+        cartesian_positions move_cartesian_cmd_positions;  // active synchronized-move target (clamped to cartesian limits by the setter below)
+        bool move_cartesian_target_valid = false;          // true once a target has been set
+        std::array<float,6> move_cartesian_last_vel = {0,0,0,0,0,0}; // last commanded velocity per cartesian axis (for accel limiting)
+        uint32_t set_move_cartesian_cmd_positions(const cartesian_positions& new_target); // called by the JSON command handler to set a new synchronized-move target
+        void move_cartesian();
 
         void inverse_kins();
 
@@ -537,20 +545,20 @@ class kins: public base_node {
 
             if(json->find("set") != json->end()){
                 auto& set_json = (*json)["set"];
-                if(set_json.find("joints") != set_json.end()){
-                    auto& joint_cmds = set_json["joints"];
+                if(set_json.find("joint") != set_json.end()){
+                    auto& joint_cmds = set_json["joint"];
                     if(joint_cmds.is_object()){
                         bool absolute = true;
                         if(joint_cmds.find("absolute") != joint_cmds.end() && joint_cmds["absolute"].is_boolean()){
                             absolute = joint_cmds["absolute"].get<bool>();
                         }
                         else {
-                            std::cerr << "Missing or invalid 'absolute' field in joint_command." << std::endl;
+                            std::cerr << "Missing or invalid 'absolute' field in joint command." << std::endl;
                             return 1; // error code for configuration failure
                         }
                         joint_positions new_cmd_positions = move_joint_cmd_positions; // start with existing values
                         for(int i = 0; i < 6; i++){
-                            std::string joint_name = "j" + std::to_string(i+1) + "_cmd_pos";
+                            std::string joint_name = std::to_string(i+1);
                             if(joint_cmds.find(joint_name) == joint_cmds.end()){
                                 // joint not found, use existing value
                                 continue;
@@ -583,7 +591,66 @@ class kins: public base_node {
                         uint32_t ret = set_move_joint_cmd_positions(new_cmd_positions);
                     }
                     else {
-                        std::cerr << "Invalid joint_commands format, expected an object." << std::endl;
+                        std::cerr << "Invalid joint command format, expected an object." << std::endl;
+                        return 1; // error code for configuration failure
+                    }
+                }
+                else if(set_json.find("cartesian") != set_json.end()){
+                    auto& cartesian_cmds = set_json["cartesian"];
+                    if(cartesian_cmds.is_object()){
+                        bool absolute = true;
+                        if(cartesian_cmds.find("absolute") != cartesian_cmds.end() && cartesian_cmds["absolute"].is_boolean()){
+                            absolute = cartesian_cmds["absolute"].get<bool>();
+                        }
+                        else {
+                            std::cerr << "Missing or invalid 'absolute' field in cartesian command." << std::endl;
+                            return 1; // error code for configuration failure
+                        }
+                        cartesian_positions new_cmd_positions = move_cartesian_cmd_positions; // start with existing values
+                        for(int i = 0; i < 6; i++){
+                            std::string axis_name = "";
+                            switch(i){
+                                case 0: axis_name = "x"; break;
+                                case 1: axis_name = "y"; break;
+                                case 2: axis_name = "z"; break;
+                                case 3: axis_name = "xangle"; break;
+                                case 4: axis_name = "yangle"; break;
+                                case 5: axis_name = "zangle"; break;
+                            }
+                            if(cartesian_cmds.find(axis_name) == cartesian_cmds.end()){ // fix bug where "rx" results in "x" being found
+                                // axis not found, use existing value
+                                continue;
+                            }
+                            double pos = cartesian_cmds[axis_name].get<float>();
+                            if(i > 2){ pos *= M_PI / 180.0f; } // angle axes only: convert degrees to radians
+                            if(absolute){
+                                // absolute position, set directly
+                                switch(i){
+                                    case 0: new_cmd_positions.x = pos; break;
+                                    case 1: new_cmd_positions.y = pos; break;
+                                    case 2: new_cmd_positions.z = pos; break;
+                                    case 3: new_cmd_positions.xangle = pos; break;
+                                    case 4: new_cmd_positions.yangle = pos; break;
+                                    case 5: new_cmd_positions.zangle = pos; break;
+                                }
+                            }
+                            else {
+                                // relative position, add to existing
+                                switch(i){
+                                    case 0: new_cmd_positions.x += pos; break;
+                                    case 1: new_cmd_positions.y += pos; break;
+                                    case 2: new_cmd_positions.z += pos; break;
+                                    case 3: new_cmd_positions.xangle += pos; break;
+                                    case 4: new_cmd_positions.yangle += pos; break;
+                                    case 5: new_cmd_positions.zangle += pos; break;
+                                }
+                            }
+                            
+                        }
+                        uint32_t ret = set_move_cartesian_cmd_positions(new_cmd_positions);
+                    }
+                    else {
+                        std::cerr << "Invalid cartesian command format, expected an object." << std::endl;
                         return 1; // error code for configuration failure
                     }
                 }
@@ -629,6 +696,16 @@ class kins: public base_node {
                         (*json)["get"]["cmd_joint_pos_target"]["j4"] = move_joint_cmd_positions.j4 * 180.0f / M_PI; // convert radians to degrees
                         (*json)["get"]["cmd_joint_pos_target"]["j5"] = move_joint_cmd_positions.j5 * 180.0f / M_PI; // convert radians to degrees
                         (*json)["get"]["cmd_joint_pos_target"]["j6"] = move_joint_cmd_positions.j6 * 180.0f / M_PI; // convert radians to degrees
+                    }
+                    if(get_json.find("cmd_cartesian_pos_target") != get_json.end()){
+                        // return the current commanded cartesian position target (synchronized move target)
+                        // only valid in cartesian control mode
+                        (*json)["get"]["cmd_cartesian_pos_target"]["x"] = move_cartesian_cmd_positions.x;
+                        (*json)["get"]["cmd_cartesian_pos_target"]["y"] = move_cartesian_cmd_positions.y;
+                        (*json)["get"]["cmd_cartesian_pos_target"]["z"] = move_cartesian_cmd_positions.z;
+                        (*json)["get"]["cmd_cartesian_pos_target"]["xangle"] = move_cartesian_cmd_positions.xangle;
+                        (*json)["get"]["cmd_cartesian_pos_target"]["yangle"] = move_cartesian_cmd_positions.yangle;
+                        (*json)["get"]["cmd_cartesian_pos_target"]["zangle"] = move_cartesian_cmd_positions.zangle;
                     }
                 }
                 else {

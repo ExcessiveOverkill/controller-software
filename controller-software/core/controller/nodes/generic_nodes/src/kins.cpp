@@ -188,7 +188,21 @@ uint32_t kins::run(){
             // joints move in sync
             move_joints();
             break;
+
+        case control_modes::CARTESIAN:
+            if(last_control_mode != control_modes::CARTESIAN || in_sigs.reset){
+                // last_cmd_cartesian_positions is only kept in sync by inverse_kins() (called from
+                // jog_cartesian/jog_mouse/move_cartesian); if we just arrived here from JOINT mode
+                // or JOG mode it can be stale, so resync it to the true current pose.
+                last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
+            }
+            // commanded cartesian positions are directly set by the API
+            // accel, vel, and position limits are applied, speed is scaled
+            // cartesian axes move in sync, IK solved every cycle via inverse_kins()
+            move_cartesian();
+            break;
     }
+    last_control_mode = in_sigs.control_mode;
 
     if(in_sigs.reset){
         // reset the commanded joint positions to the current positions
@@ -585,11 +599,7 @@ void kins::jog_mouse(){
 }
 
 uint32_t kins::set_move_joint_cmd_positions(const joint_positions& new_target){
-    // prev = each joint's current setpoint register; req = what this call is asking it to
-    // become (the caller merges in unspecified joints from the previous target before calling
-    // this, so an untouched joint arrives with req[i] == prev[i]). Clamp/scale math is relative
-    // to prev, not the live position, so a joint that didn't change this call is mathematically
-    // unaffected no matter what other joints in the same call need to be scaled back for.
+
     double prev[6] = {
         move_joint_cmd_positions.j1, move_joint_cmd_positions.j2, move_joint_cmd_positions.j3,
         move_joint_cmd_positions.j4, move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
@@ -613,12 +623,14 @@ uint32_t kins::set_move_joint_cmd_positions(const joint_positions& new_target){
     if(!joint_distances_to_limit[1].infinite) constrain(prev[1], req[1], joint_limits[1].min_pos, joint_limits[1].max_pos);
     // j3 is commanded relative to j2 (servo coupling); constrain the combined angle, same
     // convention as clamp_to_joint_limits()/update_joint_distances_to_limit().
+    // TODO: verify this j2 and j3 limiting
     if(!joint_distances_to_limit[2].infinite) constrain(prev[1]+prev[2], req[1]+req[2], joint_limits[2].min_pos, joint_limits[2].max_pos);
+    if(!joint_distances_to_limit[3].infinite) constrain(prev[3], req[3], joint_limits[3].min_pos, joint_limits[3].max_pos);
     if(!joint_distances_to_limit[4].infinite) constrain(prev[4], req[4], joint_limits[4].min_pos, joint_limits[4].max_pos);
-    // j4, j6 are continuous -- no clamp needed
+    if(!joint_distances_to_limit[5].infinite) constrain(prev[5], req[5], joint_limits[5].min_pos, joint_limits[5].max_pos);
 
     double result[6];
-    for(int i = 0; i < 6; i++) result[i] = prev[i] + s * (req[i] - prev[i]); // req==prev -> result==prev, untouched
+    for(int i = 0; i < 6; i++) result[i] = prev[i] + s * (req[i] - prev[i]);
 
     move_joint_cmd_positions = {result[0], result[1], result[2], result[3], result[4], result[5]};
     move_joint_target_valid = true;
@@ -717,6 +729,146 @@ void kins::move_joints(){
     bool all_at_target = true;
     for(int i = 0; i < 6; i++){
         if(fabs(target[i] - new_pos[i]) > pos_tol) all_at_target = false;
+    }
+    out_sigs.at_cmd_pos = all_at_target;
+}
+
+uint32_t kins::set_move_cartesian_cmd_positions(const cartesian_positions& new_target){
+
+    float prev[6] = {
+        move_cartesian_cmd_positions.x, move_cartesian_cmd_positions.y, move_cartesian_cmd_positions.z,
+        move_cartesian_cmd_positions.xangle, move_cartesian_cmd_positions.yangle, move_cartesian_cmd_positions.zangle
+    };
+    float req[6] = {
+        new_target.x, new_target.y, new_target.z,
+        new_target.xangle, new_target.yangle, new_target.zangle
+    };
+
+    // largest fraction of this call's requested move that every constrained axis can tolerate
+    float s = 1.0f;
+    auto constrain = [&](float base, float target_val, float min_pos, float max_pos){
+        if(target_val >= min_pos && target_val <= max_pos) return; // already in range
+        float delta = target_val - base;
+        if(delta == 0.0f) return;                                  // this axis isn't moving
+        float limit = (target_val > max_pos) ? max_pos : min_pos;
+        s = fminf(s, std::clamp((limit - base) / delta, 0.0f, 1.0f));
+    };
+
+    for(int i = 0; i < 6; i++){
+        if(!cartesian_distances_to_limit[i].infinite) constrain(prev[i], req[i], cartesian_limits[i].min_pos, cartesian_limits[i].max_pos);
+    }
+
+    float result[6];
+    for(int i = 0; i < 6; i++) result[i] = prev[i] + s * (req[i] - prev[i]);
+
+    move_cartesian_cmd_positions = {result[0], result[1], result[2], result[3], result[4], result[5]};
+    move_cartesian_target_valid = true;
+
+    return 0; // success
+}
+
+void kins::move_cartesian(){
+    // synchronized cartesian-space point-to-point move: ramp all 6 axes toward
+    // move_cartesian_cmd_positions together, respecting each axis's max velocity, max
+    // acceleration, and position limits. The target may change at any time (via
+    // set_move_cartesian_cmd_positions()); motion replans from the current position/velocity
+    // every cycle. IK is solved every cycle via inverse_kins(), same as jog_cartesian().
+
+    if(in_sigs.reset){
+        // cancel any in-flight move -- resync to the true current pose, same as the CARTESIAN
+        // mode entry check in run() does.
+        move_cartesian_cmd_positions = out_sigs.fbk_cartesian_positions;
+        last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
+        move_cartesian_target_valid = true;
+        move_cartesian_last_vel.fill(0.0f);
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    if(!move_cartesian_target_valid){
+        // no commanded target has been set yet -- nothing to do
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    std::array<float,6> current = {
+        last_cmd_cartesian_positions.x, last_cmd_cartesian_positions.y, last_cmd_cartesian_positions.z,
+        last_cmd_cartesian_positions.xangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.zangle
+    };
+    std::array<float,6> target = {
+        move_cartesian_cmd_positions.x, move_cartesian_cmd_positions.y, move_cartesian_cmd_positions.z,
+        move_cartesian_cmd_positions.xangle, move_cartesian_cmd_positions.yangle, move_cartesian_cmd_positions.zangle
+    };
+
+    const float pos_tol = 1e-5f;   // position tolerance for considering a linear axis "at target" (meters)
+    const float angle_tol = 1e-5f; // position tolerance for considering an angular axis "at target" (radians)
+    auto tol_for = [&](int i){ return (i < 3) ? pos_tol : angle_tol; };
+
+    std::array<float,6> dist;  // signed distance remaining, per axis
+    std::array<float,6> v_cap; // this axis's own max safe speed toward target this cycle
+    for(int i = 0; i < 6; i++){
+        dist[i] = target[i] - current[i];
+
+        float acc = cartesian_limits[i].max_acc;
+        float stop_vel = sqrtf(2.0f * acc * fabsf(dist[i])); // v such that we can still stop exactly at target
+        float v = fminf(cartesian_limits[i].max_vel, stop_vel);
+
+        if(dist[i] > 0)      v = fminf(v, cartesian_distances_to_limit[i].allowed_positive_vel);
+        else if(dist[i] < 0) v = fminf(v, cartesian_distances_to_limit[i].allowed_negative_vel);
+        else                 v = 0.0f;
+
+        v_cap[i] = fmaxf(v, 0.0f);
+    }
+
+    // find the slowest axis (longest time to arrive at its own capped speed) and synchronize
+    // every other axis's speed to match that time, so all 6 arrive together.
+    float t_sync = 0.0f;
+    for(int i = 0; i < 6; i++){
+        if(fabsf(dist[i]) > tol_for(i) && v_cap[i] > 1e-6f){
+            t_sync = fmaxf(t_sync, fabsf(dist[i]) / v_cap[i]);
+        }
+    }
+
+    std::array<float,6> new_pos;
+    for(int i = 0; i < 6; i++){
+        float v_target = 0.0f;
+        if(fabsf(dist[i]) > tol_for(i)){
+            v_target = (t_sync > 1e-6f) ? fabsf(dist[i]) / t_sync : v_cap[i];
+            v_target = fminf(v_target, v_cap[i]); // never exceed this axis's own safe speed
+            v_target = copysignf(v_target, dist[i]);
+        }
+
+        // accel-limit the change from last cycle's commanded velocity
+        float max_dv = cartesian_limits[i].max_acc * time_step;
+        float dv = v_target - move_cartesian_last_vel[i];
+        if(fabsf(dv) > max_dv) v_target = move_cartesian_last_vel[i] + copysignf(max_dv, dv);
+        move_cartesian_last_vel[i] = v_target;
+
+        float step = v_target * time_step;
+        new_pos[i] = current[i] + step;
+
+        // don't overshoot the target
+        if((dist[i] >= 0 && new_pos[i] > target[i]) || (dist[i] < 0 && new_pos[i] < target[i])){
+            new_pos[i] = target[i];
+            move_cartesian_last_vel[i] = 0.0f;
+        }
+    }
+
+    // snapshot before mutating, same convention jog_cartesian()/jog_mouse() use -- inverse_kins()
+    // rolls last_cmd_cartesian_positions back to this snapshot on IK failure or failed validation.
+    prev_cmd_cartesian_positions = last_cmd_cartesian_positions;
+    last_cmd_cartesian_positions = {new_pos[0], new_pos[1], new_pos[2], new_pos[3], new_pos[4], new_pos[5]};
+    inverse_kins(); // solve IK, rate-limit, validate, and write out_sigs.cmd_joint_positions on success
+
+    // check against the post-inverse_kins() state, not the pre-IK ramped new_pos -- if IK failed
+    // this cycle and rolled back, we did not actually reach new_pos and at_cmd_pos must reflect that.
+    std::array<float,6> reached = {
+        last_cmd_cartesian_positions.x, last_cmd_cartesian_positions.y, last_cmd_cartesian_positions.z,
+        last_cmd_cartesian_positions.xangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.zangle
+    };
+    bool all_at_target = true;
+    for(int i = 0; i < 6; i++){
+        if(fabsf(target[i] - reached[i]) > tol_for(i)) all_at_target = false;
     }
     out_sigs.at_cmd_pos = all_at_target;
 }
