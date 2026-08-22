@@ -361,9 +361,12 @@ void kins::update_forward_kinematics_outputs(){
     out_sigs.fbk_cartesian_positions.y = pos_out_tcp[1];
     out_sigs.fbk_cartesian_positions.z = pos_out_tcp[2];
 
-    out_sigs.fbk_cartesian_positions.xangle = euler_out_tcp[0];
+    // euler_out_tcp is [Z-rot, Y-rot, X-rot] (rot_to_euler()'s internal flip + matrixToPose()'s
+    // convention) -- assign so .xangle genuinely means X-rotation and .zangle means Z-rotation,
+    // matching jog_cartesian()/jog_mouse() and inverse_kins().
+    out_sigs.fbk_cartesian_positions.zangle = euler_out_tcp[0]; // Z-rotation
     out_sigs.fbk_cartesian_positions.yangle = euler_out_tcp[1];
-    out_sigs.fbk_cartesian_positions.zangle = euler_out_tcp[2];
+    out_sigs.fbk_cartesian_positions.xangle = euler_out_tcp[2]; // X-rotation
     return;
 }
 
@@ -436,13 +439,13 @@ bool kins::validate_kins_solution(const std::array<float,6>* joint_angles_, cons
     // regardless of which Euler decomposition was used to produce them.
     //
     // Convention in this code:
-    //   xangle = Z-rotation (yaw), yangle = Y-rotation (pitch), zangle = X-rotation (roll)
+    //   xangle = X-rotation (roll), yangle = Y-rotation (pitch), zangle = Z-rotation (yaw)
     //   poseToMatrix(pos, zyx) interprets zyx as [Z-rot, Y-rot, X-rot] → Rz·Ry·Rx
-    // So {xangle, yangle, zangle} maps directly onto the [phi, theta, psi] argument of poseToMatrix.
+    // So {zangle, yangle, xangle} maps onto the [phi, theta, psi] argument of poseToMatrix.
     //
     // Threshold: ||R1 - R2||_F² ≈ 2·θ² for a single-axis error of θ, so the threshold is 2·angle_tol².
     const std::array<float,3> dummy_pos  = {0.0f, 0.0f, 0.0f};
-    const std::array<float,3> target_zyx = {cartesian_pos->xangle, cartesian_pos->yangle, cartesian_pos->zangle};
+    const std::array<float,3> target_zyx = {cartesian_pos->zangle, cartesian_pos->yangle, cartesian_pos->xangle};
     Mat4 T_target = poseToMatrix(dummy_pos, target_zyx);
 
     float frob_sq = 0.0f;
@@ -780,11 +783,27 @@ uint32_t kins::set_move_cartesian_cmd_positions(const cartesian_positions& new_t
 }
 
 void kins::move_cartesian(){
-    // synchronized cartesian-space point-to-point move: ramp all 6 axes toward
-    // move_cartesian_cmd_positions together, respecting each axis's max velocity, max
-    // acceleration, and position limits. The target may change at any time (via
+    // synchronized cartesian-space point-to-point move: ramp x/y/z and a combined 3D orientation
+    // channel toward move_cartesian_cmd_positions together, respecting each channel's max
+    // velocity/acceleration. The target may change at any time (via
     // set_move_cartesian_cmd_positions()); motion replans from the current position/velocity
     // every cycle. IK is solved every cycle via inverse_kins(), same as jog_cartesian().
+    //
+    // Orientation (previously xangle/yangle/zangle ramped as 3 independent Euler-angle scalars)
+    // is ramped as a SINGLE quaternion-slerp channel instead. Independent per-axis Euler ramping
+    // is only a valid stand-in for "shortest path in 3D orientation" away from gimbal lock
+    // (yangle ~= +/-90deg); near gimbal lock a tiny real orientation change can require
+    // xangle/zangle to swing by up to 180deg in the Euler representation, so per-axis ramping
+    // (even shortest-angular-path-per-axis) can command large, wrong-direction wrist motion.
+    // Quaternion slerp interpolates the actual 3D rotation directly and has no such singularity.
+    //
+    // Known limitation: for a config where the angle axes are bounded (non-infinite, e.g.
+    // new_node_config.json's +/-180deg) this channel has no mechanism to keep the interpolated
+    // path's per-axis Euler decomposition within cartesian_limits[3..5].min_pos/max_pos --
+    // set_move_cartesian_cmd_positions() still clamps the *endpoint* into range, but the
+    // intermediate slerp path is not guaranteed to stay in range the way per-axis linear
+    // interpolation used to. Out of scope here; the active config (r2000) has all 3 angle axes
+    // unbounded (continuous).
 
     if(in_sigs.reset){
         // cancel any in-flight move -- resync to the true current pose, same as the CARTESIAN
@@ -793,6 +812,7 @@ void kins::move_cartesian(){
         last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
         move_cartesian_target_valid = true;
         move_cartesian_last_vel.fill(0.0f);
+        move_cartesian_last_ang_vel = 0.0f;
         out_sigs.at_cmd_pos = true;
         return;
     }
@@ -803,36 +823,21 @@ void kins::move_cartesian(){
         return;
     }
 
-    std::array<float,6> current = {
-        last_cmd_cartesian_positions.x, last_cmd_cartesian_positions.y, last_cmd_cartesian_positions.z,
-        last_cmd_cartesian_positions.xangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.zangle
-    };
-    std::array<float,6> target = {
-        move_cartesian_cmd_positions.x, move_cartesian_cmd_positions.y, move_cartesian_cmd_positions.z,
-        move_cartesian_cmd_positions.xangle, move_cartesian_cmd_positions.yangle, move_cartesian_cmd_positions.zangle
-    };
-
-    // xangle/yangle/zangle are angles (periodic mod 2pi), so re-express the target as whichever
-    // equivalent is closest to current -- the shortest angular path -- before computing distance.
-    // Without this, a target/current pair that are physically close but land on different +/-2pi
-    // branches (e.g. an absolute JSON command outside [-pi,pi], or inverse_kins()'s rate-limited
-    // path re-deriving the angle via atan2, which always snaps to the canonical [-pi,pi] range
-    // regardless of the branch the previous cycle was on) would ramp "the long way around": a small
-    // requested change could move far more than requested, in a direction that varies cycle to
-    // cycle depending on which branch happened to be picked.
-    std::array<float,6> eff_target = target;
-    for(int i = 3; i < 6; i++){
-        eff_target[i] = current[i] + wrapPi(target[i] - current[i]);
-    }
-
     const float pos_tol = 1e-5f;   // position tolerance for considering a linear axis "at target" (meters)
-    const float angle_tol = 1e-5f; // position tolerance for considering an angular axis "at target" (radians)
-    auto tol_for = [&](int i){ return (i < 3) ? pos_tol : angle_tol; };
+    const float angle_tol = 1e-5f; // angle tolerance for considering the orientation channel "at target" (radians)
 
-    std::array<float,6> dist;  // signed distance remaining, per axis
-    std::array<float,6> v_cap; // this axis's own max safe speed toward target this cycle
-    for(int i = 0; i < 6; i++){
-        dist[i] = eff_target[i] - current[i];
+    // ---- x, y, z: per-axis accel/vel-limited ramp (unchanged) ----------------------------------
+    std::array<float,3> current = {
+        last_cmd_cartesian_positions.x, last_cmd_cartesian_positions.y, last_cmd_cartesian_positions.z
+    };
+    std::array<float,3> target = {
+        move_cartesian_cmd_positions.x, move_cartesian_cmd_positions.y, move_cartesian_cmd_positions.z
+    };
+
+    std::array<float,3> dist;  // signed distance remaining, per axis
+    std::array<float,3> v_cap; // this axis's own max safe speed toward target this cycle
+    for(int i = 0; i < 3; i++){
+        dist[i] = target[i] - current[i];
 
         float acc = cartesian_limits[i].max_acc;
         float stop_vel = sqrtf(2.0f * acc * fabsf(dist[i])); // v such that we can still stop exactly at target
@@ -845,19 +850,42 @@ void kins::move_cartesian(){
         v_cap[i] = fmaxf(v, 0.0f);
     }
 
-    // find the slowest axis (longest time to arrive at its own capped speed) and synchronize
-    // every other axis's speed to match that time, so all 6 arrive together.
+    // ---- orientation: single combined quaternion-slerp channel ---------------------------------
+    quat_rot q_current = quatFromZYX(last_cmd_cartesian_positions.zangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.xangle);
+    quat_rot q_target  = quatFromZYX(move_cartesian_cmd_positions.zangle,  move_cartesian_cmd_positions.yangle,  move_cartesian_cmd_positions.xangle);
+
+    // total remaining rotation angle, shortest path, radians -- see quat_angle_between().
+    float ang_dist = quat_angle_between(q_current, q_target);
+
+    // combined max_vel/max_acc for the orientation channel: the most conservative (MIN) of the 3
+    // configured angle-axis limits. A single physical TCP can't be told "rotate at X deg/s about
+    // combined axis A but only Y deg/s about combined axis B" -- a single scalar cap per channel
+    // is the closest sane approximation without a genuinely axis-decomposed 3D angular-rate-limit
+    // model. cartesian_distances_to_limit[3..5] (per-axis Euler position-limit throttling) is
+    // intentionally NOT applied to this channel -- see the known-limitation note above.
+    float ang_max_vel = fminf(fminf(cartesian_limits[3].max_vel, cartesian_limits[4].max_vel), cartesian_limits[5].max_vel);
+    float ang_max_acc = fminf(fminf(cartesian_limits[3].max_acc, cartesian_limits[4].max_acc), cartesian_limits[5].max_acc);
+
+    float ang_stop_vel = sqrtf(2.0f * ang_max_acc * ang_dist); // v such that we can still stop exactly at target
+    float ang_v_cap = fmaxf(fminf(ang_max_vel, ang_stop_vel), 0.0f);
+
+    // find the slowest channel (longest time to arrive at its own capped speed) and synchronize
+    // every other channel's speed to match that time, so translation and reorientation finish
+    // together.
     float t_sync = 0.0f;
-    for(int i = 0; i < 6; i++){
-        if(fabsf(dist[i]) > tol_for(i) && v_cap[i] > 1e-6f){
+    for(int i = 0; i < 3; i++){
+        if(fabsf(dist[i]) > pos_tol && v_cap[i] > 1e-6f){
             t_sync = fmaxf(t_sync, fabsf(dist[i]) / v_cap[i]);
         }
     }
+    if(ang_dist > angle_tol && ang_v_cap > 1e-6f){
+        t_sync = fmaxf(t_sync, ang_dist / ang_v_cap);
+    }
 
-    std::array<float,6> new_pos;
-    for(int i = 0; i < 6; i++){
+    std::array<float,3> new_pos;
+    for(int i = 0; i < 3; i++){
         float v_target = 0.0f;
-        if(fabsf(dist[i]) > tol_for(i)){
+        if(fabsf(dist[i]) > pos_tol){
             v_target = (t_sync > 1e-6f) ? fabsf(dist[i]) / t_sync : v_cap[i];
             v_target = fminf(v_target, v_cap[i]); // never exceed this axis's own safe speed
             v_target = copysignf(v_target, dist[i]);
@@ -873,32 +901,75 @@ void kins::move_cartesian(){
         new_pos[i] = current[i] + step;
 
         // don't overshoot the target
-        if((dist[i] >= 0 && new_pos[i] > eff_target[i]) || (dist[i] < 0 && new_pos[i] < eff_target[i])){
-            new_pos[i] = eff_target[i];
+        if((dist[i] >= 0 && new_pos[i] > target[i]) || (dist[i] < 0 && new_pos[i] < target[i])){
+            new_pos[i] = target[i];
             move_cartesian_last_vel[i] = 0.0f;
         }
     }
 
+    // orientation channel: same stop-distance / sync-to-t_sync / accel-limit-from-last-cycle
+    // pattern as x/y/z above, but as a single non-negative scalar speed -- direction is encoded
+    // entirely in q_current/q_target/slerp(), there is no separate sign to track.
+    float ang_v_target = 0.0f;
+    if(ang_dist > angle_tol){
+        ang_v_target = (t_sync > 1e-6f) ? ang_dist / t_sync : ang_v_cap;
+        ang_v_target = fminf(ang_v_target, ang_v_cap); // never exceed this channel's own safe speed
+    }
+
+    float ang_max_dv = ang_max_acc * time_step;
+    float ang_dv = ang_v_target - move_cartesian_last_ang_vel;
+    if(fabsf(ang_dv) > ang_max_dv) ang_v_target = move_cartesian_last_ang_vel + copysignf(ang_max_dv, ang_dv);
+    // unlike x/y/z's v_target, this channel has no reverse direction -- accel-limiting toward a
+    // shrinking target could otherwise drive it negative, which would feed slerp() a negative
+    // fraction (extrapolating backward past q_current instead of a no-op).
+    ang_v_target = fmaxf(ang_v_target, 0.0f);
+    move_cartesian_last_ang_vel = ang_v_target;
+
+    float ang_step = ang_v_target * time_step; // this cycle's rotation step, radians
+
+    quat_rot q_new;
+    if(ang_dist > angle_tol){
+        float frac = ang_step / ang_dist; // slerp fraction, using ang_dist measured at cycle start
+        if(frac >= 1.0f){
+            // don't overshoot the target
+            q_new = q_target;
+            move_cartesian_last_ang_vel = 0.0f;
+        } else {
+            q_new = slerp(q_current, q_target, frac);
+        }
+    } else {
+        q_new = q_current; // already within tolerance -- hold, same as the linear axes do
+    }
+
+    float new_zangle, new_yangle, new_xangle;
+    toEulerZYX(&q_new, &new_zangle, &new_yangle, &new_xangle);
+
     // snapshot before mutating, same convention jog_cartesian()/jog_mouse() use -- inverse_kins()
     // rolls last_cmd_cartesian_positions back to this snapshot on IK failure or failed validation.
     prev_cmd_cartesian_positions = last_cmd_cartesian_positions;
-    last_cmd_cartesian_positions = {new_pos[0], new_pos[1], new_pos[2], new_pos[3], new_pos[4], new_pos[5]};
+    last_cmd_cartesian_positions = {new_pos[0], new_pos[1], new_pos[2], new_xangle, new_yangle, new_zangle};
     inverse_kins(); // solve IK, rate-limit, validate, and write out_sigs.cmd_joint_positions on success
 
     // check against the post-inverse_kins() state, not the pre-IK ramped new_pos -- if IK failed
-    // this cycle and rolled back, we did not actually reach new_pos and at_cmd_pos must reflect that.
-    std::array<float,6> reached = {
-        last_cmd_cartesian_positions.x, last_cmd_cartesian_positions.y, last_cmd_cartesian_positions.z,
-        last_cmd_cartesian_positions.xangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.zangle
+    // this cycle and rolled back, we did not actually reach new_pos and at_cmd_pos must reflect
+    // that.
+    std::array<float,3> reached = {
+        last_cmd_cartesian_positions.x, last_cmd_cartesian_positions.y, last_cmd_cartesian_positions.z
     };
     bool all_at_target = true;
-    for(int i = 0; i < 6; i++){
-        // wrap-aware error for angle axes: reached[i] may be on a different +/-2pi branch than
-        // target[i] (e.g. inverse_kins()'s rate-limited path re-derives it via atan2), so compare
-        // the shortest angular distance, not the raw numeric difference.
-        float err = (i < 3) ? (target[i] - reached[i]) : wrapPi(target[i] - reached[i]);
-        if(fabsf(err) > tol_for(i)) all_at_target = false;
+    for(int i = 0; i < 3; i++){
+        if(fabsf(target[i] - reached[i]) > pos_tol) all_at_target = false;
     }
+
+    // orientation: shortest-path rotation angle between the post-inverse_kins() reached
+    // orientation and the target orientation -- NOT a per-axis Euler comparison. At/near gimbal
+    // lock, toEulerZYX() (and inverse_kins()'s rate-limited-path re-derivation via
+    // atan2/matrixToPose) can land on a different xangle/zangle split than commanded for the
+    // exact same physical orientation, so a per-axis Euler comparison would false-trigger here --
+    // same reasoning validate_kins_solution() already uses its rotation-matrix Frobenius check for.
+    quat_rot q_reached = quatFromZYX(last_cmd_cartesian_positions.zangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.xangle);
+    if(quat_angle_between(q_reached, q_target) > angle_tol) all_at_target = false;
+
     out_sigs.at_cmd_pos = all_at_target;
 }
 
@@ -909,10 +980,14 @@ void kins::inverse_kins(){
         last_cmd_cartesian_positions.y,
         last_cmd_cartesian_positions.z
     };
+    // poseToMatrix()/matrixToPose() interpret this array as [Z-rot, Y-rot, X-rot] (see
+    // validate_kins_solution()'s convention note), so build it from zangle/yangle/xangle in that
+    // order -- this is what makes .xangle genuinely mean "rotate about physical X" and .zangle mean
+    // "rotate about physical Z", matching jog_cartesian()/jog_mouse()'s convention.
     std::array<float,3> target_euler_tool = {
-        last_cmd_cartesian_positions.xangle,
-        last_cmd_cartesian_positions.yangle,
-        last_cmd_cartesian_positions.zangle
+        last_cmd_cartesian_positions.zangle,  // zyx[0] = Z-rotation
+        last_cmd_cartesian_positions.yangle,  // zyx[1] = Y-rotation
+        last_cmd_cartesian_positions.xangle   // zyx[2] = X-rotation
     };
 
     // un-apply tool offset to get the flange position and orientation
@@ -990,9 +1065,9 @@ void kins::inverse_kins(){
         last_cmd_cartesian_positions.x      = target_pos_tool[0];
         last_cmd_cartesian_positions.y      = target_pos_tool[1];
         last_cmd_cartesian_positions.z      = target_pos_tool[2];
-        last_cmd_cartesian_positions.xangle = target_euler_tool[0];
+        last_cmd_cartesian_positions.zangle = target_euler_tool[0];
         last_cmd_cartesian_positions.yangle = target_euler_tool[1];
-        last_cmd_cartesian_positions.zangle = target_euler_tool[2];
+        last_cmd_cartesian_positions.xangle = target_euler_tool[2];
 
         // If rate limiting reduced the step, set the integrator to the FK of the rate-limited
         // joints rather than a proportional interpolation in Cartesian space.
@@ -1035,9 +1110,9 @@ void kins::inverse_kins(){
             last_cmd_cartesian_positions.x      = tcp_pos_rl[0];
             last_cmd_cartesian_positions.y      = tcp_pos_rl[1];
             last_cmd_cartesian_positions.z      = tcp_pos_rl[2];
-            last_cmd_cartesian_positions.xangle = tcp_eul_rl[0];
+            last_cmd_cartesian_positions.zangle = tcp_eul_rl[0];
             last_cmd_cartesian_positions.yangle = tcp_eul_rl[1];
-            last_cmd_cartesian_positions.zangle = tcp_eul_rl[2];
+            last_cmd_cartesian_positions.xangle = tcp_eul_rl[2];
         }
 
         bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.02f, 0.05f);

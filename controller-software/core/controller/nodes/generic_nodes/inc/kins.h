@@ -170,7 +170,8 @@ class kins: public base_node {
 
         cartesian_positions move_cartesian_cmd_positions;  // active synchronized-move target (clamped to cartesian limits by the setter below)
         bool move_cartesian_target_valid = false;          // true once a target has been set
-        std::array<float,6> move_cartesian_last_vel = {0,0,0,0,0,0}; // last commanded velocity per cartesian axis (for accel limiting)
+        std::array<float,3> move_cartesian_last_vel = {0,0,0}; // last commanded velocity per linear axis (x,y,z; for accel limiting)
+        float move_cartesian_last_ang_vel = 0.0f; // last commanded angular speed for the combined orientation (slerp) channel (for accel limiting)
         uint32_t set_move_cartesian_cmd_positions(const cartesian_positions& new_target); // called by the JSON command handler to set a new synchronized-move target
         void move_cartesian();
 
@@ -304,6 +305,17 @@ class kins: public base_node {
                 A.y*w1 + T.y*w2,
                 A.z*w1 + T.z*w2
             });
+        }
+
+        // physical 3D rotation angle to go from orientation A to orientation B (radians, range
+        // [0, pi]), shortest path (quaternion double-cover: q and -q represent the same
+        // orientation -- same hemisphere-selection idea as slerp()'s own sign flip above). Used
+        // by move_cartesian()'s combined orientation channel both to size the remaining-distance
+        // ramp and to check at_cmd_pos.
+        float quat_angle_between(const quat_rot &A, const quat_rot &B) {
+            float dot = A.w*B.w + A.x*B.x + A.y*B.y + A.z*B.z;
+            dot = fminf(fabsf(dot), 1.0f); // clamp -- dot can slightly exceed 1 from float roundoff, which would make acosf return NaN
+            return 2.0f * acosf(dot);
         }
 
 
