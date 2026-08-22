@@ -126,8 +126,31 @@ uint32_t kins::run(){
     // update inputs
     update_inputs();
 
+    if(!cmd_joint_positions_initialized){
+        // out_sigs.cmd_joint_positions otherwise defaults to all-zero, which is essentially never
+        // the robot's real joint configuration. move_joints()'s ramp "current", inverse_kins()'s IK
+        // initial guess, and clamp_to_joint_limits()'s baseline all depend on this being correct
+        // from cycle 1, not just after the first reset or JOG+JOINT jog.
+        out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
+        last_output_joint_positions = out_sigs.cmd_joint_positions;
+        cmd_joint_positions_initialized = true;
+    }
+
+    if(in_sigs.tool_select != last_tool_select || in_sigs.reset){
+        select_tool(in_sigs.tool_select);
+        last_tool_select = in_sigs.tool_select;
+    }
+
     // update forward kinematics outputs (so we always have the current cartesian position)
     update_forward_kinematics_outputs();
+
+    if(in_sigs.control_mode == control_modes::CARTESIAN && (last_control_mode != control_modes::CARTESIAN || in_sigs.reset)){
+        // last_cmd_cartesian_positions is only kept in sync by inverse_kins() (called from
+        // jog_cartesian/jog_mouse/move_cartesian); if we just arrived here from JOINT mode or JOG
+        // mode it can be stale. Resync here, before update_cartesian_distances_to_limit() runs below,
+        // so this cycle's velocity caps are computed from the correct position.
+        last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
+    }
 
     update_joint_distances_to_limit();
     update_cartesian_distances_to_limit();
@@ -135,12 +158,7 @@ uint32_t kins::run(){
     switch(in_sigs.control_mode){
         case control_modes::JOG:
             // update joint positions based on jog inputs
-
-            if(in_sigs.jog_mode != last_jog_mode || in_sigs.reset){
-                // tool changes only apply when the mode is changed or the reset is triggered
-                select_tool(in_sigs.tool_select); // select the tool based on the input
-                update_forward_kinematics_outputs();    // recalculate in the event the tool changed
-            }
+            // (tool selection and forward kinematics are already handled above, unconditionally)
 
             switch(in_sigs.jog_mode){
                 case jog_modes::JOINT:
@@ -190,12 +208,6 @@ uint32_t kins::run(){
             break;
 
         case control_modes::CARTESIAN:
-            if(last_control_mode != control_modes::CARTESIAN || in_sigs.reset){
-                // last_cmd_cartesian_positions is only kept in sync by inverse_kins() (called from
-                // jog_cartesian/jog_mouse/move_cartesian); if we just arrived here from JOINT mode
-                // or JOG mode it can be stale, so resync it to the true current pose.
-                last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
-            }
             // commanded cartesian positions are directly set by the API
             // accel, vel, and position limits are applied, speed is scaled
             // cartesian axes move in sync, IK solved every cycle via inverse_kins()
@@ -800,6 +812,19 @@ void kins::move_cartesian(){
         move_cartesian_cmd_positions.xangle, move_cartesian_cmd_positions.yangle, move_cartesian_cmd_positions.zangle
     };
 
+    // xangle/yangle/zangle are angles (periodic mod 2pi), so re-express the target as whichever
+    // equivalent is closest to current -- the shortest angular path -- before computing distance.
+    // Without this, a target/current pair that are physically close but land on different +/-2pi
+    // branches (e.g. an absolute JSON command outside [-pi,pi], or inverse_kins()'s rate-limited
+    // path re-deriving the angle via atan2, which always snaps to the canonical [-pi,pi] range
+    // regardless of the branch the previous cycle was on) would ramp "the long way around": a small
+    // requested change could move far more than requested, in a direction that varies cycle to
+    // cycle depending on which branch happened to be picked.
+    std::array<float,6> eff_target = target;
+    for(int i = 3; i < 6; i++){
+        eff_target[i] = current[i] + wrapPi(target[i] - current[i]);
+    }
+
     const float pos_tol = 1e-5f;   // position tolerance for considering a linear axis "at target" (meters)
     const float angle_tol = 1e-5f; // position tolerance for considering an angular axis "at target" (radians)
     auto tol_for = [&](int i){ return (i < 3) ? pos_tol : angle_tol; };
@@ -807,7 +832,7 @@ void kins::move_cartesian(){
     std::array<float,6> dist;  // signed distance remaining, per axis
     std::array<float,6> v_cap; // this axis's own max safe speed toward target this cycle
     for(int i = 0; i < 6; i++){
-        dist[i] = target[i] - current[i];
+        dist[i] = eff_target[i] - current[i];
 
         float acc = cartesian_limits[i].max_acc;
         float stop_vel = sqrtf(2.0f * acc * fabsf(dist[i])); // v such that we can still stop exactly at target
@@ -848,8 +873,8 @@ void kins::move_cartesian(){
         new_pos[i] = current[i] + step;
 
         // don't overshoot the target
-        if((dist[i] >= 0 && new_pos[i] > target[i]) || (dist[i] < 0 && new_pos[i] < target[i])){
-            new_pos[i] = target[i];
+        if((dist[i] >= 0 && new_pos[i] > eff_target[i]) || (dist[i] < 0 && new_pos[i] < eff_target[i])){
+            new_pos[i] = eff_target[i];
             move_cartesian_last_vel[i] = 0.0f;
         }
     }
@@ -868,7 +893,11 @@ void kins::move_cartesian(){
     };
     bool all_at_target = true;
     for(int i = 0; i < 6; i++){
-        if(fabsf(target[i] - reached[i]) > tol_for(i)) all_at_target = false;
+        // wrap-aware error for angle axes: reached[i] may be on a different +/-2pi branch than
+        // target[i] (e.g. inverse_kins()'s rate-limited path re-derives it via atan2), so compare
+        // the shortest angular distance, not the raw numeric difference.
+        float err = (i < 3) ? (target[i] - reached[i]) : wrapPi(target[i] - reached[i]);
+        if(fabsf(err) > tol_for(i)) all_at_target = false;
     }
     out_sigs.at_cmd_pos = all_at_target;
 }

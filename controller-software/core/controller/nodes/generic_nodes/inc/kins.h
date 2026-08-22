@@ -145,6 +145,10 @@ class kins: public base_node {
 
         control_modes last_control_mode = control_modes::UNDEFINED; // last control mode used, to detect CARTESIAN-mode entry and resync last_cmd_cartesian_positions
 
+        bool cmd_joint_positions_initialized = false; // true once out_sigs.cmd_joint_positions has been seeded from feedback
+
+        uint8_t last_tool_select = 0; // last tool_select value, to detect changes regardless of control mode
+
         float last_joint_jog_vel = 0.0f; // last jog vel used, to limit acceleration
         void jog_joint(uint8_t jog_axis, float jog_vel, float speed_override);
 
@@ -556,7 +560,10 @@ class kins: public base_node {
                             std::cerr << "Missing or invalid 'absolute' field in joint command." << std::endl;
                             return 1; // error code for configuration failure
                         }
-                        joint_positions new_cmd_positions = move_joint_cmd_positions; // start with existing values
+                        // seed from live feedback until a target has actually been commanded, so any
+                        // axis this call doesn't specify defaults to the real current position instead
+                        // of the struct-default 0
+                        joint_positions new_cmd_positions = move_joint_target_valid ? move_joint_cmd_positions : in_sigs.fbk_joint_positions;
                         for(int i = 0; i < 6; i++){
                             std::string joint_name = std::to_string(i+1);
                             if(joint_cmds.find(joint_name) == joint_cmds.end()){
@@ -606,7 +613,10 @@ class kins: public base_node {
                             std::cerr << "Missing or invalid 'absolute' field in cartesian command." << std::endl;
                             return 1; // error code for configuration failure
                         }
-                        cartesian_positions new_cmd_positions = move_cartesian_cmd_positions; // start with existing values
+                        // seed from live feedback until a target has actually been commanded, so any
+                        // axis this call doesn't specify defaults to the real current pose instead of
+                        // the struct-default 0 (which is nowhere near a real TCP position)
+                        cartesian_positions new_cmd_positions = move_cartesian_target_valid ? move_cartesian_cmd_positions : out_sigs.fbk_cartesian_positions;
                         for(int i = 0; i < 6; i++){
                             std::string axis_name = "";
                             switch(i){
