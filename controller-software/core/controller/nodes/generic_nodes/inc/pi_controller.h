@@ -46,7 +46,7 @@ class pi_controller: public base_node {
                         output = output_max;
                         out_sat = true;
                     }
-                    if(output < output_min){
+                    else if(output < output_min){
                         output = output_min;
                         out_sat = true;
                     }

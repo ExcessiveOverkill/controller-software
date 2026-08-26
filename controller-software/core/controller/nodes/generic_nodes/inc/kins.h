@@ -43,6 +43,8 @@ class kins: public base_node {
 
             input* reset = nullptr;
 
+            input* collision_detected = nullptr;
+
         } in_sig_ptrs;
 
         struct joint_limit{
@@ -94,6 +96,12 @@ class kins: public base_node {
             UNDEFINED = 0
         };
 
+        enum class backup_state{
+            IDLE = 0,          // normal operation -- dispatch goes through switch(control_mode), history is recorded
+            RETRACING = 1,     // collision_detected is true -- driving backward through recorded history
+            DECELERATING = 2   // collision_detected just fell -- ramping residual velocity to zero, normal accel limits
+        };
+
         struct input_signals{
             joint_positions fbk_joint_positions;
             float jog_vel = 0.0f;
@@ -105,6 +113,7 @@ class kins: public base_node {
             joint_positions cmd_joint_positions;
             uint8_t tool_select = 0;
             bool reset = false;
+            bool collision_detected = false;
 
         } in_sigs;
 
@@ -112,6 +121,7 @@ class kins: public base_node {
             joint_positions cmd_joint_positions;
             cartesian_positions fbk_cartesian_positions;    // commanded cartesian position, not raw feedback from the robot
             bool at_cmd_pos = false;
+            bool backup_buffer_exhausted = false;
         } out_sigs;
 
         InverseKinematics ik_solver;
@@ -174,6 +184,47 @@ class kins: public base_node {
         float move_cartesian_last_ang_vel = 0.0f; // last commanded angular speed for the combined orientation (slerp) channel (for accel limiting)
         uint32_t set_move_cartesian_cmd_positions(const cartesian_positions& new_target); // called by the JSON command handler to set a new synchronized-move target
         void move_cartesian();
+
+        // --- collision backup (retrace-path) ---
+        // Circular history of commanded joint positions, recorded while in JOINT/CARTESIAN control
+        // mode. On a collision_detected rising edge, motion immediately abandons whatever it was
+        // doing (no decel ramp) and drives backward through this history at a reduced configurable
+        // speed until either collision_detected clears or the history runs out. Joint positions are
+        // stored (not cartesian) so retracing can never resolve to a different IK branch than the
+        // one actually taken on the way out.
+        std::array<joint_positions, 100> backup_buffer;
+        size_t backup_write_index = 0;     // next slot to write into, wraps mod backup_buffer.size()
+        size_t backup_count = 0;           // number of valid entries currently held, 0..backup_buffer.size()
+        cartesian_positions backup_last_recorded_cartesian; // fbk_cartesian_positions at the last recorded point (cartesian threshold reference)
+
+        backup_state collision_backup_state = backup_state::IDLE;
+        bool last_collision_detected = false; // for edge-detection / debugging
+
+        std::array<float,6> backup_last_vel = {0,0,0,0,0,0}; // accel-limit velocity memory for the backup ramp --
+                                                               // kept separate from move_joint_last_vel so a normal
+                                                               // move and a backup retrace never share/corrupt each
+                                                               // other's ramp state
+
+        float backup_speed_scale = 0.25f; // portion of each joint's max_vel used during collision-backup retrace (same convention as max_jog_speed)
+        float backup_record_joint_threshold = 1.0f * M_PI / 180.0f; // radians -- largest single-joint delta before a new backup history point is recorded (default 1deg)
+        float backup_record_cartesian_threshold = 0.005f; // meters -- TCP position delta before a new backup history point is recorded (default 5mm)
+
+        // index of the most-recently-recorded/retrace-target entry; only meaningful when backup_count > 0
+        size_t backup_newest_index() const {
+            return (backup_write_index + backup_buffer.size() - 1) % backup_buffer.size();
+        }
+
+        void record_backup_point();      // append the current commanded joint position if it moved far enough since the last recorded point
+        void start_collision_backup();   // collision_detected rising edge (or a reassertion mid-decel): abandon the in-flight move and begin retracing
+        void run_backup_retrace();       // per-cycle: drive toward the newest buffered point, popping it once reached
+        void begin_backup_decel();       // collision_detected falling edge: stop retracing, rewind the popped-but-unreached waypoint, begin decel
+        void run_backup_decel();         // per-cycle: ramp residual velocity to zero under normal accel limits, then resync and go IDLE
+
+        // shared trapezoidal ramp core (used by both move_joints() and the backup retrace) --
+        // ramps out_sigs.cmd_joint_positions toward target, capping each joint's velocity at
+        // joint_limits[i].max_vel * speed_scale (acceleration is never scaled), accel-limiting the
+        // change from last_vel. Returns true once every joint is within tolerance of target.
+        bool ramp_joints_to_target(const joint_positions& target, float speed_scale, std::array<float,6>& last_vel);
 
         void inverse_kins();
 
@@ -377,6 +428,11 @@ class kins: public base_node {
                 },
 
                 "max_jog_speed": .1,    // max speed for jogging, as a portion of the joint max_vel
+
+                "backup_speed_scale": 0.25,                 // portion of each joint's max_vel used during collision-backup retrace (same convention as max_jog_speed)
+                "backup_record_joint_threshold": 1.0,       // degrees, largest single-joint delta before a new backup history point is recorded
+                "backup_record_cartesian_threshold": 0.005, // meters, TCP position delta before a new backup history point is recorded
+
                 "cartesian_limits":{   // cartesian limits for the end effector
                     "x":{
                         "min_pos": -.2,
@@ -479,6 +535,33 @@ class kins: public base_node {
                 else {
                     max_jog_speed_set = true;
                 }
+            }
+
+            if(json->find("backup_speed_scale") != json->end()){
+                float scale = (*json)["backup_speed_scale"].get<float>();
+                if(scale < 0.0f || scale > 1.0f){
+                    std::cerr << "Invalid backup speed scale, must be between 0.0 and 1.0." << std::endl;
+                    return 1; // error code for configuration failure
+                }
+                backup_speed_scale = scale;
+            }
+
+            if(json->find("backup_record_joint_threshold") != json->end()){
+                float threshold = (*json)["backup_record_joint_threshold"].get<float>();
+                if(threshold < 0.0f){
+                    std::cerr << "Invalid backup joint recording threshold, must be >= 0." << std::endl;
+                    return 1; // error code for configuration failure
+                }
+                backup_record_joint_threshold = threshold * M_PI / 180.0f; // convert degrees to radians
+            }
+
+            if(json->find("backup_record_cartesian_threshold") != json->end()){
+                float threshold = (*json)["backup_record_cartesian_threshold"].get<float>();
+                if(threshold < 0.0f){
+                    std::cerr << "Invalid backup cartesian recording threshold, must be >= 0." << std::endl;
+                    return 1; // error code for configuration failure
+                }
+                backup_record_cartesian_threshold = threshold;
             }
 
             if(json->find("cartesian_limits") != json->end()){

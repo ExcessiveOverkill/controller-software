@@ -73,6 +73,9 @@ void kins::create_inputs(){
 
     inputs.emplace("reset", input(io_type::BOOL, nullptr));
     in_sig_ptrs.reset = &inputs["reset"];
+
+    inputs.emplace("collision_detected", input(io_type::BOOL, nullptr));
+    in_sig_ptrs.collision_detected = &inputs["collision_detected"];
 }
 
 void kins::create_outputs(){
@@ -90,6 +93,7 @@ void kins::create_outputs(){
     outputs.emplace("yangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.yangle), &execution_number));
     outputs.emplace("zangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.zangle), &execution_number));
     outputs.emplace("at_cmd_pos", output(io_type::BOOL, &(out_sigs.at_cmd_pos), &execution_number));
+    outputs.emplace("backup_buffer_exhausted", output(io_type::BOOL, &(out_sigs.backup_buffer_exhausted), &execution_number));
 }
 
 void kins::update_inputs(){
@@ -118,6 +122,7 @@ void kins::update_inputs(){
     in_sigs.cmd_joint_positions.j6 = *(double*)(in_sig_ptrs.j6_cmd_pos->data_pointer);
     in_sigs.tool_select = *(uint8_t*)(in_sig_ptrs.tool_select->data_pointer);
     in_sigs.reset = *(bool*)(in_sig_ptrs.reset->data_pointer);
+    in_sigs.collision_detected = *(bool*)(in_sig_ptrs.collision_detected->data_pointer);
 
     in_sigs.speed_override = fmax(0.001f, fmin(in_sigs.speed_override, 1.0f)); // clamp speed override to [0.001, 1]
 }
@@ -144,6 +149,40 @@ uint32_t kins::run(){
     // update forward kinematics outputs (so we always have the current cartesian position)
     update_forward_kinematics_outputs();
 
+    if(in_sigs.control_mode != last_control_mode){
+        // Control mode just changed (in either direction, e.g. JOG -> CARTESIAN, JOINT -> JOG,
+        // etc.) -- invalidate any previously-stored synchronized-move target for BOTH joint and
+        // cartesian moves, regardless of which mode set it. Without this, a "set joint"/"set
+        // cartesian" command sent while in a *different* control mode (most commonly JOG) stays
+        // latched in move_joint_cmd_positions/move_cartesian_cmd_positions, and the instant the
+        // mode is switched into JOINT/CARTESIAN, move_joints()/move_cartesian() would immediately
+        // start moving toward that stale target with no new command ever having been issued in
+        // the now-active mode.
+        //
+        // Deliberately target_valid = FALSE here, not true: move_joints()/move_cartesian() both
+        // early-return the instant their target_valid flag is false, WITHOUT calling
+        // inverse_kins() at all -- that early-return is what keeps the IK solver from running
+        // every single cycle when no real command has been issued yet in the new mode. Setting
+        // target_valid = true instead (target := current position, so distance is zero) looks
+        // equivalent at first glance, but it is not: it forces move_cartesian() to execute its
+        // full ramp + inverse_kins() body every cycle, forever, from the moment the mode is
+        // entered -- a large, unconditional new CPU cost at this 1kHz loop (time_step = 0.001f),
+        // and if that solve ever fails to converge from whatever guess exists at that instant, it
+        // burns the full 50-iteration cap every cycle indefinitely, which is exactly the "IK
+        // taking way longer than it should, missing IRQs" regression this replaces.
+        // (move_joint_cmd_positions/move_cartesian_cmd_positions are still snapped to the current
+        // position below, purely so a "get" query reports the real current position rather than a
+        // stale prior target -- they are not used as a ramp target while target_valid is false.)
+        move_joint_cmd_positions = out_sigs.cmd_joint_positions;
+        move_joint_target_valid = false;
+        move_joint_last_vel.fill(0.0f);
+
+        move_cartesian_cmd_positions = out_sigs.fbk_cartesian_positions;
+        move_cartesian_target_valid = false;
+        move_cartesian_last_vel.fill(0.0f);
+        move_cartesian_last_ang_vel = 0.0f;
+    }
+
     if(in_sigs.control_mode == control_modes::CARTESIAN && (last_control_mode != control_modes::CARTESIAN || in_sigs.reset)){
         // last_cmd_cartesian_positions is only kept in sync by inverse_kins() (called from
         // jog_cartesian/jog_mouse/move_cartesian); if we just arrived here from JOINT mode or JOG
@@ -155,6 +194,32 @@ uint32_t kins::run(){
     update_joint_distances_to_limit();
     update_cartesian_distances_to_limit();
 
+    // ---- collision backup (retrace-path) edge detection & dispatch ----
+    // Phrased directly off collision_backup_state (not just a raw last_collision_detected edge)
+    // so a reassertion of collision_detected while still DECELERATING immediately re-arms
+    // RETRACING -- a live collision signal always wins over an in-progress graceful stop.
+    bool collision_rising = in_sigs.collision_detected && collision_backup_state != backup_state::RETRACING;
+    bool collision_falling = !in_sigs.collision_detected && collision_backup_state == backup_state::RETRACING;
+
+    if(collision_rising && cmd_joint_positions_initialized &&
+       (in_sigs.control_mode == control_modes::JOINT || in_sigs.control_mode == control_modes::CARTESIAN)){
+        start_collision_backup();
+    }
+    if(collision_falling){
+        begin_backup_decel();
+    }
+    last_collision_detected = in_sigs.collision_detected;
+
+    if(collision_backup_state == backup_state::RETRACING){
+        // collision backup in progress -- overrides the normal control-mode dispatch entirely,
+        // driving purely in joint space regardless of which control mode was active when
+        // collision_detected first fired.
+        run_backup_retrace();
+    }
+    else if(collision_backup_state == backup_state::DECELERATING){
+        run_backup_decel();
+    }
+    else
     switch(in_sigs.control_mode){
         case control_modes::JOG:
             // update joint positions based on jog inputs
@@ -220,9 +285,23 @@ uint32_t kins::run(){
         // reset the commanded joint positions to the current positions
         out_sigs.cmd_joint_positions = in_sigs.fbk_joint_positions;
         last_output_joint_positions = out_sigs.cmd_joint_positions;
+
+        // reset overrides/cancels any in-progress collision backup, same "cancel and resync to
+        // feedback" role reset already plays for normal moves above
+        collision_backup_state = backup_state::IDLE;
+        backup_last_vel.fill(0.0f);
     }
-    
+
     bool on_joint_limit = clamp_to_joint_limits();  // clamp the commanded joint positions to the limits as a failsafe
+
+    // record collision-backup history from the fully-finalized, clamped output for this cycle --
+    // only while not itself backing up (don't record the retreating path while retracing it), and
+    // only for JOINT/CARTESIAN moves (this feature does not apply to JOG).
+    if(collision_backup_state == backup_state::IDLE && cmd_joint_positions_initialized &&
+       (in_sigs.control_mode == control_modes::JOINT || in_sigs.control_mode == control_modes::CARTESIAN)){
+        record_backup_point();
+    }
+    out_sigs.backup_buffer_exhausted = (collision_backup_state == backup_state::RETRACING && backup_count == 0);
 
 
 
@@ -615,6 +694,13 @@ void kins::jog_mouse(){
 
 uint32_t kins::set_move_joint_cmd_positions(const joint_positions& new_target){
 
+    if(collision_backup_state != backup_state::IDLE){
+        // reject new move targets while a collision backup is retracing or decelerating -- the
+        // robot must not resume forward motion until it has fully stopped and collision_detected
+        // has cleared.
+        return 1;
+    }
+
     double prev[6] = {
         move_joint_cmd_positions.j1, move_joint_cmd_positions.j2, move_joint_cmd_positions.j3,
         move_joint_cmd_positions.j4, move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
@@ -676,15 +762,25 @@ void kins::move_joints(){
         return;
     }
 
+    out_sigs.at_cmd_pos = ramp_joints_to_target(move_joint_cmd_positions, 1.0f, move_joint_last_vel);
+}
+
+bool kins::ramp_joints_to_target(const joint_positions& target_, float speed_scale, std::array<float,6>& last_vel){
+    // shared trapezoidal ramp core -- extracted from move_joints() so the collision-backup
+    // retrace (run_backup_retrace()) can drive the exact same accel-limited, synchronized-arrival
+    // motion profile at a reduced speed cap, without duplicating this logic. speed_scale only
+    // caps the velocity ceiling (joint_limits[i].max_vel * speed_scale); the stop-distance
+    // calculation and the accel limit itself (joint_limits[i].max_acc) are never scaled, so
+    // acceleration/deceleration behavior is identical between a normal move and a backup retrace --
+    // only the top speed differs.
+
     std::array<double,6> current = {
         out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
         out_sigs.cmd_joint_positions.j3, out_sigs.cmd_joint_positions.j4,
         out_sigs.cmd_joint_positions.j5, out_sigs.cmd_joint_positions.j6
     };
     std::array<double,6> target = {
-        move_joint_cmd_positions.j1, move_joint_cmd_positions.j2,
-        move_joint_cmd_positions.j3, move_joint_cmd_positions.j4,
-        move_joint_cmd_positions.j5, move_joint_cmd_positions.j6
+        target_.j1, target_.j2, target_.j3, target_.j4, target_.j5, target_.j6
     };
 
     const double pos_tol = 1e-5; // position tolerance for considering a joint "at target"
@@ -696,7 +792,7 @@ void kins::move_joints(){
 
         float acc = joint_limits[i].max_acc;
         float stop_vel = sqrtf(2.0f * acc * (float)fabs(dist[i])); // v such that we can still stop exactly at target
-        float v = fminf(joint_limits[i].max_vel, stop_vel);
+        float v = fminf(joint_limits[i].max_vel * speed_scale, stop_vel);
 
         if(dist[i] > 0)      v = fminf(v, joint_distances_to_limit[i].allowed_positive_vel);
         else if(dist[i] < 0) v = fminf(v, joint_distances_to_limit[i].allowed_negative_vel);
@@ -725,9 +821,9 @@ void kins::move_joints(){
 
         // accel-limit the change from last cycle's commanded velocity
         float max_dv = joint_limits[i].max_acc * time_step;
-        float dv = v_target - move_joint_last_vel[i];
-        if(fabs(dv) > max_dv) v_target = move_joint_last_vel[i] + copysignf(max_dv, dv);
-        move_joint_last_vel[i] = v_target;
+        float dv = v_target - last_vel[i];
+        if(fabs(dv) > max_dv) v_target = last_vel[i] + copysignf(max_dv, dv);
+        last_vel[i] = v_target;
 
         double step = (double)v_target * time_step;
         new_pos[i] = current[i] + step;
@@ -735,7 +831,7 @@ void kins::move_joints(){
         // don't overshoot the target
         if((dist[i] >= 0 && new_pos[i] > target[i]) || (dist[i] < 0 && new_pos[i] < target[i])){
             new_pos[i] = target[i];
-            move_joint_last_vel[i] = 0.0f;
+            last_vel[i] = 0.0f;
         }
     }
 
@@ -745,10 +841,17 @@ void kins::move_joints(){
     for(int i = 0; i < 6; i++){
         if(fabs(target[i] - new_pos[i]) > pos_tol) all_at_target = false;
     }
-    out_sigs.at_cmd_pos = all_at_target;
+    return all_at_target;
 }
 
 uint32_t kins::set_move_cartesian_cmd_positions(const cartesian_positions& new_target){
+
+    if(collision_backup_state != backup_state::IDLE){
+        // reject new move targets while a collision backup is retracing or decelerating -- the
+        // robot must not resume forward motion until it has fully stopped and collision_detected
+        // has cleared.
+        return 1;
+    }
 
     float prev[6] = {
         move_cartesian_cmd_positions.x, move_cartesian_cmd_positions.y, move_cartesian_cmd_positions.z,
@@ -971,6 +1074,157 @@ void kins::move_cartesian(){
     if(quat_angle_between(q_reached, q_target) > angle_tol) all_at_target = false;
 
     out_sigs.at_cmd_pos = all_at_target;
+}
+
+// ============================================================================================
+// collision backup (retrace-path)
+// ============================================================================================
+
+void kins::record_backup_point(){
+    // append the current commanded joint position to the history buffer if it moved far enough
+    // (in joint space or in cartesian space) since the last recorded point. Called once per cycle
+    // from run(), only while control_mode is JOINT/CARTESIAN and no backup is in progress.
+
+    joint_positions candidate = out_sigs.cmd_joint_positions;
+
+    if(backup_count == 0){
+        // always keep at least one valid point once motion starts -- seed unconditionally
+        backup_buffer[backup_write_index] = candidate;
+        backup_last_recorded_cartesian = out_sigs.fbk_cartesian_positions;
+        backup_write_index = (backup_write_index + 1) % backup_buffer.size();
+        backup_count = 1;
+        return;
+    }
+
+    const joint_positions& last = backup_buffer[backup_newest_index()];
+    double max_joint_delta = fmax(fmax(fabs(candidate.j1 - last.j1), fabs(candidate.j2 - last.j2)),
+                              fmax(fmax(fabs(candidate.j3 - last.j3), fabs(candidate.j4 - last.j4)),
+                                   fmax(fabs(candidate.j5 - last.j5), fabs(candidate.j6 - last.j6))));
+
+    float dx = out_sigs.fbk_cartesian_positions.x - backup_last_recorded_cartesian.x;
+    float dy = out_sigs.fbk_cartesian_positions.y - backup_last_recorded_cartesian.y;
+    float dz = out_sigs.fbk_cartesian_positions.z - backup_last_recorded_cartesian.z;
+    float cart_delta = sqrtf(dx*dx + dy*dy + dz*dz);
+
+    if(max_joint_delta > backup_record_joint_threshold || cart_delta > backup_record_cartesian_threshold){
+        if(backup_count < backup_buffer.size()) backup_count++; // else: buffer full, oldest slot is overwritten below
+        backup_buffer[backup_write_index] = candidate;
+        backup_last_recorded_cartesian = out_sigs.fbk_cartesian_positions;
+        backup_write_index = (backup_write_index + 1) % backup_buffer.size();
+    }
+}
+
+void kins::start_collision_backup(){
+    // collision_detected rising edge (or a reassertion mid-DECELERATING): abandon whatever move
+    // was in flight immediately, ignoring accel limits entirely -- identical semantics to the
+    // existing in_sigs.reset branches in move_joints()/move_cartesian() (snap the target to the
+    // current position, zero velocity state), so there is no decel ramp before backup begins.
+
+    move_joint_cmd_positions = out_sigs.cmd_joint_positions;
+    move_joint_target_valid = true;
+    move_joint_last_vel.fill(0.0f);
+
+    move_cartesian_cmd_positions = out_sigs.fbk_cartesian_positions;
+    last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
+    move_cartesian_target_valid = true;
+    move_cartesian_last_vel.fill(0.0f);
+    move_cartesian_last_ang_vel = 0.0f;
+
+    collision_backup_state = backup_state::RETRACING;
+    backup_last_vel.fill(0.0f); // fresh ramp state -- the retrace accelerates from zero, at full max_acc, up to backup_speed_scale * max_vel
+}
+
+void kins::run_backup_retrace(){
+    // drive backward toward the newest buffered point at backup_speed_scale; once reached, pop it
+    // (advance to the next older point). If the buffer is empty, there is nowhere left to go --
+    // hold position (out_sigs.backup_buffer_exhausted is computed centrally in run()).
+
+    if(backup_count == 0){
+        backup_last_vel.fill(0.0f);
+        out_sigs.at_cmd_pos = true;
+        return;
+    }
+
+    const joint_positions& target = backup_buffer[backup_newest_index()];
+    bool reached = ramp_joints_to_target(target, backup_speed_scale, backup_last_vel);
+
+    if(reached){
+        // "pop" this waypoint -- it's now behind us. This is also the undo half of the undo/redo
+        // buffer semantics: once backup ends, whatever remains in the buffer is exactly the
+        // history behind the stopping point, and new recordings will overwrite forward from there.
+        backup_write_index = backup_newest_index();
+        backup_count--;
+    }
+    out_sigs.at_cmd_pos = false;
+}
+
+void kins::begin_backup_decel(){
+    // collision_detected falling edge: stop retracing and begin an accel-limited decel to a full
+    // stop, even if not exactly at a stored waypoint.
+
+    if(backup_count > 0){
+        // we were mid-transit toward this waypoint and never actually reached it -- discard it
+        // (same pop operation as run_backup_retrace()'s "reached" branch) so it doesn't remain
+        // claimed as valid history; new recording will overwrite forward from the actual
+        // stopping point once decel finishes.
+        backup_write_index = backup_newest_index();
+        backup_count--;
+    }
+
+    collision_backup_state = backup_state::DECELERATING;
+    // backup_last_vel is intentionally NOT reset here -- decel continues ramping down from
+    // whatever velocity the retrace ramp had, for velocity continuity (no discontinuity).
+}
+
+void kins::run_backup_decel(){
+    // ramp all 6 joints' velocity to zero at joint_limits[i].max_acc, with no position target
+    // (and therefore no overshoot clamp) -- this is what makes it "obey normal decel limits"
+    // rather than the abrupt cancel used to enter backup.
+
+    std::array<double,6> new_pos = {
+        out_sigs.cmd_joint_positions.j1, out_sigs.cmd_joint_positions.j2,
+        out_sigs.cmd_joint_positions.j3, out_sigs.cmd_joint_positions.j4,
+        out_sigs.cmd_joint_positions.j5, out_sigs.cmd_joint_positions.j6
+    };
+
+    bool all_stopped = true;
+    for(int i = 0; i < 6; i++){
+        float v = backup_last_vel[i];
+        if(v != 0.0f){
+            float max_dv = joint_limits[i].max_acc * time_step;
+            v = (fabsf(v) > max_dv) ? (v - copysignf(max_dv, v)) : 0.0f;
+            backup_last_vel[i] = v;
+        }
+        if(v != 0.0f) all_stopped = false;
+        new_pos[i] += (double)v * time_step;
+    }
+
+    out_sigs.cmd_joint_positions = {new_pos[0], new_pos[1], new_pos[2], new_pos[3], new_pos[4], new_pos[5]};
+
+    if(all_stopped){
+        // fully stopped -- exit backup and resync all move-tracking state to this final position,
+        // so a subsequent JOINT or CARTESIAN move (whichever mode is active) starts cleanly from
+        // here rather than jumping back toward the original pre-collision target.
+        //
+        // target_valid = false (not true, unlike a plain reset) so move_joints()/move_cartesian()
+        // early-return -- doing nothing, calling no IK -- until an actual new command is issued.
+        // Forcing target_valid = true here would make move_cartesian() call inverse_kins() every
+        // cycle from this point on with no command ever having been sent, the same needless
+        // solver-load regression described in run()'s mode-change handling above.
+        move_joint_cmd_positions = out_sigs.cmd_joint_positions;
+        move_joint_target_valid = false;
+        move_joint_last_vel.fill(0.0f);
+
+        move_cartesian_cmd_positions = out_sigs.fbk_cartesian_positions;
+        last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
+        move_cartesian_target_valid = false;
+        move_cartesian_last_vel.fill(0.0f);
+        move_cartesian_last_ang_vel = 0.0f;
+
+        collision_backup_state = backup_state::IDLE;
+        backup_last_vel.fill(0.0f);
+    }
+    out_sigs.at_cmd_pos = all_stopped;
 }
 
 void kins::inverse_kins(){

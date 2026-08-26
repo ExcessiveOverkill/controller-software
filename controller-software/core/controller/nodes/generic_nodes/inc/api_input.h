@@ -125,6 +125,9 @@ class api_input: public base_node {
                 }
                 else{
                     default_value = c["default"];
+                    if(!configured){
+                        in_data = default_value;
+                    }
                 }
                 if(c.at("timeout").is_null()){
                     timeout = 0.0;
