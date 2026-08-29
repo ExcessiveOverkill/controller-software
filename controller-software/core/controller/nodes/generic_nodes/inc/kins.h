@@ -234,8 +234,8 @@ class kins: public base_node {
 
         float apply_cartesian_joint_rate_limit(std::array<float,6>& joint_angles); // returns min scale applied
         
-        bool bypass_joint_limits = true; // if true, no joint limits will be applied
-        joint_positions last_output_joint_positions;    // save these so we can allow movement if it is in the correct direction
+        bool bypass_joint_limits = false; // if true, no joint limits will be applied
+        joint_positions last_output_joint_positions;    // last cycle's finalized (post-clamp) commanded joint positions -- baseline for this cycle's per-joint delta cap in clamp_to_joint_limits()
         bool clamp_to_joint_limits();
 
         bool bypass_cartesian_limits = false; // if true, no cartesian limits will be applied
@@ -788,9 +788,9 @@ class kins: public base_node {
                         (*json)["get"]["cmd_cartesian_pos"]["x"] = out_sigs.fbk_cartesian_positions.x;
                         (*json)["get"]["cmd_cartesian_pos"]["y"] = out_sigs.fbk_cartesian_positions.y;
                         (*json)["get"]["cmd_cartesian_pos"]["z"] = out_sigs.fbk_cartesian_positions.z;
-                        (*json)["get"]["cmd_cartesian_pos"]["xangle"] = out_sigs.fbk_cartesian_positions.xangle;
-                        (*json)["get"]["cmd_cartesian_pos"]["yangle"] = out_sigs.fbk_cartesian_positions.yangle;
-                        (*json)["get"]["cmd_cartesian_pos"]["zangle"] = out_sigs.fbk_cartesian_positions.zangle;
+                        (*json)["get"]["cmd_cartesian_pos"]["xangle"] = out_sigs.fbk_cartesian_positions.xangle * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_cartesian_pos"]["yangle"] = out_sigs.fbk_cartesian_positions.yangle * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_cartesian_pos"]["zangle"] = out_sigs.fbk_cartesian_positions.zangle * 180.0f / M_PI; // convert radians to degrees
                     }
                     if(get_json.find("cmd_joint_pos_target") != get_json.end()){
                         // return the current commanded joint position target (synchronized move target)
@@ -808,9 +808,13 @@ class kins: public base_node {
                         (*json)["get"]["cmd_cartesian_pos_target"]["x"] = move_cartesian_cmd_positions.x;
                         (*json)["get"]["cmd_cartesian_pos_target"]["y"] = move_cartesian_cmd_positions.y;
                         (*json)["get"]["cmd_cartesian_pos_target"]["z"] = move_cartesian_cmd_positions.z;
-                        (*json)["get"]["cmd_cartesian_pos_target"]["xangle"] = move_cartesian_cmd_positions.xangle;
-                        (*json)["get"]["cmd_cartesian_pos_target"]["yangle"] = move_cartesian_cmd_positions.yangle;
-                        (*json)["get"]["cmd_cartesian_pos_target"]["zangle"] = move_cartesian_cmd_positions.zangle;
+                        (*json)["get"]["cmd_cartesian_pos_target"]["xangle"] = move_cartesian_cmd_positions.xangle * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_cartesian_pos_target"]["yangle"] = move_cartesian_cmd_positions.yangle * 180.0f / M_PI; // convert radians to degrees
+                        (*json)["get"]["cmd_cartesian_pos_target"]["zangle"] = move_cartesian_cmd_positions.zangle * 180.0f / M_PI; // convert radians to degrees
+                    }
+                    if(get_json.find("at_cmd_pos") != get_json.end()){
+                        // return whether the robot is at the target position
+                        (*json)["get"] = out_sigs.at_cmd_pos;
                     }
                 }
                 else {

@@ -2364,118 +2364,118 @@
                     "dst_port": "input"
                 },
                 "10": {
-                    "src_node": "comparator_57",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_59",
-                    "dst_port": "input_enable"
-                },
-                "11": {
                     "src_node": "pfc drive",
                     "src_port": "dc_bus_voltage",
                     "dst_node": "comparator_42",
                     "dst_port": "input_0"
                 },
-                "12": {
+                "11": {
                     "src_node": "get_global_variable_0",
                     "src_port": "output",
                     "dst_node": "pfc drive",
                     "dst_port": "em_device"
                 },
-                "13": {
+                "12": {
                     "src_node": "mode change",
                     "src_port": "output",
                     "dst_node": "set_global_variable_25",
                     "dst_port": "input"
                 },
-                "14": {
+                "13": {
                     "src_node": "run",
                     "src_port": "output",
                     "dst_node": "set_global_variable_18",
                     "dst_port": "input"
                 },
-                "15": {
+                "14": {
                     "src_node": "pfc drive",
                     "src_port": "dc_bus_voltage",
                     "dst_node": "converter_40",
                     "dst_port": "input"
                 },
-                "16": {
+                "15": {
                     "src_node": "edge_delay_26",
                     "src_port": "output",
                     "dst_node": "logic_gate_28",
                     "dst_port": "input_0"
                 },
-                "17": {
+                "16": {
                     "src_node": "logic_gate_31",
                     "src_port": "output",
                     "dst_node": "logic_gate_32",
                     "dst_port": "input_0"
                 },
-                "18": {
+                "17": {
                     "src_node": "edge_delay_36",
                     "src_port": "output",
                     "dst_node": "logic_gate_29",
                     "dst_port": "input_0"
                 },
-                "19": {
+                "18": {
                     "src_node": "logic_gate_29",
                     "src_port": "output",
                     "dst_node": "set_global_variable_25",
                     "dst_port": "input_enable"
                 },
-                "20": {
+                "19": {
                     "src_node": "comparator_42",
                     "src_port": "output",
                     "dst_node": "logic_gate_63",
                     "dst_port": "input_0"
                 },
-                "21": {
+                "20": {
                     "src_node": "logic_gate_61",
                     "src_port": "output",
                     "dst_node": "set_global_variable_64",
                     "dst_port": "input"
                 },
-                "22": {
+                "21": {
                     "src_node": "fault reset",
                     "src_port": "output",
                     "dst_node": "set_global_variable_19",
                     "dst_port": "input"
                 },
-                "23": {
+                "22": {
                     "src_node": "edge_detect_37",
                     "src_port": "output",
                     "dst_node": "edge_delay_38",
                     "dst_port": "input"
                 },
-                "24": {
+                "23": {
                     "src_node": "logic_gate_39",
                     "src_port": "output",
                     "dst_node": "set_global_variable_4",
                     "dst_port": "input"
                 },
-                "25": {
+                "24": {
                     "src_node": "over voltage",
                     "src_port": "output",
                     "dst_node": "comparator_57",
                     "dst_port": "input_1"
                 },
-                "26": {
+                "25": {
                     "src_node": "logic_gate_28",
                     "src_port": "output",
                     "dst_node": "logic_gate_29",
                     "dst_port": "input_1"
                 },
-                "27": {
+                "26": {
                     "src_node": "run current",
                     "src_port": "output",
                     "dst_node": "multiplexer_46",
                     "dst_port": "input_1"
                 },
-                "28": {
+                "27": {
                     "src_node": "comparator_42",
                     "src_port": "output",
                     "dst_node": "edge_delay_44",
                     "dst_port": "input"
+                },
+                "28": {
+                    "src_node": "edge_delay_67",
+                    "src_port": "output",
+                    "dst_node": "print_60",
+                    "dst_port": "enable"
                 },
                 "29": {
                     "src_node": "logic_gate_61",
@@ -2484,192 +2484,198 @@
                     "dst_port": "input_enable"
                 },
                 "30": {
+                    "src_node": "edge_delay_67",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_59",
+                    "dst_port": "input"
+                },
+                "31": {
                     "src_node": "logic_gate_63",
                     "src_port": "output",
                     "dst_node": "logic_gate_61",
                     "dst_port": "input_0"
                 },
-                "31": {
+                "32": {
                     "src_node": "logic_gate_33",
                     "src_port": "output",
                     "dst_node": "set_global_variable_16",
                     "dst_port": "input_enable"
                 },
-                "32": {
+                "33": {
                     "src_node": "get_global_variable_62",
                     "src_port": "output",
                     "dst_node": "logic_gate_61",
                     "dst_port": "input_1"
                 },
-                "33": {
+                "34": {
                     "src_node": "pre charge negative",
                     "src_port": "output",
                     "dst_node": "multiplexer_8",
                     "dst_port": "input_0"
                 },
-                "34": {
+                "35": {
+                    "src_node": "pfc drive",
+                    "src_port": "dc_bus_voltage",
+                    "dst_node": "print_60",
+                    "dst_port": "input"
+                },
+                "36": {
                     "src_node": "logic_gate_30",
                     "src_port": "output",
                     "dst_node": "set_global_variable_18",
                     "dst_port": "input_enable"
                 },
-                "35": {
+                "37": {
                     "src_node": "pfc drive",
                     "src_port": "dc_bus_voltage",
                     "dst_node": "comparator_57",
                     "dst_port": "input_0"
                 },
-                "36": {
+                "38": {
                     "src_node": "edge_delay_34",
                     "src_port": "output",
                     "dst_node": "edge_detect_35",
                     "dst_port": "input"
                 },
-                "37": {
+                "39": {
                     "src_node": "logic_gate_31",
                     "src_port": "output",
                     "dst_node": "set_global_variable_17",
                     "dst_port": "input_enable"
                 },
-                "38": {
+                "40": {
                     "src_node": "edge_detect_65",
                     "src_port": "output",
                     "dst_node": "print_66",
                     "dst_port": "enable"
                 },
-                "39": {
+                "41": {
                     "src_node": "get_global_variable_2",
                     "src_port": "output",
                     "dst_node": "edge_delay_3",
                     "dst_port": "input"
                 },
-                "40": {
+                "42": {
                     "src_node": "edge_delay_34",
                     "src_port": "output",
                     "dst_node": "logic_gate_31",
                     "dst_port": "input_0"
                 },
-                "41": {
+                "43": {
+                    "src_node": "comparator_57",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_67",
+                    "dst_port": "input"
+                },
+                "44": {
+                    "src_node": "edge_delay_67",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_59",
+                    "dst_port": "input_enable"
+                },
+                "45": {
                     "src_node": "edge_delay_26",
                     "src_port": "output",
                     "dst_node": "logic_gate_32",
                     "dst_port": "input_2"
                 },
-                "42": {
+                "46": {
                     "src_node": "logic_gate_61",
                     "src_port": "output",
                     "dst_node": "edge_detect_65",
                     "dst_port": "input"
                 },
-                "43": {
+                "47": {
                     "src_node": "edge_detect_35",
                     "src_port": "output",
                     "dst_node": "edge_delay_36",
                     "dst_port": "input"
                 },
-                "44": {
-                    "src_node": "comparator_57",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_59",
-                    "dst_port": "input"
-                },
-                "45": {
+                "48": {
                     "src_node": "logic_gate_28",
                     "src_port": "output",
                     "dst_node": "logic_gate_30",
                     "dst_port": "input_1"
                 },
-                "46": {
+                "49": {
                     "src_node": "edge_delay_38",
                     "src_port": "output",
                     "dst_node": "logic_gate_30",
                     "dst_port": "input_0"
                 },
-                "47": {
+                "50": {
                     "src_node": "get_global_variable_6",
                     "src_port": "output",
                     "dst_node": "multiplexer_46",
                     "dst_port": "select_bit_0"
                 },
-                "48": {
+                "51": {
                     "src_node": "pfc drive",
                     "src_port": "dc_bus_voltage",
                     "dst_node": "print_66",
                     "dst_port": "input"
                 },
-                "49": {
+                "52": {
                     "src_node": "edge_delay_26",
                     "src_port": "output",
                     "dst_node": "edge_detect_27",
                     "dst_port": "input"
                 },
-                "50": {
+                "53": {
                     "src_node": "idle",
                     "src_port": "output",
                     "dst_node": "set_global_variable_17",
                     "dst_port": "input"
                 },
-                "51": {
+                "54": {
                     "src_node": "logic_gate_30",
                     "src_port": "output",
                     "dst_node": "logic_gate_32",
                     "dst_port": "input_1"
                 },
-                "52": {
+                "55": {
                     "src_node": "logic_gate_29",
                     "src_port": "output",
                     "dst_node": "logic_gate_32",
                     "dst_port": "input_3"
                 },
-                "53": {
+                "56": {
                     "src_node": "edge_detect_27",
                     "src_port": "output",
                     "dst_node": "edge_delay_34",
                     "dst_port": "input"
                 },
-                "54": {
-                    "src_node": "comparator_57",
-                    "src_port": "output",
-                    "dst_node": "print_60",
-                    "dst_port": "enable"
-                },
-                "55": {
+                "57": {
                     "src_node": "get_global_variable_6",
                     "src_port": "output",
                     "dst_node": "multiplexer_8",
                     "dst_port": "select_bit_0"
                 },
-                "56": {
+                "58": {
                     "src_node": "none",
                     "src_port": "output",
                     "dst_node": "set_global_variable_16",
                     "dst_port": "input"
                 },
-                "57": {
+                "59": {
                     "src_node": "edge_delay_26",
                     "src_port": "output",
                     "dst_node": "set_global_variable_19",
                     "dst_port": "input_enable"
                 },
-                "58": {
-                    "src_node": "over voltage",
-                    "src_port": "output",
-                    "dst_node": "print_60",
-                    "dst_port": "input"
-                },
-                "59": {
+                "60": {
                     "src_node": "converter_40",
                     "src_port": "output",
                     "dst_node": "set_global_variable_41",
                     "dst_port": "input"
                 },
-                "60": {
+                "61": {
                     "src_node": "precharge current",
                     "src_port": "output",
                     "dst_node": "multiplexer_46",
                     "dst_port": "input_0"
                 },
-                "61": {
+                "62": {
                     "src_node": "run negative",
                     "src_port": "output",
                     "dst_node": "multiplexer_8",
@@ -2720,7 +2726,7 @@
                             "set": [
                                 {
                                     "name": "pfc_target_voltage",
-                                    "value": 45000.0
+                                    "value": 48000.0
                                 },
                                 {
                                     "name": "regen_max_current",
@@ -2728,7 +2734,7 @@
                                 },
                                 {
                                     "name": "regen_ramp_start",
-                                    "value": 45.0
+                                    "value": 52.0
                                 },
                                 {
                                     "name": "pfc_voltage_i_limit",
@@ -2736,7 +2742,7 @@
                                 },
                                 {
                                     "name": "regen_ramp_end",
-                                    "value": 48.0
+                                    "value": 54.0
                                 },
                                 {
                                     "name": "regen_resistance",
@@ -3047,7 +3053,7 @@
                     "type": "constant",
                     "config": {
                         "type": "uint16",
-                        "value": 5000.0
+                        "value": 6000.0
                     }
                 },
                 "bypass": {
@@ -3082,7 +3088,7 @@
                     "type": "constant",
                     "config": {
                         "type": "uint16",
-                        "value": 55.0
+                        "value": 60.0
                     }
                 },
                 "set_global_variable_59": {
@@ -3142,6 +3148,14 @@
                     "config": {
                         "name": "undervoltage fault",
                         "type": "uint16"
+                    }
+                },
+                "edge_delay_67": {
+                    "type": "edge_delay",
+                    "config": {
+                        "rising_edge": true,
+                        "falling_edge": false,
+                        "cycles": 20
                     }
                 }
             }
@@ -3303,6 +3317,12 @@
                     "src_port": "output",
                     "dst_node": "print_23",
                     "dst_port": "input"
+                },
+                "25": {
+                    "src_node": "get_global_variable_10",
+                    "src_port": "output",
+                    "dst_node": "power is on",
+                    "dst_port": "input"
                 }
             },
             "nodes": {
@@ -3387,6 +3407,14 @@
                         }
                     }
                 },
+                "get_global_variable_10": {
+                    "type": "get_global_variable",
+                    "config": {
+                        "variables": {
+                            "output": "enable power"
+                        }
+                    }
+                },
                 "logic_gate_11": {
                     "type": "logic_gate",
                     "config": {
@@ -3407,6 +3435,12 @@
                     "config": {
                         "gate_type": "and",
                         "input_count": 2
+                    }
+                },
+                "power is on": {
+                    "type": "api_output",
+                    "config": {
+                        "type": "bool"
                     }
                 },
                 "logic_gate_15": {
@@ -4207,363 +4241,363 @@
                     "dst_port": "input_0"
                 },
                 "14": {
-                    "src_node": "logic_gate_119",
-                    "src_port": "output",
-                    "dst_node": "edge_delay_120",
-                    "dst_port": "input"
-                },
-                "15": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j1 vel loop",
                     "dst_port": "reset"
                 },
-                "16": {
+                "15": {
                     "src_node": "edge_delay_121",
                     "src_port": "output",
                     "dst_node": "set_global_variable_107",
                     "dst_port": "input_enable"
                 },
-                "17": {
+                "16": {
                     "src_node": "math_operation_40",
                     "src_port": "output",
                     "dst_node": "vel_estimator_43",
                     "dst_port": "input"
                 },
-                "18": {
+                "17": {
                     "src_node": "edge_delay_118",
                     "src_port": "output",
                     "dst_node": "set_global_variable_33",
                     "dst_port": "input_enable"
                 },
-                "19": {
+                "18": {
                     "src_node": "converter_50",
                     "src_port": "output",
                     "dst_node": "j1 pos loop",
                     "dst_port": "input"
                 },
-                "20": {
+                "19": {
                     "src_node": "math_operation_13",
                     "src_port": "output",
                     "dst_node": "math_operation_8",
                     "dst_port": "input_1"
                 },
-                "21": {
+                "20": {
                     "src_node": "math_operation_5",
                     "src_port": "output",
                     "dst_node": "math_operation_6",
                     "dst_port": "input_0"
                 },
-                "22": {
+                "21": {
                     "src_node": "math_operation_74",
                     "src_port": "output",
                     "dst_node": "comparator_56",
                     "dst_port": "input_0"
                 },
-                "23": {
+                "22": {
                     "src_node": "get_global_variable_0",
                     "src_port": "output",
                     "dst_node": "set_global_variable_68",
                     "dst_port": "input"
                 },
-                "24": {
+                "23": {
                     "src_node": "vel_estimator_20",
                     "src_port": "output",
                     "dst_node": "math_operation_31",
                     "dst_port": "input_0"
                 },
-                "25": {
+                "24": {
                     "src_node": "math_operation_38",
                     "src_port": "output",
                     "dst_node": "vel_estimator_41",
                     "dst_port": "input"
                 },
-                "26": {
+                "25": {
                     "src_node": "math_operation_8",
                     "src_port": "output",
                     "dst_node": "j4 vel loop",
                     "dst_port": "input"
                 },
-                "27": {
+                "26": {
                     "src_node": "converter_52",
                     "src_port": "output",
                     "dst_node": "math_operation_104",
                     "dst_port": "input_0"
                 },
-                "28": {
+                "27": {
                     "src_node": "logic_gate_110",
                     "src_port": "output",
                     "dst_node": "set_global_variable_114",
                     "dst_port": "input_enable"
                 },
-                "29": {
+                "28": {
                     "src_node": "vel_estimator_21",
                     "src_port": "output",
                     "dst_node": "math_operation_32",
                     "dst_port": "input_0"
                 },
-                "30": {
+                "29": {
                     "src_node": "converter_12",
                     "src_port": "output",
                     "dst_node": "j5 pos loop",
                     "dst_port": "input"
                 },
-                "31": {
+                "30": {
                     "src_node": "vel_estimator_43",
                     "src_port": "output",
                     "dst_node": "math_operation_61",
                     "dst_port": "input_0"
                 },
-                "32": {
+                "31": {
                     "src_node": "true",
                     "src_port": "output",
                     "dst_node": "set_global_variable_122",
                     "dst_port": "input_enable"
                 },
-                "33": {
+                "32": {
                     "src_node": "edge_detect_106",
                     "src_port": "output",
                     "dst_node": "print_108",
                     "dst_port": "enable"
                 },
-                "34": {
+                "33": {
                     "src_node": "math_operation_6",
                     "src_port": "output",
                     "dst_node": "converter_7",
                     "dst_port": "input"
                 },
-                "35": {
+                "34": {
                     "src_node": "get_global_variable_47",
                     "src_port": "output",
                     "dst_node": "math_operation_44",
                     "dst_port": "input_1"
                 },
-                "36": {
+                "35": {
                     "src_node": "comparator_99",
                     "src_port": "output",
                     "dst_node": "edge_detect_100",
                     "dst_port": "input"
                 },
-                "37": {
+                "36": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j5 vel loop",
                     "dst_port": "reset"
                 },
-                "38": {
+                "37": {
                     "src_node": "get_global_variable_109",
                     "src_port": "output",
                     "dst_node": "edge_delay_118",
                     "dst_port": "input"
                 },
-                "39": {
+                "38": {
                     "src_node": "j5 allowable error",
                     "src_port": "output",
                     "dst_node": "comparator_81",
                     "dst_port": "input_1"
                 },
-                "40": {
+                "39": {
                     "src_node": "math_operation_45",
                     "src_port": "output",
                     "dst_node": "converter_51",
                     "dst_port": "input"
                 },
-                "41": {
+                "40": {
                     "src_node": "logic_gate_110",
                     "src_port": "output",
                     "dst_node": "set_global_variable_112",
                     "dst_port": "input_enable"
                 },
-                "42": {
+                "41": {
                     "src_node": "j3 following error",
                     "src_port": "output",
                     "dst_node": "comparator_105",
                     "dst_port": "input_1"
                 },
-                "43": {
+                "42": {
                     "src_node": "math_operation_60",
                     "src_port": "output",
                     "dst_node": "j2 vel loop",
                     "dst_port": "input"
                 },
-                "44": {
+                "43": {
                     "src_node": "comparator_87",
                     "src_port": "output",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_8"
                 },
-                "45": {
+                "44": {
                     "src_node": "j4 pos loop",
                     "src_port": "output",
                     "dst_node": "math_operation_13",
                     "dst_port": "input_0"
                 },
-                "46": {
+                "45": {
                     "src_node": "get_global_variable_35",
                     "src_port": "output",
                     "dst_node": "math_operation_38",
                     "dst_port": "input_0"
                 },
-                "47": {
+                "46": {
                     "src_node": "math_operation_23",
                     "src_port": "output",
                     "dst_node": "converter_24",
                     "dst_port": "input"
                 },
-                "48": {
+                "47": {
                     "src_node": "math_operation_17",
                     "src_port": "output",
                     "dst_node": "vel_estimator_21",
                     "dst_port": "input"
                 },
-                "49": {
+                "48": {
                     "src_node": "comparator_105",
                     "src_port": "output",
                     "dst_node": "edge_detect_106",
                     "dst_port": "input"
                 },
-                "50": {
+                "49": {
                     "src_node": "math_operation_39",
                     "src_port": "output",
                     "dst_node": "math_operation_45",
                     "dst_port": "input_0"
                 },
-                "51": {
+                "50": {
                     "src_node": "default current",
                     "src_port": "output",
                     "dst_node": "set_global_variable_113",
                     "dst_port": "input"
                 },
-                "52": {
+                "51": {
                     "src_node": "vel_estimator_1",
                     "src_port": "output",
                     "dst_node": "math_operation_8",
                     "dst_port": "input_0"
                 },
-                "53": {
+                "52": {
                     "src_node": "j4 vel loop",
                     "src_port": "saturation",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_0"
                 },
-                "54": {
+                "53": {
                     "src_node": "edge_detect_126",
                     "src_port": "output",
                     "dst_node": "set_global_variable_124",
                     "dst_port": "input"
                 },
-                "55": {
+                "54": {
                     "src_node": "math_operation_17",
                     "src_port": "output",
                     "dst_node": "math_operation_23",
                     "dst_port": "input_0"
                 },
-                "56": {
+                "55": {
                     "src_node": "edge_detect_126",
                     "src_port": "output",
                     "dst_node": "print_125",
                     "dst_port": "enable"
                 },
-                "57": {
+                "56": {
                     "src_node": "comparator_93",
                     "src_port": "output",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_9"
                 },
-                "58": {
+                "57": {
                     "src_node": "comparator_105",
                     "src_port": "output",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_11"
                 },
-                "59": {
+                "58": {
                     "src_node": "get_global_variable_96",
                     "src_port": "output",
                     "dst_node": "collision detect",
                     "dst_port": "input"
                 },
-                "60": {
+                "59": {
                     "src_node": "math_operation_40",
                     "src_port": "output",
                     "dst_node": "math_operation_46",
                     "dst_port": "input_0"
                 },
-                "61": {
+                "60": {
                     "src_node": "j3 vel loop",
                     "src_port": "output",
                     "dst_node": "set_global_variable_67",
                     "dst_port": "input"
                 },
-                "62": {
+                "61": {
                     "src_node": "get_global_variable_16",
                     "src_port": "output",
                     "dst_node": "math_operation_17",
                     "dst_port": "input_0"
                 },
-                "63": {
+                "62": {
                     "src_node": "j6 allowable error",
                     "src_port": "output",
                     "dst_node": "comparator_87",
                     "dst_port": "input_1"
                 },
-                "64": {
+                "63": {
                     "src_node": "clear collision detect",
                     "src_port": "output",
                     "dst_node": "set_global_variable_129",
                     "dst_port": "input_enable"
                 },
-                "65": {
+                "64": {
                     "src_node": "default current",
                     "src_port": "output",
                     "dst_node": "set_global_variable_112",
                     "dst_port": "input"
                 },
-                "66": {
+                "65": {
                     "src_node": "get_global_variable_36",
                     "src_port": "output",
                     "dst_node": "math_operation_39",
                     "dst_port": "input_0"
                 },
-                "67": {
+                "66": {
                     "src_node": "converter_24",
                     "src_port": "output",
                     "dst_node": "j6 pos loop",
                     "dst_port": "input"
                 },
-                "68": {
+                "67": {
                     "src_node": "edge_delay_118",
                     "src_port": "output",
                     "dst_node": "logic_gate_110",
                     "dst_port": "input_0"
                 },
-                "69": {
+                "68": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j2 pos loop",
                     "dst_port": "reset"
                 },
-                "70": {
+                "69": {
                     "src_node": "get_global_variable_35",
                     "src_port": "output",
                     "dst_node": "set_global_variable_69",
                     "dst_port": "input"
                 },
-                "71": {
+                "70": {
                     "src_node": "math_operation_5",
                     "src_port": "output",
                     "dst_node": "vel_estimator_1",
                     "dst_port": "input"
                 },
-                "72": {
+                "71": {
                     "src_node": "math_operation_58",
                     "src_port": "output",
                     "dst_node": "math_operation_61",
                     "dst_port": "input_1"
                 },
-                "73": {
+                "72": {
                     "src_node": "edge_delay_121",
                     "src_port": "output",
                     "dst_node": "set_global_variable_122",
+                    "dst_port": "input"
+                },
+                "73": {
+                    "src_node": "logic_gate_90",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_120",
                     "dst_port": "input"
                 },
                 "74": {
@@ -4855,166 +4889,166 @@
                     "dst_port": "input"
                 },
                 "122": {
-                    "src_node": "logic_gate_119",
-                    "src_port": "output",
-                    "dst_node": "edge_delay_123",
-                    "dst_port": "input"
-                },
-                "123": {
                     "src_node": "math_operation_104",
                     "src_port": "output",
                     "dst_node": "comparator_105",
                     "dst_port": "input_0"
                 },
-                "124": {
+                "123": {
                     "src_node": "converter_12",
                     "src_port": "output",
                     "dst_node": "math_operation_80",
                     "dst_port": "input_0"
                 },
-                "125": {
+                "124": {
                     "src_node": "edge_delay_118",
                     "src_port": "output",
                     "dst_node": "set_global_variable_65",
                     "dst_port": "input_enable"
                 },
-                "126": {
+                "125": {
                     "src_node": "default current",
                     "src_port": "output",
                     "dst_node": "set_global_variable_111",
                     "dst_port": "input"
                 },
-                "127": {
+                "126": {
                     "src_node": "j1 pos loop",
                     "src_port": "output",
                     "dst_node": "math_operation_59",
                     "dst_port": "input_1"
                 },
-                "128": {
+                "127": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j4 vel loop",
                     "dst_port": "reset"
                 },
-                "129": {
+                "128": {
                     "src_node": "get_global_variable_19",
                     "src_port": "output",
                     "dst_node": "math_operation_23",
                     "dst_port": "input_1"
                 },
-                "130": {
+                "129": {
                     "src_node": "j6 vel loop",
                     "src_port": "saturation",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_2"
                 },
-                "131": {
+                "130": {
                     "src_node": "edge_detect_100",
                     "src_port": "output",
                     "dst_node": "print_101",
                     "dst_port": "enable"
                 },
-                "132": {
+                "131": {
                     "src_node": "j5 vel loop",
                     "src_port": "saturation",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_1"
                 },
-                "133": {
+                "132": {
                     "src_node": "default current",
                     "src_port": "output",
                     "dst_node": "set_global_variable_116",
                     "dst_port": "input"
                 },
-                "134": {
+                "133": {
                     "src_node": "get_global_variable_49",
                     "src_port": "output",
                     "dst_node": "math_operation_46",
                     "dst_port": "input_1"
                 },
-                "135": {
+                "134": {
                     "src_node": "comparator_93",
                     "src_port": "output",
                     "dst_node": "edge_detect_94",
                     "dst_port": "input"
                 },
-                "136": {
+                "135": {
                     "src_node": "get_global_variable_37",
                     "src_port": "output",
                     "dst_node": "set_global_variable_73",
                     "dst_port": "input"
                 },
-                "137": {
+                "136": {
                     "src_node": "default current",
                     "src_port": "output",
                     "dst_node": "set_global_variable_115",
                     "dst_port": "input"
                 },
-                "138": {
+                "137": {
                     "src_node": "logic_gate_110",
                     "src_port": "output",
                     "dst_node": "set_global_variable_115",
                     "dst_port": "input_enable"
                 },
-                "139": {
+                "138": {
                     "src_node": "edge_delay_118",
                     "src_port": "output",
                     "dst_node": "set_global_variable_66",
                     "dst_port": "input_enable"
                 },
-                "140": {
+                "139": {
                     "src_node": "comparator_87",
                     "src_port": "output",
                     "dst_node": "edge_detect_88",
                     "dst_port": "input"
                 },
-                "141": {
+                "140": {
                     "src_node": "converter_51",
                     "src_port": "output",
                     "dst_node": "math_operation_98",
                     "dst_port": "input_0"
                 },
-                "142": {
+                "141": {
                     "src_node": "get_global_variable_36",
                     "src_port": "output",
                     "dst_node": "set_global_variable_72",
                     "dst_port": "input"
                 },
-                "143": {
+                "142": {
                     "src_node": "math_operation_92",
                     "src_port": "output",
                     "dst_node": "comparator_93",
                     "dst_port": "input_0"
                 },
-                "144": {
+                "143": {
                     "src_node": "math_operation_30",
                     "src_port": "output",
                     "dst_node": "math_operation_32",
                     "dst_port": "input_1"
                 },
-                "145": {
+                "144": {
                     "src_node": "j2 following error",
                     "src_port": "output",
                     "dst_node": "comparator_99",
                     "dst_port": "input_1"
                 },
-                "146": {
+                "145": {
                     "src_node": "get_global_variable_0",
                     "src_port": "output",
                     "dst_node": "math_operation_5",
                     "dst_port": "input_0"
                 },
-                "147": {
+                "146": {
                     "src_node": "comparator_56",
                     "src_port": "output",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_6"
                 },
-                "148": {
+                "147": {
                     "src_node": "j2 vel loop",
                     "src_port": "saturation",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_4"
+                },
+                "148": {
+                    "src_node": "get_global_variable_10",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_90",
+                    "dst_port": "input_0"
                 },
                 "149": {
                     "src_node": "j6 vel loop",
@@ -5023,96 +5057,108 @@
                     "dst_port": "input"
                 },
                 "150": {
+                    "src_node": "logic_gate_90",
+                    "src_port": "output",
+                    "dst_node": "edge_delay_123",
+                    "dst_port": "input"
+                },
+                "151": {
                     "src_node": "get_global_variable_3",
                     "src_port": "output",
                     "dst_node": "math_operation_6",
                     "dst_port": "input_1"
                 },
-                "151": {
+                "152": {
                     "src_node": "math_operation_44",
                     "src_port": "output",
                     "dst_node": "converter_50",
                     "dst_port": "input"
                 },
-                "152": {
+                "153": {
                     "src_node": "j1 vel loop",
                     "src_port": "saturation",
                     "dst_node": "logic_gate_119",
                     "dst_port": "input_3"
                 },
-                "153": {
+                "154": {
                     "src_node": "edge_delay_123",
                     "src_port": "output",
                     "dst_node": "edge_detect_126",
                     "dst_port": "input"
                 },
-                "154": {
+                "155": {
                     "src_node": "converter_7",
                     "src_port": "output",
                     "dst_node": "math_operation_74",
                     "dst_port": "input_0"
                 },
-                "155": {
+                "156": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j6 pos loop",
                     "dst_port": "reset"
                 },
-                "156": {
+                "157": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j6 vel loop",
                     "dst_port": "reset"
                 },
-                "157": {
+                "158": {
                     "src_node": "get_global_variable_48",
                     "src_port": "output",
                     "dst_node": "math_operation_45",
                     "dst_port": "input_1"
                 },
-                "158": {
+                "159": {
                     "src_node": "logic_gate_110",
                     "src_port": "output",
                     "dst_node": "set_global_variable_113",
                     "dst_port": "input_enable"
                 },
-                "159": {
+                "160": {
                     "src_node": "comparator_56",
                     "src_port": "output",
                     "dst_node": "edge_detect_76",
                     "dst_port": "input"
                 },
-                "160": {
+                "161": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j2 vel loop",
                     "dst_port": "reset"
                 },
-                "161": {
+                "162": {
                     "src_node": "math_operation_104",
                     "src_port": "output",
                     "dst_node": "print_108",
                     "dst_port": "input"
                 },
-                "162": {
+                "163": {
                     "src_node": "vel_estimator_42",
                     "src_port": "output",
                     "dst_node": "math_operation_60",
                     "dst_port": "input_0"
                 },
-                "163": {
+                "164": {
                     "src_node": "edge_detect_11",
                     "src_port": "output",
                     "dst_node": "j3 pos loop",
                     "dst_port": "reset"
                 },
-                "164": {
+                "165": {
                     "src_node": "comparator_81",
                     "src_port": "output",
                     "dst_node": "edge_detect_82",
                     "dst_port": "input"
                 },
-                "165": {
+                "166": {
+                    "src_node": "logic_gate_119",
+                    "src_port": "output",
+                    "dst_node": "logic_gate_90",
+                    "dst_port": "input_1"
+                },
+                "167": {
                     "src_node": "edge_delay_118",
                     "src_port": "output",
                     "dst_node": "set_global_variable_34",
@@ -5841,6 +5887,13 @@
                         "type": "float"
                     }
                 },
+                "logic_gate_90": {
+                    "type": "logic_gate",
+                    "config": {
+                        "gate_type": "and",
+                        "input_count": 2
+                    }
+                },
                 "j1 following error": {
                     "type": "constant",
                     "config": {
@@ -6061,7 +6114,7 @@
                     "config": {
                         "rising_edge": true,
                         "falling_edge": false,
-                        "cycles": 50
+                        "cycles": 75
                     }
                 },
                 "edge_delay_121": {
@@ -6069,7 +6122,7 @@
                     "config": {
                         "rising_edge": false,
                         "falling_edge": true,
-                        "cycles": 200
+                        "cycles": 300
                     }
                 },
                 "set_global_variable_122": {
@@ -6148,580 +6201,652 @@
             "execution_order": 8,
             "connections": {
                 "0": {
-                    "src_node": "get_global_variable_2",
-                    "src_port": "output",
-                    "dst_node": "math_operation_13",
-                    "dst_port": "input_1"
-                },
-                "1": {
-                    "src_node": "j1 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_58",
-                    "dst_port": "input_1"
-                },
-                "2": {
-                    "src_node": "get_global_variable_3",
-                    "src_port": "output",
-                    "dst_node": "j4 pos fbk raw",
-                    "dst_port": "input"
-                },
-                "3": {
-                    "src_node": "math_operation_51",
-                    "src_port": "output",
-                    "dst_node": "j6 pos fbk final",
-                    "dst_port": "input"
-                },
-                "4": {
-                    "src_node": "get_global_variable_1",
-                    "src_port": "output",
-                    "dst_node": "math_operation_12",
-                    "dst_port": "input_1"
-                },
-                "5": {
-                    "src_node": "math_operation_76",
-                    "src_port": "output",
-                    "dst_node": "math_operation_77",
-                    "dst_port": "input_0"
-                },
-                "6": {
-                    "src_node": "math_operation_47",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_20",
-                    "dst_port": "input"
-                },
-                "7": {
                     "src_node": "math_operation_65",
                     "src_port": "output",
                     "dst_node": "math_operation_66",
                     "dst_port": "input_0"
                 },
-                "8": {
-                    "src_node": "math_operation_49",
-                    "src_port": "output",
-                    "dst_node": "j5 pos fbk final",
-                    "dst_port": "input"
-                },
-                "9": {
-                    "src_node": "math_operation_13",
-                    "src_port": "output",
-                    "dst_node": "math_operation_16",
-                    "dst_port": "input_0"
-                },
-                "10": {
-                    "src_node": "j1 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_44",
-                    "dst_port": "input_0"
-                },
-                "11": {
+                "1": {
                     "src_node": "math_operation_58",
                     "src_port": "output",
                     "dst_node": "set_global_variable_59",
                     "dst_port": "input"
                 },
-                "12": {
-                    "src_node": "math_operation_47",
-                    "src_port": "output",
-                    "dst_node": "j4 pos fbk final",
-                    "dst_port": "input"
-                },
-                "13": {
-                    "src_node": "j1 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_6",
-                    "dst_port": "input_0"
-                },
-                "14": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_13",
-                    "dst_port": "input_2"
-                },
-                "15": {
-                    "src_node": "math_operation_16",
-                    "src_port": "output",
-                    "dst_node": "math_operation_46",
-                    "dst_port": "input_1"
-                },
-                "16": {
-                    "src_node": "get_global_variable_1",
-                    "src_port": "output",
-                    "dst_node": "j2 pos fbk raw",
-                    "dst_port": "input"
-                },
-                "17": {
-                    "src_node": "j6 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_76",
-                    "dst_port": "input_1"
-                },
-                "18": {
-                    "src_node": "math_operation_78",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_79",
-                    "dst_port": "input"
-                },
-                "19": {
-                    "src_node": "j5 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_74",
-                    "dst_port": "input_1"
-                },
-                "20": {
-                    "src_node": "math_operation_46",
-                    "src_port": "output",
-                    "dst_node": "j3 pos fbk final",
-                    "dst_port": "input"
-                },
-                "21": {
-                    "src_node": "get_global_variable_0",
-                    "src_port": "output",
-                    "dst_node": "math_operation_6",
-                    "dst_port": "input_1"
-                },
-                "22": {
-                    "src_node": "math_operation_6",
-                    "src_port": "output",
-                    "dst_node": "math_operation_44",
-                    "dst_port": "input_1"
-                },
-                "23": {
-                    "src_node": "j4 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_69",
-                    "dst_port": "input_1"
-                },
-                "24": {
-                    "src_node": "j2 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_12",
-                    "dst_port": "input_0"
-                },
-                "25": {
+                "2": {
                     "src_node": "math_operation_61",
                     "src_port": "output",
                     "dst_node": "math_operation_62",
                     "dst_port": "input_0"
                 },
-                "26": {
-                    "src_node": "math_operation_45",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_8",
-                    "dst_port": "input"
-                },
-                "27": {
-                    "src_node": "j3 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_65",
-                    "dst_port": "input_1"
-                },
-                "28": {
-                    "src_node": "math_operation_44",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_10",
-                    "dst_port": "input"
-                },
-                "29": {
+                "3": {
                     "src_node": "math_operation_70",
                     "src_port": "output",
                     "dst_node": "set_global_variable_71",
                     "dst_port": "input"
                 },
-                "30": {
+                "4": {
+                    "src_node": "j1 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_6",
+                    "dst_port": "input_0"
+                },
+                "5": {
                     "src_node": "2pi",
                     "src_port": "output",
-                    "dst_node": "math_operation_18",
+                    "dst_node": "math_operation_13",
                     "dst_port": "input_2"
                 },
-                "31": {
+                "6": {
+                    "src_node": "j6 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_76",
+                    "dst_port": "input_1"
+                },
+                "7": {
+                    "src_node": "math_operation_78",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_79",
+                    "dst_port": "input"
+                },
+                "8": {
+                    "src_node": "math_operation_93",
+                    "src_port": "output",
+                    "dst_node": "math_operation_89",
+                    "dst_port": "input_0"
+                },
+                "9": {
+                    "src_node": "math_operation_90",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_75",
+                    "dst_port": "input"
+                },
+                "10": {
+                    "src_node": "math_operation_6",
+                    "src_port": "output",
+                    "dst_node": "math_operation_44",
+                    "dst_port": "input_1"
+                },
+                "11": {
+                    "src_node": "j4 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_69",
+                    "dst_port": "input_1"
+                },
+                "12": {
+                    "src_node": "j2 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_12",
+                    "dst_port": "input_0"
+                },
+                "13": {
+                    "src_node": "math_operation_45",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_8",
+                    "dst_port": "input"
+                },
+                "14": {
+                    "src_node": "math_operation_44",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_10",
+                    "dst_port": "input"
+                },
+                "15": {
+                    "src_node": "math_operation_73",
+                    "src_port": "output",
+                    "dst_node": "math_operation_93",
+                    "dst_port": "input_0"
+                },
+                "16": {
                     "src_node": "math_operation_69",
                     "src_port": "output",
                     "dst_node": "math_operation_70",
                     "dst_port": "input_0"
                 },
-                "32": {
+                "17": {
+                    "src_node": "math_operation_49",
+                    "src_port": "output",
+                    "dst_node": "math_operation_87",
+                    "dst_port": "input_1"
+                },
+                "18": {
+                    "src_node": "math_operation_87",
+                    "src_port": "output",
+                    "dst_node": "math_operation_86",
+                    "dst_port": "input_1"
+                },
+                "19": {
                     "src_node": "get_global_variable_2",
                     "src_port": "output",
                     "dst_node": "j3 pos fbk raw",
                     "dst_port": "input"
                 },
-                "33": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_74",
-                    "dst_port": "input_2"
-                },
-                "34": {
+                "20": {
                     "src_node": "get_global_variable_64",
                     "src_port": "output",
                     "dst_node": "math_operation_65",
                     "dst_port": "input_0"
                 },
-                "35": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_78",
-                    "dst_port": "input_2"
-                },
-                "36": {
-                    "src_node": "j6 belt reduction",
+                "21": {
+                    "src_node": "j6 concentric reduction",
                     "src_port": "output",
                     "dst_node": "math_operation_26",
                     "dst_port": "input_0"
                 },
-                "37": {
-                    "src_node": "math_operation_49",
+                "22": {
+                    "src_node": "math_operation_86",
                     "src_port": "output",
-                    "dst_node": "set_global_variable_23",
+                    "dst_node": "j5 pos fbk final",
                     "dst_port": "input"
                 },
-                "38": {
-                    "src_node": "j3 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_17",
-                    "dst_port": "input_1"
-                },
-                "39": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_58",
-                    "dst_port": "input_2"
-                },
-                "40": {
-                    "src_node": "math_operation_45",
-                    "src_port": "output",
-                    "dst_node": "j2 pos fbk final",
-                    "dst_port": "input"
-                },
-                "41": {
+                "23": {
                     "src_node": "j4 gear reduction",
                     "src_port": "output",
                     "dst_node": "math_operation_18",
                     "dst_port": "input_0"
                 },
-                "42": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_70",
-                    "dst_port": "input_2"
-                },
-                "43": {
-                    "src_node": "j3 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_46",
-                    "dst_port": "input_0"
-                },
-                "44": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_62",
-                    "dst_port": "input_2"
-                },
-                "45": {
-                    "src_node": "j5 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_49",
-                    "dst_port": "input_0"
-                },
-                "46": {
-                    "src_node": "math_operation_22",
-                    "src_port": "output",
-                    "dst_node": "math_operation_49",
-                    "dst_port": "input_1"
-                },
-                "47": {
-                    "src_node": "math_operation_22",
+                "24": {
+                    "src_node": "math_operation_86",
                     "src_port": "output",
                     "dst_node": "math_operation_28",
                     "dst_port": "input_1"
                 },
-                "48": {
-                    "src_node": "math_operation_74",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_75",
-                    "dst_port": "input"
-                },
-                "49": {
-                    "src_node": "get_global_variable_72",
-                    "src_port": "output",
-                    "dst_node": "math_operation_73",
-                    "dst_port": "input_0"
-                },
-                "50": {
-                    "src_node": "j2 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_61",
-                    "dst_port": "input_1"
-                },
-                "51": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_22",
-                    "dst_port": "input_2"
-                },
-                "52": {
-                    "src_node": "math_operation_73",
-                    "src_port": "output",
-                    "dst_node": "math_operation_74",
-                    "dst_port": "input_0"
-                },
-                "53": {
-                    "src_node": "j6 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_29",
-                    "dst_port": "input_0"
-                },
-                "54": {
-                    "src_node": "get_global_variable_0",
-                    "src_port": "output",
-                    "dst_node": "j1 pos fbk raw",
-                    "dst_port": "input"
-                },
-                "55": {
-                    "src_node": "2pi",
-                    "src_port": "output",
-                    "dst_node": "math_operation_6",
-                    "dst_port": "input_2"
-                },
-                "56": {
-                    "src_node": "math_operation_29",
-                    "src_port": "output",
-                    "dst_node": "math_operation_51",
-                    "dst_port": "input_1"
-                },
-                "57": {
+                "25": {
                     "src_node": "math_operation_61",
                     "src_port": "output",
                     "dst_node": "math_operation_66",
                     "dst_port": "input_1"
                 },
-                "58": {
-                    "src_node": "j1 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_57",
-                    "dst_port": "input_1"
-                },
-                "59": {
-                    "src_node": "math_operation_73",
-                    "src_port": "output",
-                    "dst_node": "math_operation_27",
-                    "dst_port": "input_0"
-                },
-                "60": {
-                    "src_node": "j2 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_62",
-                    "dst_port": "input_1"
-                },
-                "61": {
+                "26": {
                     "src_node": "math_operation_12",
                     "src_port": "output",
                     "dst_node": "math_operation_16",
                     "dst_port": "input_1"
                 },
-                "62": {
+                "27": {
+                    "src_node": "j3 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_46",
+                    "dst_port": "input_0"
+                },
+                "28": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_62",
+                    "dst_port": "input_2"
+                },
+                "29": {
+                    "src_node": "j5 concentric reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_90",
+                    "dst_port": "input_1"
+                },
+                "30": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_22",
+                    "dst_port": "input_2"
+                },
+                "31": {
                     "src_node": "math_operation_27",
                     "src_port": "output",
                     "dst_node": "math_operation_78",
                     "dst_port": "input_0"
                 },
-                "63": {
+                "32": {
+                    "src_node": "math_operation_91",
+                    "src_port": "output",
+                    "dst_node": "math_operation_28",
+                    "dst_port": "input_0"
+                },
+                "33": {
                     "src_node": "get_global_variable_5",
                     "src_port": "output",
                     "dst_node": "math_operation_26",
                     "dst_port": "input_1"
                 },
-                "64": {
+                "34": {
                     "src_node": "math_operation_46",
                     "src_port": "output",
                     "dst_node": "set_global_variable_15",
                     "dst_port": "input"
                 },
-                "65": {
+                "35": {
                     "src_node": "math_operation_26",
                     "src_port": "output",
-                    "dst_node": "math_operation_28",
+                    "dst_node": "math_operation_91",
                     "dst_port": "input_0"
                 },
-                "66": {
+                "36": {
                     "src_node": "get_global_variable_3",
                     "src_port": "output",
                     "dst_node": "math_operation_18",
                     "dst_port": "input_1"
                 },
-                "67": {
-                    "src_node": "math_operation_28",
-                    "src_port": "output",
-                    "dst_node": "math_operation_29",
-                    "dst_port": "input_1"
-                },
-                "68": {
-                    "src_node": "j6 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_77",
-                    "dst_port": "input_1"
-                },
-                "69": {
+                "37": {
                     "src_node": "j6 offset",
                     "src_port": "output",
                     "dst_node": "math_operation_51",
                     "dst_port": "input_0"
                 },
-                "70": {
-                    "src_node": "j4 gear reduction",
+                "38": {
+                    "src_node": "math_operation_89",
                     "src_port": "output",
-                    "dst_node": "math_operation_70",
-                    "dst_port": "input_1"
+                    "dst_node": "math_operation_90",
+                    "dst_port": "input_0"
                 },
-                "71": {
+                "39": {
                     "src_node": "get_global_variable_4",
                     "src_port": "output",
                     "dst_node": "j5 pos fbk raw",
                     "dst_port": "input"
                 },
-                "72": {
-                    "src_node": "j5 offset",
-                    "src_port": "output",
-                    "dst_node": "math_operation_73",
-                    "dst_port": "input_1"
-                },
-                "73": {
-                    "src_node": "j3 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_13",
-                    "dst_port": "input_0"
-                },
-                "74": {
-                    "src_node": "math_operation_51",
-                    "src_port": "output",
-                    "dst_node": "set_global_variable_30",
-                    "dst_port": "input"
-                },
-                "75": {
-                    "src_node": "math_operation_77",
-                    "src_port": "output",
-                    "dst_node": "math_operation_27",
-                    "dst_port": "input_1"
-                },
-                "76": {
+                "40": {
                     "src_node": "get_global_variable_60",
                     "src_port": "output",
                     "dst_node": "math_operation_61",
                     "dst_port": "input_0"
                 },
-                "77": {
+                "41": {
+                    "src_node": "math_operation_51",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_30",
+                    "dst_port": "input"
+                },
+                "42": {
                     "src_node": "2pi",
                     "src_port": "output",
                     "dst_node": "math_operation_26",
                     "dst_port": "input_2"
                 },
-                "78": {
+                "43": {
                     "src_node": "math_operation_12",
                     "src_port": "output",
                     "dst_node": "math_operation_45",
                     "dst_port": "input_1"
                 },
-                "79": {
+                "44": {
                     "src_node": "math_operation_57",
                     "src_port": "output",
                     "dst_node": "math_operation_58",
                     "dst_port": "input_0"
                 },
-                "80": {
+                "45": {
                     "src_node": "2pi",
                     "src_port": "output",
                     "dst_node": "math_operation_12",
                     "dst_port": "input_2"
                 },
-                "81": {
-                    "src_node": "j5 gear reduction",
-                    "src_port": "output",
-                    "dst_node": "math_operation_22",
-                    "dst_port": "input_0"
-                },
-                "82": {
+                "46": {
                     "src_node": "math_operation_66",
                     "src_port": "output",
                     "dst_node": "math_operation_17",
                     "dst_port": "input_0"
                 },
-                "83": {
+                "47": {
                     "src_node": "get_global_variable_68",
                     "src_port": "output",
                     "dst_node": "math_operation_69",
                     "dst_port": "input_0"
                 },
-                "84": {
-                    "src_node": "math_operation_18",
-                    "src_port": "output",
-                    "dst_node": "math_operation_47",
-                    "dst_port": "input_1"
-                },
-                "85": {
-                    "src_node": "get_global_variable_4",
-                    "src_port": "output",
-                    "dst_node": "math_operation_22",
-                    "dst_port": "input_1"
-                },
-                "86": {
+                "48": {
                     "src_node": "get_global_variable_55",
                     "src_port": "output",
                     "dst_node": "math_operation_57",
                     "dst_port": "input_0"
                 },
-                "87": {
+                "49": {
                     "src_node": "2pi",
                     "src_port": "output",
                     "dst_node": "math_operation_17",
                     "dst_port": "input_2"
                 },
-                "88": {
+                "50": {
                     "src_node": "math_operation_62",
                     "src_port": "output",
                     "dst_node": "set_global_variable_63",
                     "dst_port": "input"
                 },
-                "89": {
-                    "src_node": "j4 offset",
+                "51": {
+                    "src_node": "j6 concentric reduction",
                     "src_port": "output",
-                    "dst_node": "math_operation_47",
-                    "dst_port": "input_0"
+                    "dst_node": "math_operation_78",
+                    "dst_port": "input_1"
                 },
-                "90": {
+                "52": {
+                    "src_node": "get_global_variable_2",
+                    "src_port": "output",
+                    "dst_node": "math_operation_13",
+                    "dst_port": "input_1"
+                },
+                "53": {
                     "src_node": "get_global_variable_5",
                     "src_port": "output",
                     "dst_node": "j6 pos fbk raw",
                     "dst_port": "input"
                 },
-                "91": {
+                "54": {
                     "src_node": "math_operation_44",
                     "src_port": "output",
                     "dst_node": "j1 pos fbk final",
                     "dst_port": "input"
                 },
-                "92": {
+                "55": {
                     "src_node": "get_global_variable_56",
                     "src_port": "output",
                     "dst_node": "math_operation_76",
                     "dst_port": "input_0"
                 },
-                "93": {
-                    "src_node": "j6 belt reduction",
+                "56": {
+                    "src_node": "j1 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_58",
+                    "dst_port": "input_1"
+                },
+                "57": {
+                    "src_node": "get_global_variable_3",
+                    "src_port": "output",
+                    "dst_node": "j4 pos fbk raw",
+                    "dst_port": "input"
+                },
+                "58": {
+                    "src_node": "math_operation_51",
+                    "src_port": "output",
+                    "dst_node": "j6 pos fbk final",
+                    "dst_port": "input"
+                },
+                "59": {
+                    "src_node": "get_global_variable_1",
+                    "src_port": "output",
+                    "dst_node": "math_operation_12",
+                    "dst_port": "input_1"
+                },
+                "60": {
+                    "src_node": "math_operation_76",
+                    "src_port": "output",
+                    "dst_node": "math_operation_77",
+                    "dst_port": "input_0"
+                },
+                "61": {
+                    "src_node": "math_operation_47",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_20",
+                    "dst_port": "input"
+                },
+                "62": {
+                    "src_node": "j1 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_44",
+                    "dst_port": "input_0"
+                },
+                "63": {
+                    "src_node": "math_operation_13",
+                    "src_port": "output",
+                    "dst_node": "math_operation_16",
+                    "dst_port": "input_0"
+                },
+                "64": {
+                    "src_node": "math_operation_47",
+                    "src_port": "output",
+                    "dst_node": "j4 pos fbk final",
+                    "dst_port": "input"
+                },
+                "65": {
+                    "src_node": "math_operation_47",
+                    "src_port": "output",
+                    "dst_node": "math_operation_27",
+                    "dst_port": "input_1"
+                },
+                "66": {
+                    "src_node": "math_operation_92",
+                    "src_port": "output",
+                    "dst_node": "math_operation_27",
+                    "dst_port": "input_0"
+                },
+                "67": {
+                    "src_node": "math_operation_16",
+                    "src_port": "output",
+                    "dst_node": "math_operation_46",
+                    "dst_port": "input_1"
+                },
+                "68": {
+                    "src_node": "get_global_variable_1",
+                    "src_port": "output",
+                    "dst_node": "j2 pos fbk raw",
+                    "dst_port": "input"
+                },
+                "69": {
+                    "src_node": "math_operation_46",
+                    "src_port": "output",
+                    "dst_node": "j3 pos fbk final",
+                    "dst_port": "input"
+                },
+                "70": {
+                    "src_node": "get_global_variable_0",
+                    "src_port": "output",
+                    "dst_node": "math_operation_6",
+                    "dst_port": "input_1"
+                },
+                "71": {
+                    "src_node": "j3 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_65",
+                    "dst_port": "input_1"
+                },
+                "72": {
+                    "src_node": "math_operation_77",
+                    "src_port": "output",
+                    "dst_node": "math_operation_92",
+                    "dst_port": "input_0"
+                },
+                "73": {
+                    "src_node": "j5 rv ratio",
+                    "src_port": "output",
+                    "dst_node": "math_operation_87",
+                    "dst_port": "input_0"
+                },
+                "74": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_18",
+                    "dst_port": "input_2"
+                },
+                "75": {
+                    "src_node": "math_operation_47",
+                    "src_port": "output",
+                    "dst_node": "math_operation_49",
+                    "dst_port": "input_0"
+                },
+                "76": {
+                    "src_node": "j3 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_17",
+                    "dst_port": "input_1"
+                },
+                "77": {
+                    "src_node": "2pi",
                     "src_port": "output",
                     "dst_node": "math_operation_78",
+                    "dst_port": "input_2"
+                },
+                "78": {
+                    "src_node": "math_operation_47",
+                    "src_port": "output",
+                    "dst_node": "math_operation_89",
+                    "dst_port": "input_1"
+                },
+                "79": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_58",
+                    "dst_port": "input_2"
+                },
+                "80": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_90",
+                    "dst_port": "input_2"
+                },
+                "81": {
+                    "src_node": "math_operation_45",
+                    "src_port": "output",
+                    "dst_node": "j2 pos fbk final",
+                    "dst_port": "input"
+                },
+                "82": {
+                    "src_node": "math_operation_29",
+                    "src_port": "output",
+                    "dst_node": "math_operation_51",
+                    "dst_port": "input_1"
+                },
+                "83": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_70",
+                    "dst_port": "input_2"
+                },
+                "84": {
+                    "src_node": "math_operation_22",
+                    "src_port": "output",
+                    "dst_node": "math_operation_49",
+                    "dst_port": "input_1"
+                },
+                "85": {
+                    "src_node": "j6 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_29",
+                    "dst_port": "input_0"
+                },
+                "86": {
+                    "src_node": "j2 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_61",
+                    "dst_port": "input_1"
+                },
+                "87": {
+                    "src_node": "get_global_variable_72",
+                    "src_port": "output",
+                    "dst_node": "math_operation_73",
+                    "dst_port": "input_0"
+                },
+                "88": {
+                    "src_node": "get_global_variable_0",
+                    "src_port": "output",
+                    "dst_node": "j1 pos fbk raw",
+                    "dst_port": "input"
+                },
+                "89": {
+                    "src_node": "2pi",
+                    "src_port": "output",
+                    "dst_node": "math_operation_6",
+                    "dst_port": "input_2"
+                },
+                "90": {
+                    "src_node": "math_operation_47",
+                    "src_port": "output",
+                    "dst_node": "math_operation_91",
+                    "dst_port": "input_1"
+                },
+                "91": {
+                    "src_node": "j1 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_57",
+                    "dst_port": "input_1"
+                },
+                "92": {
+                    "src_node": "math_operation_86",
+                    "src_port": "output",
+                    "dst_node": "math_operation_92",
+                    "dst_port": "input_1"
+                },
+                "93": {
+                    "src_node": "j2 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_62",
                     "dst_port": "input_1"
                 },
                 "94": {
-                    "src_node": "math_operation_17",
+                    "src_node": "j4 gear reduction",
                     "src_port": "output",
-                    "dst_node": "set_global_variable_67",
-                    "dst_port": "input"
+                    "dst_node": "math_operation_70",
+                    "dst_port": "input_1"
                 },
                 "95": {
+                    "src_node": "math_operation_28",
+                    "src_port": "output",
+                    "dst_node": "math_operation_29",
+                    "dst_port": "input_1"
+                },
+                "96": {
+                    "src_node": "j6 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_77",
+                    "dst_port": "input_1"
+                },
+                "97": {
+                    "src_node": "math_operation_86",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_23",
+                    "dst_port": "input"
+                },
+                "98": {
+                    "src_node": "j5 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_73",
+                    "dst_port": "input_1"
+                },
+                "99": {
+                    "src_node": "j3 gear reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_13",
+                    "dst_port": "input_0"
+                },
+                "100": {
+                    "src_node": "j5 rv ratio",
+                    "src_port": "output",
+                    "dst_node": "math_operation_93",
+                    "dst_port": "input_1"
+                },
+                "101": {
+                    "src_node": "j5 concentric reduction",
+                    "src_port": "output",
+                    "dst_node": "math_operation_22",
+                    "dst_port": "input_0"
+                },
+                "102": {
+                    "src_node": "math_operation_18",
+                    "src_port": "output",
+                    "dst_node": "math_operation_47",
+                    "dst_port": "input_1"
+                },
+                "103": {
+                    "src_node": "get_global_variable_4",
+                    "src_port": "output",
+                    "dst_node": "math_operation_22",
+                    "dst_port": "input_1"
+                },
+                "104": {
                     "src_node": "j2 offset",
                     "src_port": "output",
                     "dst_node": "math_operation_45",
                     "dst_port": "input_0"
+                },
+                "105": {
+                    "src_node": "j4 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_47",
+                    "dst_port": "input_0"
+                },
+                "106": {
+                    "src_node": "j5 offset",
+                    "src_port": "output",
+                    "dst_node": "math_operation_86",
+                    "dst_port": "input_0"
+                },
+                "107": {
+                    "src_node": "math_operation_17",
+                    "src_port": "output",
+                    "dst_node": "set_global_variable_67",
+                    "dst_port": "input"
                 }
             },
             "nodes": {
@@ -6786,7 +6911,7 @@
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": -0.0070921985815602835
+                        "value": -0.00486121238636916
                     }
                 },
                 "set_global_variable_8": {
@@ -6883,7 +7008,7 @@
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": 0.004665593580143234
+                        "value": 0.004665999035616388
                     }
                 },
                 "set_global_variable_20": {
@@ -6894,11 +7019,11 @@
                         }
                     }
                 },
-                "j5 gear reduction": {
+                "j5 concentric reduction": {
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": -0.004567920408554802
+                        "value": -0.5833333333333334
                     }
                 },
                 "math_operation_22": {
@@ -6918,18 +7043,18 @@
                         }
                     }
                 },
-                "j6 belt reduction": {
+                "j6 concentric reduction": {
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": 1.0
+                        "value": -0.7924528301886793
                     }
                 },
                 "j6 gear reduction": {
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": -0.006549217368524461
+                        "value": 0.008264462809917356
                     }
                 },
                 "math_operation_26": {
@@ -6946,7 +7071,7 @@
                     "config": {
                         "type": "double",
                         "op_type": "nary",
-                        "op": "add",
+                        "op": "sub",
                         "input_count": 2
                     }
                 },
@@ -6955,7 +7080,7 @@
                     "config": {
                         "type": "double",
                         "op_type": "nary",
-                        "op": "sub",
+                        "op": "add",
                         "input_count": 2
                     }
                 },
@@ -6980,14 +7105,14 @@
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": 0.648552
+                        "value": -1.636
                     }
                 },
                 "j1 offset": {
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": 0.0
+                        "value": 0.0277
                     }
                 },
                 "j2 offset": {
@@ -7001,7 +7126,7 @@
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": -1.54
+                        "value": 4.26979
                     }
                 },
                 "j1 pos fbk raw": {
@@ -7134,7 +7259,7 @@
                     "type": "constant",
                     "config": {
                         "type": "double",
-                        "value": 1.66063
+                        "value": 5.3941
                     }
                 },
                 "j3 offset": {
@@ -7305,15 +7430,6 @@
                         "input_count": 2
                     }
                 },
-                "math_operation_74": {
-                    "type": "math_operation",
-                    "config": {
-                        "type": "double",
-                        "op_type": "nary",
-                        "op": "div",
-                        "input_count": 3
-                    }
-                },
                 "set_global_variable_75": {
                     "type": "set_global_variable",
                     "config": {
@@ -7427,6 +7543,76 @@
                             "default": null,
                             "timeout": null
                         }
+                    }
+                },
+                "math_operation_86": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "math_operation_87": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "mul",
+                        "input_count": 2
+                    }
+                },
+                "j5 rv ratio": {
+                    "type": "constant",
+                    "config": {
+                        "type": "double",
+                        "value": 0.00783068783068783
+                    }
+                },
+                "math_operation_89": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "sub",
+                        "input_count": 2
+                    }
+                },
+                "math_operation_90": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "div",
+                        "input_count": 3
+                    }
+                },
+                "math_operation_91": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "add",
+                        "input_count": 2
+                    }
+                },
+                "math_operation_92": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "sub",
+                        "input_count": 2
+                    }
+                },
+                "math_operation_93": {
+                    "type": "math_operation",
+                    "config": {
+                        "type": "double",
+                        "op_type": "nary",
+                        "op": "div",
+                        "input_count": 2
                     }
                 }
             }
@@ -7874,20 +8060,20 @@
                         ],
                         "limits": {
                             "0": {
-                                "min_pos": 0,
-                                "max_pos": 0,
+                                "min_pos": -80,
+                                "max_pos": 80,
                                 "max_vel": 6.0,
                                 "max_acc": 100
                             },
                             "1": {
-                                "min_pos": 0,
-                                "max_pos": 0,
+                                "min_pos": -60,
+                                "max_pos": 75,
                                 "max_vel": 2.8333333333333335,
                                 "max_acc": 100
                             },
                             "2": {
-                                "min_pos": 0,
-                                "max_pos": 0,
+                                "min_pos": -78,
+                                "max_pos": 90,
                                 "max_vel": 3.0,
                                 "max_acc": 100
                             },
@@ -7916,32 +8102,32 @@
                         "backup_record_cartesian_threshold": 0.01,
                         "cartesian_limits": {
                             "x": {
-                                "min_pos": 0.5,
-                                "max_pos": 1.5,
-                                "max_vel": 0.3,
-                                "max_acc": 1
-                            },
-                            "y": {
-                                "min_pos": -1.0,
-                                "max_pos": 1.0,
-                                "max_vel": 0.3,
-                                "max_acc": 1
-                            },
-                            "z": {
-                                "min_pos": 0.0,
+                                "min_pos": 1.2,
                                 "max_pos": 2.0,
                                 "max_vel": 0.3,
                                 "max_acc": 1
                             },
+                            "y": {
+                                "min_pos": -1.2,
+                                "max_pos": 1.2,
+                                "max_vel": 0.3,
+                                "max_acc": 1
+                            },
+                            "z": {
+                                "min_pos": -0.66,
+                                "max_pos": 1.8,
+                                "max_vel": 0.3,
+                                "max_acc": 1
+                            },
                             "xangle": {
-                                "min_pos": 0,
-                                "max_pos": 0,
+                                "min_pos": 120,
+                                "max_pos": 240,
                                 "max_vel": 10.0,
                                 "max_acc": 100
                             },
                             "yangle": {
-                                "min_pos": 0,
-                                "max_pos": 0,
+                                "min_pos": -60,
+                                "max_pos": 60,
                                 "max_vel": 10.0,
                                 "max_acc": 100
                             },

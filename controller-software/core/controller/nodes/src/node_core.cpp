@@ -389,7 +389,7 @@ uint32_t Node_Core::add_node(std::string network_name, std::string node_name, st
     // creates a new node with the given name and type
 
     if(networks.find(network_name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << network_name << std::endl;
         return 1;
     }
 
@@ -407,7 +407,7 @@ uint32_t Node_Core::remove_node(std::string network_name, std::string node_name)
     // removes a node with the given name
 
     if(networks.find(network_name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << network_name << std::endl;
         return 1;
     }
 
@@ -425,7 +425,7 @@ uint32_t Node_Core::configure_node(std::string network_name, std::string node_na
     // configures a node with the given name
 
     if(networks.find(network_name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << network_name << std::endl;
         return 1;
     }
 
@@ -443,7 +443,7 @@ uint32_t Node_Core::connect_nodes(std::string network_name, std::string source_n
     // connects an output to an input
 
     if(networks.find(network_name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << network_name << std::endl;
         return 1;
     }
 
@@ -594,12 +594,12 @@ uint32_t Node_Core::rename_network(std::string old_name, std::string new_name){
     // renames the network with the given old name to the new name, execution order will be maintained since the network is a shared pointer
 
     if(networks.find(old_name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << old_name << std::endl;
         return 1;
     }
 
     if(networks.find(new_name) != networks.end()){
-        std::cerr << "Error: new network name already exists" << std::endl;
+        std::cerr << "Error: new network name already exists: " << new_name << std::endl;
         return 2;
     }
 
@@ -615,7 +615,7 @@ uint32_t Node_Core::delete_network(std::string name){
     // deletes the network with the given name
 
     if(networks.find(name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << name << std::endl;
         return 1;
     }
 
@@ -632,7 +632,7 @@ uint32_t Node_Core::configure_network(std::string name, json* data){
 
     // make sure the network exists
     if(networks.find(name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << name << std::endl;
         return 1;
     }
 
@@ -753,12 +753,12 @@ uint32_t Node_Core::rebuild_execution_order(std::string name){
     // rebuilds the execution order for the network with the given name
 
     if(networks.find(name) == networks.end()){
-        std::cerr << "Error: network name not found" << std::endl;
+        std::cerr << "Error: network name not found: " << name << std::endl;
         return 1;
     }
 
     if(networks[name]->rebuild_execution_order() != 0){
-        std::cerr << "Error: failed to rebuild execution order" << std::endl;
+        std::cerr << "Error: failed to rebuild execution order: " << name << std::endl;
         return 2;
     }
 

@@ -309,93 +309,65 @@ uint32_t kins::run(){
 }
 
 bool kins::clamp_to_joint_limits(){
-    // clamp the commanded joint positions to the limits
+    // Failsafe backstop, applied after every control-mode dispatch (JOG/JOINT/CARTESIAN alike):
+    // caps this cycle's per-joint commanded delta so it can never exceed what
+    // joint_distances_to_limit[i].allowed_positive_vel/allowed_negative_vel already permit.
+    // update_joint_distances_to_limit() (called once per cycle, before dispatch) is the single
+    // source of truth for "which direction is safe to move a joint that is at/over a limit, and
+    // how fast" -- jog_joint(), ramp_joints_to_target(), and apply_cartesian_joint_rate_limit()
+    // all already cap their own output to these same values, so this function is a true no-op for
+    // every currently-exercised control path (in particular: zero jog input -> zero delta -> never
+    // exceeds either cap -> the joint holds, exactly as intended). It only ever engages for a delta
+    // that exceeds the allowed velocity, in which case it caps the step (or fully holds, when
+    // allowed_vel is 0 because the joint is already past that limit) -- it never teleports to the
+    // limit boundary.
 
     if(bypass_joint_limits){
         last_output_joint_positions = out_sigs.cmd_joint_positions;
         return false; // if bypassing limits, do nothing
     }
 
-    double tol = 1e-3; // tolerance for clamping, to avoid false triggering of flag
-
-    bool outside_limit = false; // flag to check if any joint was outside_limit
-    
-    // positive if within limits, negative if outside
-    double error_distance = 0.0f;
-    double last_error_distance = 0.0f;
+    bool outside_limit = false;
 
     for(int i = 0; i < 6; i++){
+        if(joint_distances_to_limit[i].infinite) continue; // continuous joint, nothing to enforce
+
         double *cmd_pos = nullptr;
-        double last_cmd_pos = 0.0f;
-        double relative_cmd_pos = 0.0f;
-        double last_relative_cmd_pos = 0.0f;
-        double clamped_pos = 0.0f;
+        double last_cmd_pos = 0.0;
         switch(i){
-            case 0:
-                cmd_pos = &out_sigs.cmd_joint_positions.j1;
-                last_cmd_pos = last_output_joint_positions.j1;
-                break;
-            case 1:
-                cmd_pos = &out_sigs.cmd_joint_positions.j2;
-                last_cmd_pos = last_output_joint_positions.j2;
-                break;
-            case 2:
-                cmd_pos = &out_sigs.cmd_joint_positions.j3;
-                last_cmd_pos = last_output_joint_positions.j3;
-                relative_cmd_pos = out_sigs.cmd_joint_positions.j2;
-                last_relative_cmd_pos = last_output_joint_positions.j2;
-                break;
-            case 3:
-                cmd_pos = &out_sigs.cmd_joint_positions.j4;
-                last_cmd_pos = last_output_joint_positions.j4;
-                break;
-            case 4:
-                cmd_pos = &out_sigs.cmd_joint_positions.j5;
-                last_cmd_pos = last_output_joint_positions.j5;
-                break;
-            case 5:
-                cmd_pos = &out_sigs.cmd_joint_positions.j6;
-                last_cmd_pos = last_output_joint_positions.j6;
-                break;
+            case 0: cmd_pos = &out_sigs.cmd_joint_positions.j1; last_cmd_pos = last_output_joint_positions.j1; break;
+            case 1: cmd_pos = &out_sigs.cmd_joint_positions.j2; last_cmd_pos = last_output_joint_positions.j2; break;
+            case 2: cmd_pos = &out_sigs.cmd_joint_positions.j3; last_cmd_pos = last_output_joint_positions.j3; break;
+            case 3: cmd_pos = &out_sigs.cmd_joint_positions.j4; last_cmd_pos = last_output_joint_positions.j4; break;
+            case 4: cmd_pos = &out_sigs.cmd_joint_positions.j5; last_cmd_pos = last_output_joint_positions.j5; break;
+            case 5: cmd_pos = &out_sigs.cmd_joint_positions.j6; last_cmd_pos = last_output_joint_positions.j6; break;
         }
 
-        if(joint_limits[i].min_pos != joint_limits[i].max_pos){ // if the joint is not continuous
+        double delta = *cmd_pos - last_cmd_pos;
+        double max_pos_delta = (double)joint_distances_to_limit[i].allowed_positive_vel * (double)time_step;
+        double max_neg_delta = (double)joint_distances_to_limit[i].allowed_negative_vel * (double)time_step;
 
-            // check if in limits, then find nearest limit
-            if(*cmd_pos + relative_cmd_pos < joint_limits[i].min_pos - tol){
-                clamped_pos = joint_limits[i].min_pos - relative_cmd_pos - tol;
-                error_distance = joint_limits[i].min_pos - (*cmd_pos + relative_cmd_pos);
-                last_error_distance = joint_limits[i].min_pos - (last_cmd_pos + last_relative_cmd_pos);
-                
-                // should be negative if outside the limit
-                error_distance = -error_distance;
-                last_error_distance = -last_error_distance;
-            }
-            else if(*cmd_pos + relative_cmd_pos > joint_limits[i].max_pos + tol){
-                clamped_pos = joint_limits[i].max_pos - relative_cmd_pos + tol;
-                error_distance = joint_limits[i].max_pos - (*cmd_pos + relative_cmd_pos);
-                last_error_distance = joint_limits[i].max_pos - (last_cmd_pos + last_relative_cmd_pos);
-            }
-            else{
-                continue;
-            }
-
+        if(delta > max_pos_delta){
+            *cmd_pos = last_cmd_pos + max_pos_delta; // hold (max_pos_delta==0 past the max limit) or cap the step
             outside_limit = true;
+        }
+        else if(delta < -max_neg_delta){
+            *cmd_pos = last_cmd_pos - max_neg_delta; // hold (max_neg_delta==0 past the min limit) or cap the step
+            outside_limit = true;
+        }
 
-            if(error_distance < last_error_distance){
-                // moving towards the limit (good), allow movement
-            }
-            else{
-                // moving away from the limit (bad), clamp position
-                *cmd_pos = clamped_pos;
-            }
-
+        // flag genuine limit violations even on cycles where this cycle's delta didn't need
+        // capping (e.g. an idle joint already sitting past a limit) -- preserves the original
+        // return-value meaning ("is any joint currently outside its limit"), not just "did we
+        // clamp this cycle".
+        if(joint_distances_to_limit[i].to_min < 0.0 || joint_distances_to_limit[i].to_max < 0.0){
+            outside_limit = true;
         }
     }
 
     last_output_joint_positions = out_sigs.cmd_joint_positions;
 
-    return outside_limit; // return true if any joint was outside_limit
+    return outside_limit; // true if any joint is currently outside its limit
 }
 
 void kins::update_forward_kinematics_outputs(){
