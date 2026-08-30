@@ -109,6 +109,7 @@ class pi_controller: public base_node {
             
             */
 
+            // apply settings from json
             if(data->find("Kp") != data->end()){
                 ctrl.Kp = (*data)["Kp"];
             }
@@ -124,6 +125,13 @@ class pi_controller: public base_node {
             if(data->find("output_max") != data->end()){
                 ctrl.output_max = (*data)["output_max"];
             }
+
+            // add all values to json as feedback
+            (*data)["Kp"] = ctrl.Kp;
+            (*data)["Ki"] = ctrl.Ki;
+            (*data)["i_limit"] = ctrl.i_limit;
+            (*data)["output_min"] = ctrl.output_min;
+            (*data)["output_max"] = ctrl.output_max;
             return 0;
         }
 };
