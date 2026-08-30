@@ -915,8 +915,12 @@ void kins::move_cartesian(){
         return;
     }
 
-    const float pos_tol = 1e-5f;   // position tolerance for considering a linear axis "at target" (meters)
-    const float angle_tol = 1e-5f; // angle tolerance for considering the orientation channel "at target" (radians)
+    // position / orientation tolerances for "at target" (also gate the ramp termination below).
+    // Configurable; defaults deliberately clear of float32 noise -- angle_tol in particular must
+    // stay above the ~7e-4 rad resolution floor of 2*acosf(|dot|) near dot=1, or the ramp never
+    // snaps to target and at_cmd_pos never latches. See kins.h.
+    const float pos_tol   = at_cmd_pos_tol;
+    const float angle_tol = at_cmd_pos_angle_tol;
 
     // ---- x, y, z: per-axis accel/vel-limited ramp (unchanged) ----------------------------------
     std::array<float,3> current = {
@@ -1078,7 +1082,14 @@ void kins::move_cartesian(){
     // exact same physical orientation, so a per-axis Euler comparison would false-trigger here --
     // same reasoning validate_kins_solution() already uses its rotation-matrix Frobenius check for.
     quat_rot q_reached = quatFromZYX(last_cmd_cartesian_positions.zangle, last_cmd_cartesian_positions.yangle, last_cmd_cartesian_positions.xangle);
-    if(quat_angle_between(q_reached, q_target) > angle_tol) all_at_target = false;
+    // cancellation-free equivalent of quat_angle_between(q_reached, q_target) <= angle_tol:
+    // |dot| >= cos(angle_tol/2). Avoids acosf near dot=1 (infinite slope -> ~7e-4 rad float32
+    // resolution floor); cosf near 0 is well-conditioned so the threshold stays meaningful.
+    {
+        float ori_dot = fabsf(q_reached.w*q_target.w + q_reached.x*q_target.x
+                            + q_reached.y*q_target.y + q_reached.z*q_target.z);
+        if(ori_dot < cosf(0.5f * angle_tol)) all_at_target = false;
+    }
 
     out_sigs.at_cmd_pos = all_at_target;
 }

@@ -148,6 +148,13 @@ class kins: public base_node {
 
         float max_jog_speed = 0.1f; // max jog speed as a portion of the joint max_vel
 
+        // tolerances for move_cartesian()'s out_sigs.at_cmd_pos latch (and its ramp-termination
+        // gate). Defaults chosen to clear float32 noise: at_cmd_pos_angle_tol must stay above the
+        // ~7e-4 rad floor of 2*acosf(|dot|) near dot=1 (see quat_angle_between()). Overridable via
+        // the "at_cmd_pos_tol" config block.
+        float at_cmd_pos_tol       = 1e-4f; // metres  (0.1 mm)
+        float at_cmd_pos_angle_tol = 1e-3f; // radians (~0.057 deg)
+
         cartesian_positions last_cmd_cartesian_positions; // these are what were used with the inverse kins
         cartesian_positions prev_cmd_cartesian_positions; // TCP position before this cycle's jog step
 
@@ -574,6 +581,32 @@ class kins: public base_node {
                     return 1; // error code for configuration failure
                 }
                 backup_record_cartesian_threshold = threshold;
+            }
+
+            // optional: override the CARTESIAN-mode "at target" tolerances
+            // { "at_cmd_pos_tol": { "pos": 0.0001, "angle": 0.06 } }   pos in metres, angle in degrees
+            if(json->find("at_cmd_pos_tol") != json->end()){
+                auto& tol_json = (*json)["at_cmd_pos_tol"];
+                if(!tol_json.is_object()){
+                    std::cerr << "Invalid at_cmd_pos_tol format, expected an object." << std::endl;
+                    return 1;
+                }
+                if(tol_json.find("pos") != tol_json.end()){
+                    float p = tol_json["pos"].get<float>();
+                    if(p <= 0.0f){
+                        std::cerr << "Invalid at_cmd_pos_tol.pos, must be > 0." << std::endl;
+                        return 1;
+                    }
+                    at_cmd_pos_tol = p;
+                }
+                if(tol_json.find("angle") != tol_json.end()){
+                    float a = tol_json["angle"].get<float>();
+                    if(a <= 0.0f){
+                        std::cerr << "Invalid at_cmd_pos_tol.angle, must be > 0." << std::endl;
+                        return 1;
+                    }
+                    at_cmd_pos_angle_tol = a * M_PI / 180.0f; // degrees to radians
+                }
             }
 
             if(json->find("cartesian_limits") != json->end()){
