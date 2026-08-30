@@ -415,9 +415,11 @@ void kins::update_forward_kinematics_outputs(){
     // euler_out_tcp is [Z-rot, Y-rot, X-rot] (rot_to_euler()'s internal flip + matrixToPose()'s
     // convention) -- assign so .xangle genuinely means X-rotation and .zangle means Z-rotation,
     // matching jog_cartesian()/jog_mouse() and inverse_kins().
-    out_sigs.fbk_cartesian_positions.zangle = euler_out_tcp[0]; // Z-rotation
-    out_sigs.fbk_cartesian_positions.yangle = euler_out_tcp[1];
-    out_sigs.fbk_cartesian_positions.xangle = euler_out_tcp[2]; // X-rotation
+    // unwrap bounded angle axes onto their limit band's branch (matches decompose_cmd_angles());
+    // continuous axes keep the principal value. index 3,4,5 == xangle,yangle,zangle.
+    out_sigs.fbk_cartesian_positions.zangle = unwrap_cartesian_angle(5, euler_out_tcp[0]);
+    out_sigs.fbk_cartesian_positions.yangle = unwrap_cartesian_angle(4, euler_out_tcp[1]);
+    out_sigs.fbk_cartesian_positions.xangle = unwrap_cartesian_angle(3, euler_out_tcp[2]);
     return;
 }
 
@@ -599,13 +601,24 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
         // apply the jog rotation to the current quaternion
         q = multiply(q, jog_rot);
 
-        // convert the quaternion back to euler angles
-        toEulerZYX(&q, 
-            &last_cmd_cartesian_positions.zangle, 
-            &last_cmd_cartesian_positions.yangle, 
-            &last_cmd_cartesian_positions.xangle
+        // convert back to the stored triple, each angle axis unwrapped onto its limit band's branch
+        decompose_cmd_angles(q,
+            last_cmd_cartesian_positions.zangle,
+            last_cmd_cartesian_positions.yangle,
+            last_cmd_cartesian_positions.xangle
         );
-        
+
+        // position backstop: hard-clamp bounded angle axes to the limit box (jog velocity is
+        // already throttled near limits via cartesian_distances_to_limit[jog_axis])
+        {
+            float* ang[3] = { &last_cmd_cartesian_positions.xangle,
+                              &last_cmd_cartesian_positions.yangle,
+                              &last_cmd_cartesian_positions.zangle };
+            for(int i = 3; i <= 5; i++){
+                if(cartesian_distances_to_limit[i].infinite) continue;
+                *ang[i-3] = std::clamp(*ang[i-3], cartesian_limits[i].min_pos, cartesian_limits[i].max_pos);
+            }
+        }
     }
 
     inverse_kins(); // calculate the joint positions based on the new cartesian positions
@@ -834,6 +847,10 @@ uint32_t kins::set_move_cartesian_cmd_positions(const cartesian_positions& new_t
         new_target.xangle, new_target.yangle, new_target.zangle
     };
 
+    // unwrap requested angle targets onto their limit band's branch so off-centre / wide bands
+    // compare correctly in constrain() below. index 3,4,5 == xangle,yangle,zangle.
+    for(int i = 3; i <= 5; i++) req[i] = unwrap_cartesian_angle(i, req[i]);
+
     // largest fraction of this call's requested move that every constrained axis can tolerate
     float s = 1.0f;
     auto constrain = [&](float base, float target_val, float min_pos, float max_pos){
@@ -1017,7 +1034,25 @@ void kins::move_cartesian(){
     }
 
     float new_zangle, new_yangle, new_xangle;
-    toEulerZYX(&q_new, &new_zangle, &new_yangle, &new_xangle);
+    // decompose with each angle axis unwrapped onto its limit band's branch so bounded/off-centre
+    // limit bands stay meaningful for the clamp below
+    decompose_cmd_angles(q_new, new_zangle, new_yangle, new_xangle);
+
+    // orientation-path clamp: the slerp geodesic between two in-box endpoints can still bow
+    // outside the per-axis Euler box, so clamp each bounded angle axis every cycle -- no commanded
+    // orientation ever leaves the box. The linear x/y/z ramp (new_pos) is untouched and keeps
+    // moving. index 3,4,5 == xangle,yangle,zangle.
+    {
+        float* ang[3] = { &new_xangle, &new_yangle, &new_zangle };
+        bool ori_clamped = false;
+        for(int i = 3; i <= 5; i++){
+            if(cartesian_distances_to_limit[i].infinite) continue;
+            float& a = *ang[i-3];
+            if(a < cartesian_limits[i].min_pos)      { a = cartesian_limits[i].min_pos; ori_clamped = true; }
+            else if(a > cartesian_limits[i].max_pos) { a = cartesian_limits[i].max_pos; ori_clamped = true; }
+        }
+        if(ori_clamped) move_cartesian_last_ang_vel = 0.0f; // bleed the angular ramp against the limit
+    }
 
     // snapshot before mutating, same convention jog_cartesian()/jog_mouse() use -- inverse_kins()
     // rolls last_cmd_cartesian_positions back to this snapshot on IK failure or failed validation.
@@ -1336,9 +1371,11 @@ void kins::inverse_kins(){
             last_cmd_cartesian_positions.x      = tcp_pos_rl[0];
             last_cmd_cartesian_positions.y      = tcp_pos_rl[1];
             last_cmd_cartesian_positions.z      = tcp_pos_rl[2];
-            last_cmd_cartesian_positions.zangle = tcp_eul_rl[0];
-            last_cmd_cartesian_positions.yangle = tcp_eul_rl[1];
-            last_cmd_cartesian_positions.xangle = tcp_eul_rl[2];
+            // unwrap bounded angle axes onto their limit band's branch (index 3,4,5 ==
+            // xangle,yangle,zangle)
+            last_cmd_cartesian_positions.zangle = unwrap_cartesian_angle(5, tcp_eul_rl[0]);
+            last_cmd_cartesian_positions.yangle = unwrap_cartesian_angle(4, tcp_eul_rl[1]);
+            last_cmd_cartesian_positions.xangle = unwrap_cartesian_angle(3, tcp_eul_rl[2]);
         }
 
         bool valid = validate_kins_solution(&outSolution, &last_cmd_cartesian_positions, 0.02f, 0.05f);
@@ -1515,6 +1552,22 @@ void kins::rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* eul
     float temp = (*euler)[0];
     (*euler)[0] = (*euler)[2];
     (*euler)[2] = temp;
+}
+
+float kins::unwrap_cartesian_angle(int axis_index, float angle){
+    if(cartesian_distances_to_limit[axis_index].infinite) return angle; // continuous axis, principal range
+    // centre the unwrap on the band midpoint: any angle actually within the band (width < 2*pi)
+    // lands on the band's branch regardless of which +-pi branch toEulerZYX() produced.
+    float mid = 0.5f * (cartesian_limits[axis_index].min_pos + cartesian_limits[axis_index].max_pos);
+    return (float)wrapNearest(mid, angle);
+}
+
+void kins::decompose_cmd_angles(const quat_rot& q, float& zangle, float& yangle, float& xangle){
+    // cartesian_limits / cartesian_distances_to_limit index 3,4,5 == xangle,yangle,zangle
+    toEulerZYX(&q, &zangle, &yangle, &xangle);
+    zangle = unwrap_cartesian_angle(5, zangle);
+    yangle = unwrap_cartesian_angle(4, yangle);
+    xangle = unwrap_cartesian_angle(3, xangle);
 }
 
 void kins::update_joint_distances_to_limit(){

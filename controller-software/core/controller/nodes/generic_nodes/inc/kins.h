@@ -243,6 +243,18 @@ class kins: public base_node {
 
         void rot_to_euler(const std::array<float,9>* rot, std::array<float,3>* euler);
 
+        // Unwrap an orientation angle for cartesian axis `axis_index` (3=xangle, 4=yangle,
+        // 5=zangle) onto the 2*pi branch centred on that axis's configured limit band. Lets
+        // off-centre bands, or bands wider than toEulerZYX()'s output range (e.g. r2000 xangle
+        // 120..240 deg), be represented on a single continuous branch that the min/max checks and
+        // the slerp-path clamp can compare against. Continuous (infinite) axes are returned
+        // unchanged (principal [-pi,pi] range). Deterministic -- no dependence on prior value.
+        float unwrap_cartesian_angle(int axis_index, float angle);
+
+        // Decompose q to ZYX-Euler (zangle=yaw, yangle=pitch, xangle=roll), each angle axis passed
+        // through unwrap_cartesian_angle().
+        void decompose_cmd_angles(const quat_rot& q, float& zangle, float& yangle, float& xangle);
+
         struct tool {
             // offset from flange to TCP
             std::array<float,3> position;
@@ -712,6 +724,15 @@ class kins: public base_node {
                         // axis this call doesn't specify defaults to the real current pose instead of
                         // the struct-default 0 (which is nowhere near a real TCP position)
                         cartesian_positions new_cmd_positions = move_cartesian_target_valid ? move_cartesian_cmd_positions : out_sigs.fbk_cartesian_positions;
+
+                        // relative rotation deltas are accumulated here and applied together, after
+                        // the loop, as a single world-frame rotation (see below). They are NOT added
+                        // straight onto the stored ZYX-Euler components: doing that makes an xangle
+                        // delta a post-multiply (tool-frame X), a zangle delta a pre-multiply (world
+                        // Z), and a yangle delta neither -- inconsistent and mostly tool-relative.
+                        double d_xangle = 0.0, d_yangle = 0.0, d_zangle = 0.0;
+                        bool any_angle_delta = false;
+
                         for(int i = 0; i < 6; i++){
                             std::string axis_name = "";
                             switch(i){
@@ -729,7 +750,10 @@ class kins: public base_node {
                             double pos = cartesian_cmds[axis_name].get<float>();
                             if(i > 2){ pos *= M_PI / 180.0f; } // angle axes only: convert degrees to radians
                             if(absolute){
-                                // absolute position, set directly
+                                // absolute position, set directly. For the angle axes this is a full
+                                // world-XYZ pose spec: move_cartesian() composes them as
+                                // quatFromZYX(z,y,x) = world-fixed X-then-Y-then-Z; axes not named in
+                                // this command keep their current commanded value.
                                 switch(i){
                                     case 0: new_cmd_positions.x = pos; break;
                                     case 1: new_cmd_positions.y = pos; break;
@@ -740,18 +764,40 @@ class kins: public base_node {
                                 }
                             }
                             else {
-                                // relative position, add to existing
+                                // relative: linear axes add directly (already world-frame); rotation
+                                // axes are accumulated and applied as a world-frame rotation below.
                                 switch(i){
                                     case 0: new_cmd_positions.x += pos; break;
                                     case 1: new_cmd_positions.y += pos; break;
                                     case 2: new_cmd_positions.z += pos; break;
-                                    case 3: new_cmd_positions.xangle += pos; break;
-                                    case 4: new_cmd_positions.yangle += pos; break;
-                                    case 5: new_cmd_positions.zangle += pos; break;
+                                    case 3: d_xangle += pos; any_angle_delta = true; break;
+                                    case 4: d_yangle += pos; any_angle_delta = true; break;
+                                    case 5: d_zangle += pos; any_angle_delta = true; break;
                                 }
                             }
-                            
+
                         }
+
+                        if(!absolute && any_angle_delta){
+                            // apply the accumulated rotation about the WORLD X/Y/Z axes: pre-multiply
+                            // a world-frame delta quaternion onto the current commanded orientation.
+                            // quatFromZYX(dz,dy,dx) is the world-fixed (extrinsic) X-then-Y-then-Z
+                            // composition of the deltas; a single commanded axis reduces to a pure
+                            // rotation about that world axis. Guarded so a linear-only relative
+                            // command skips the Euler<->quat round-trip (and its gimbal sensitivity).
+                            quat_rot q_cur   = quatFromZYX(new_cmd_positions.zangle,
+                                                          new_cmd_positions.yangle,
+                                                          new_cmd_positions.xangle);
+                            quat_rot q_delta = quatFromZYX(d_zangle, d_yangle, d_xangle);
+                            quat_rot q_new   = multiply(q_delta, q_cur); // pre-multiply == world frame
+                            // decompose back to the stored triple, each angle axis unwrapped onto
+                            // its limit band's branch so finite/off-centre bands stay meaningful
+                            decompose_cmd_angles(q_new,
+                                                 new_cmd_positions.zangle,
+                                                 new_cmd_positions.yangle,
+                                                 new_cmd_positions.xangle);
+                        }
+
                         uint32_t ret = set_move_cartesian_cmd_positions(new_cmd_positions);
                     }
                     else {
