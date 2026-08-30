@@ -601,24 +601,17 @@ void kins::jog_cartesian(uint8_t jog_axis, float jog_vel_, float speed_override)
         // apply the jog rotation to the current quaternion
         q = multiply(q, jog_rot);
 
-        // convert back to the stored triple, each angle axis unwrapped onto its limit band's branch
+        // convert back to the stored triple, each angle axis unwrapped onto its limit band's
+        // branch (periodicity-only; does not change the orientation handed to inverse_kins()).
+        // Angular jog velocity is already throttled toward limits via
+        // cartesian_distances_to_limit[jog_axis]; do NOT hard-clamp the Euler components here --
+        // see the note in move_cartesian() (post-clamping a component makes the pose unreachable
+        // and stalls IK).
         decompose_cmd_angles(q,
             last_cmd_cartesian_positions.zangle,
             last_cmd_cartesian_positions.yangle,
             last_cmd_cartesian_positions.xangle
         );
-
-        // position backstop: hard-clamp bounded angle axes to the limit box (jog velocity is
-        // already throttled near limits via cartesian_distances_to_limit[jog_axis])
-        {
-            float* ang[3] = { &last_cmd_cartesian_positions.xangle,
-                              &last_cmd_cartesian_positions.yangle,
-                              &last_cmd_cartesian_positions.zangle };
-            for(int i = 3; i <= 5; i++){
-                if(cartesian_distances_to_limit[i].infinite) continue;
-                *ang[i-3] = std::clamp(*ang[i-3], cartesian_limits[i].min_pos, cartesian_limits[i].max_pos);
-            }
-        }
     }
 
     inverse_kins(); // calculate the joint positions based on the new cartesian positions
@@ -1038,25 +1031,18 @@ void kins::move_cartesian(){
     }
 
     float new_zangle, new_yangle, new_xangle;
-    // decompose with each angle axis unwrapped onto its limit band's branch so bounded/off-centre
-    // limit bands stay meaningful for the clamp below
+    // decompose with each angle axis unwrapped onto its limit band's branch so the limit checks
+    // and feedback share one 2*pi branch. This is periodicity-only (k*2pi shift) -- it does NOT
+    // change the orientation handed to inverse_kins().
+    //
+    // NB: do NOT clamp new_xangle/new_yangle/new_zangle to cartesian_limits here. Overwriting a
+    // single Euler component produces a different physical orientation than the slerp point, and
+    // combined with the still-advancing linear position that pose is frequently unreachable ->
+    // inverse_kins() diverges and rolls back every cycle -> permanent stall. The slerp path's
+    // Euler decomposition is allowed to transiently leave the configured angle box (pre-existing
+    // limitation, see this function's header comment); any real path limiting must constrain the
+    // slerp itself, never post-clamp a component.
     decompose_cmd_angles(q_new, new_zangle, new_yangle, new_xangle);
-
-    // orientation-path clamp: the slerp geodesic between two in-box endpoints can still bow
-    // outside the per-axis Euler box, so clamp each bounded angle axis every cycle -- no commanded
-    // orientation ever leaves the box. The linear x/y/z ramp (new_pos) is untouched and keeps
-    // moving. index 3,4,5 == xangle,yangle,zangle.
-    {
-        float* ang[3] = { &new_xangle, &new_yangle, &new_zangle };
-        bool ori_clamped = false;
-        for(int i = 3; i <= 5; i++){
-            if(cartesian_distances_to_limit[i].infinite) continue;
-            float& a = *ang[i-3];
-            if(a < cartesian_limits[i].min_pos)      { a = cartesian_limits[i].min_pos; ori_clamped = true; }
-            else if(a > cartesian_limits[i].max_pos) { a = cartesian_limits[i].max_pos; ori_clamped = true; }
-        }
-        if(ori_clamped) move_cartesian_last_ang_vel = 0.0f; // bleed the angular ramp against the limit
-    }
 
     // snapshot before mutating, same convention jog_cartesian()/jog_mouse() use -- inverse_kins()
     // rolls last_cmd_cartesian_positions back to this snapshot on IK failure or failed validation.
