@@ -93,6 +93,7 @@ void kins::create_outputs(){
     outputs.emplace("yangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.yangle), &execution_number));
     outputs.emplace("zangle_fbk_pos", output(io_type::FLOAT, &(out_sigs.fbk_cartesian_positions.zangle), &execution_number));
     outputs.emplace("at_cmd_pos", output(io_type::BOOL, &(out_sigs.at_cmd_pos), &execution_number));
+    outputs.emplace("cmd_pos_limited", output(io_type::BOOL, &(out_sigs.cmd_pos_limited), &execution_number));
     outputs.emplace("backup_buffer_exhausted", output(io_type::BOOL, &(out_sigs.backup_buffer_exhausted), &execution_number));
 }
 
@@ -130,6 +131,14 @@ void kins::update_inputs(){
 uint32_t kins::run(){
     // update inputs
     update_inputs();
+
+    if(abort_requested){
+        // JSON "abort" command: drive this cycle exactly like a pull of the reset input pin --
+        // stop motion immediately, snap all commanded state to feedback, cancel any in-flight
+        // move, and clear collision backup / joint-limit stall state. One-shot: consumed here.
+        in_sigs.reset = true;
+        abort_requested = false;
+    }
 
     if(!cmd_joint_positions_initialized){
         // out_sigs.cmd_joint_positions otherwise defaults to all-zero, which is essentially never
@@ -181,6 +190,8 @@ uint32_t kins::run(){
         move_cartesian_target_valid = false;
         move_cartesian_last_vel.fill(0.0f);
         move_cartesian_last_ang_vel = 0.0f;
+        out_sigs.cmd_pos_limited = false;
+        reset_cartesian_stall_state();
     }
 
     if(in_sigs.control_mode == control_modes::CARTESIAN && (last_control_mode != control_modes::CARTESIAN || in_sigs.reset)){
@@ -189,6 +200,8 @@ uint32_t kins::run(){
         // mode it can be stale. Resync here, before update_cartesian_distances_to_limit() runs below,
         // so this cycle's velocity caps are computed from the correct position.
         last_cmd_cartesian_positions = out_sigs.fbk_cartesian_positions;
+        out_sigs.cmd_pos_limited = false;
+        reset_cartesian_stall_state();
     }
 
     update_joint_distances_to_limit();
@@ -290,6 +303,9 @@ uint32_t kins::run(){
         // feedback" role reset already plays for normal moves above
         collision_backup_state = backup_state::IDLE;
         backup_last_vel.fill(0.0f);
+
+        out_sigs.cmd_pos_limited = false;
+        reset_cartesian_stall_state();
     }
 
     bool on_joint_limit = clamp_to_joint_limits();  // clamp the commanded joint positions to the limits as a failsafe
@@ -864,6 +880,10 @@ uint32_t kins::set_move_cartesian_cmd_positions(const cartesian_positions& new_t
     move_cartesian_cmd_positions = {result[0], result[1], result[2], result[3], result[4], result[5]};
     move_cartesian_target_valid = true;
 
+    // a fresh command supersedes any prior joint-limit stop and any partial stall debounce
+    out_sigs.cmd_pos_limited = false;
+    reset_cartesian_stall_state();
+
     return 0; // success
 }
 
@@ -899,12 +919,15 @@ void kins::move_cartesian(){
         move_cartesian_last_vel.fill(0.0f);
         move_cartesian_last_ang_vel = 0.0f;
         out_sigs.at_cmd_pos = true;
+        out_sigs.cmd_pos_limited = false;
+        reset_cartesian_stall_state();
         return;
     }
 
     if(!move_cartesian_target_valid){
         // no commanded target has been set yet -- nothing to do
         out_sigs.at_cmd_pos = true;
+        reset_cartesian_stall_state();
         return;
     }
 
@@ -1050,6 +1073,58 @@ void kins::move_cartesian(){
     last_cmd_cartesian_positions = {new_pos[0], new_pos[1], new_pos[2], new_xangle, new_yangle, new_zangle};
     inverse_kins(); // solve IK, rate-limit, validate, and write out_sigs.cmd_joint_positions on success
 
+    // ---- joint-limit terminal-stall detection --------------------------------------------------
+    // If the joint-rate limiter scaled this cycle's step (joint_rate_limited_this_cycle) AND the
+    // reached pose has stopped closing on the commanded target for cartesian_stall_debounce_cycles
+    // consecutive such cycles, the move is blocked by a joint limit: rebase the commanded target
+    // onto the pose actually reached (so future relative/absolute commands build from there),
+    // latch at_cmd_pos, and flag cmd_pos_limited. Gated on joint_rate_limited_this_cycle -- NOT on
+    // "distance not shrinking" alone -- so a legitimately slow move never trips it. The
+    // reference-window progress test (latched cartesian_stall_ref_*) is robust to IK jitter and to
+    // a genuine slow crawl toward the limit: any real closure beyond the eps re-arms the reference
+    // and resets the counter, so only an effectively-stopped move collapses.
+    if(cartesian_stall_detect_enable && joint_rate_limited_this_cycle){
+        float dsx = move_cartesian_cmd_positions.x - last_cmd_cartesian_positions.x;
+        float dsy = move_cartesian_cmd_positions.y - last_cmd_cartesian_positions.y;
+        float dsz = move_cartesian_cmd_positions.z - last_cmd_cartesian_positions.z;
+        float d_lin = sqrtf(dsx*dsx + dsy*dsy + dsz*dsz);
+
+        quat_rot q_tgt = quatFromZYX(move_cartesian_cmd_positions.zangle,
+                                     move_cartesian_cmd_positions.yangle,
+                                     move_cartesian_cmd_positions.xangle);
+        quat_rot q_rch = quatFromZYX(last_cmd_cartesian_positions.zangle,
+                                     last_cmd_cartesian_positions.yangle,
+                                     last_cmd_cartesian_positions.xangle);
+        float d_ang = quat_angle_between(q_rch, q_tgt);
+
+        if(d_lin > pos_tol || d_ang > angle_tol){
+            bool progressed = !cartesian_stall_ref_valid
+                || d_lin < cartesian_stall_ref_lin - cartesian_stall_progress_eps_pos
+                || d_ang < cartesian_stall_ref_ang - cartesian_stall_progress_eps_angle;
+            if(progressed){
+                cartesian_stall_ref_lin   = d_lin;
+                cartesian_stall_ref_ang   = d_ang;
+                cartesian_stall_ref_valid = true;
+                cartesian_stall_count     = 0;
+            }
+            else if(++cartesian_stall_count >= cartesian_stall_debounce_cycles){
+                move_cartesian_cmd_positions = last_cmd_cartesian_positions; // rebase onto reached pose
+                move_cartesian_last_vel.fill(0.0f);
+                move_cartesian_last_ang_vel = 0.0f;
+                reset_cartesian_stall_state();
+                out_sigs.cmd_pos_limited = true;
+                out_sigs.at_cmd_pos      = true;
+                return; // move complete; skip the normal at_cmd_pos recompute below
+            }
+        }
+        else {
+            reset_cartesian_stall_state(); // within tolerance -- not a stall
+        }
+    }
+    else {
+        reset_cartesian_stall_state(); // not joint-rate-limited this cycle -- disarm
+    }
+
     // check against the post-inverse_kins() state, not the pre-IK ramped new_pos -- if IK failed
     // this cycle and rolled back, we did not actually reach new_pos and at_cmd_pos must reflect
     // that.
@@ -1133,6 +1208,8 @@ void kins::start_collision_backup(){
     move_cartesian_target_valid = true;
     move_cartesian_last_vel.fill(0.0f);
     move_cartesian_last_ang_vel = 0.0f;
+    out_sigs.cmd_pos_limited = false;
+    reset_cartesian_stall_state();
 
     collision_backup_state = backup_state::RETRACING;
     backup_last_vel.fill(0.0f); // fresh ramp state -- the retrace accelerates from zero, at full max_acc, up to backup_speed_scale * max_vel
@@ -1224,6 +1301,8 @@ void kins::run_backup_decel(){
         move_cartesian_target_valid = false;
         move_cartesian_last_vel.fill(0.0f);
         move_cartesian_last_ang_vel = 0.0f;
+        out_sigs.cmd_pos_limited = false;
+        reset_cartesian_stall_state();
 
         collision_backup_state = backup_state::IDLE;
         backup_last_vel.fill(0.0f);
@@ -1232,6 +1311,12 @@ void kins::run_backup_decel(){
 }
 
 void kins::inverse_kins(){
+
+    // "joint limit throttled this step" signal for move_cartesian()'s stall detector -- default
+    // to "not throttled" and only raise it on the rate-limit path below (NOT on IK failure /
+    // failed validation, which keep their existing hold-in-place behaviour).
+    joint_rate_limited_this_cycle = false;
+    last_ik_rate_scale            = 1.0f;
 
     std::array<float,3> target_pos_tool = {
         last_cmd_cartesian_positions.x,
@@ -1318,6 +1403,8 @@ void kins::inverse_kins(){
         // apply joint velocity rate limiting — all joints scale by the same factor to stay in sync
         float rate_scale = apply_cartesian_joint_rate_limit(outSolution);
         // float rate_scale = 1.0f; // bypass for testing
+        last_ik_rate_scale            = rate_scale;
+        joint_rate_limited_this_cycle = (rate_scale < 1.0f); // a joint limit (or its decel zone) throttled this step
 
         // update the last commanded cartesian positions
         last_cmd_cartesian_positions.x      = target_pos_tool[0];

@@ -121,6 +121,7 @@ class kins: public base_node {
             joint_positions cmd_joint_positions;
             cartesian_positions fbk_cartesian_positions;    // commanded cartesian position, not raw feedback from the robot
             bool at_cmd_pos = false;
+            bool cmd_pos_limited = false; // last at-rest state is a joint-limit stop (move truncated, target rebased), not arrival at the commanded pose
             bool backup_buffer_exhausted = false;
         } out_sigs;
 
@@ -155,6 +156,10 @@ class kins: public base_node {
         float at_cmd_pos_tol       = 1e-4f; // metres  (0.1 mm)
         float at_cmd_pos_angle_tol = 1e-3f; // radians (~0.057 deg)
 
+        // set by inverse_kins() every call; read by move_cartesian()'s joint-limit stall detector
+        bool  joint_rate_limited_this_cycle = false; // apply_cartesian_joint_rate_limit() scaled the step (rate_scale < 1)
+        float last_ik_rate_scale            = 1.0f;  // diagnostic / tuning only
+
         cartesian_positions last_cmd_cartesian_positions; // these are what were used with the inverse kins
         cartesian_positions prev_cmd_cartesian_positions; // TCP position before this cycle's jog step
 
@@ -163,6 +168,11 @@ class kins: public base_node {
         control_modes last_control_mode = control_modes::UNDEFINED; // last control mode used, to detect CARTESIAN-mode entry and resync last_cmd_cartesian_positions
 
         bool cmd_joint_positions_initialized = false; // true once out_sigs.cmd_joint_positions has been seeded from feedback
+
+        // set by the JSON { "abort": true } command; consumed once at the top of run(), where it is
+        // folded into in_sigs.reset so it drives the exact same "stop now + snap all commanded state
+        // to feedback + cancel move + clear collision backup / stall" path as the reset input pin.
+        bool abort_requested = false;
 
         uint8_t last_tool_select = 0; // last tool_select value, to detect changes regardless of control mode
 
@@ -191,6 +201,17 @@ class kins: public base_node {
         float move_cartesian_last_ang_vel = 0.0f; // last commanded angular speed for the combined orientation (slerp) channel (for accel limiting)
         uint32_t set_move_cartesian_cmd_positions(const cartesian_positions& new_target); // called by the JSON command handler to set a new synchronized-move target
         void move_cartesian();
+
+        // CARTESIAN move joint-limit terminal-stall detection -- see move_cartesian()
+        bool  cartesian_stall_detect_enable      = true;
+        int   cartesian_stall_debounce_cycles    = 100;     // ~0.10 s at time_step = 1 ms
+        float cartesian_stall_progress_eps_pos   = 2.0e-5f; // m   -- min closure/cycle to count as "still moving"
+        float cartesian_stall_progress_eps_angle = 3.5e-4f; // rad
+        int   cartesian_stall_count     = 0;
+        float cartesian_stall_ref_lin   = 0.0f;
+        float cartesian_stall_ref_ang   = 0.0f;
+        bool  cartesian_stall_ref_valid = false;
+        void  reset_cartesian_stall_state(){ cartesian_stall_count = 0; cartesian_stall_ref_valid = false; }
 
         // --- collision backup (retrace-path) ---
         // Circular history of commanded joint positions, recorded while in JOINT/CARTESIAN control
@@ -488,8 +509,10 @@ class kins: public base_node {
 
                 "get":{
                     "cmd_joint_pos": {}
-                }
+                },
 
+                "abort": true   // immediate stop + full state reset (same as pulsing the reset input pin);
+                                // recovery path out of a joint-limit stall without restarting the controller
             }
             */
             bool dh_set = false;
@@ -609,6 +632,44 @@ class kins: public base_node {
                 }
             }
 
+            // optional: tune / disable CARTESIAN joint-limit stall detection
+            // { "cartesian_stall_detect": { "enable": true, "debounce": 0.10, "pos_eps": 0.00002, "angle_eps": 0.02 } }
+            //   debounce seconds, pos_eps metres, angle_eps degrees
+            if(json->find("cartesian_stall_detect") != json->end()){
+                auto& sd = (*json)["cartesian_stall_detect"];
+                if(!sd.is_object()){
+                    std::cerr << "Invalid cartesian_stall_detect format, expected an object." << std::endl;
+                    return 1;
+                }
+                if(sd.find("enable") != sd.end() && sd["enable"].is_boolean()){
+                    cartesian_stall_detect_enable = sd["enable"].get<bool>();
+                }
+                if(sd.find("debounce") != sd.end()){
+                    float d = sd["debounce"].get<float>();
+                    if(d <= 0.0f){
+                        std::cerr << "Invalid cartesian_stall_detect.debounce, must be > 0." << std::endl;
+                        return 1;
+                    }
+                    cartesian_stall_debounce_cycles = std::max(1, (int)lroundf(d / time_step));
+                }
+                if(sd.find("pos_eps") != sd.end()){
+                    float p = sd["pos_eps"].get<float>();
+                    if(p < 0.0f){
+                        std::cerr << "Invalid cartesian_stall_detect.pos_eps, must be >= 0." << std::endl;
+                        return 1;
+                    }
+                    cartesian_stall_progress_eps_pos = p;
+                }
+                if(sd.find("angle_eps") != sd.end()){
+                    float a = sd["angle_eps"].get<float>();
+                    if(a < 0.0f){
+                        std::cerr << "Invalid cartesian_stall_detect.angle_eps, must be >= 0." << std::endl;
+                        return 1;
+                    }
+                    cartesian_stall_progress_eps_angle = a * (float)M_PI / 180.0f;
+                }
+            }
+
             if(json->find("cartesian_limits") != json->end()){
                 auto& cartesian_limits_json = (*json)["cartesian_limits"];
                 if(cartesian_limits_json.is_object()){
@@ -685,6 +746,20 @@ class kins: public base_node {
             if(!configured){
                 std::cerr << "Kins node initial configuration failed, missing required parameters." << std::endl;
                 return 1; // error code for configuration failure
+            }
+
+            // { "abort": true }  -- immediate motion stop + full state reset, equivalent to a
+            // one-cycle pull of the reset input pin. Cancels any in-flight synchronized move,
+            // snaps all commanded joint/cartesian state to the current feedback, clears any
+            // collision backup and any joint-limit stall latch. This is the recovery path out of
+            // a joint-limit stall without power-cycling the controller. Deferred: the flag is
+            // consumed at the top of run() so the stop lands synchronously with the control loop.
+            // Any value other than an explicit false triggers it.
+            if(json->find("abort") != json->end()){
+                auto& abort_json = (*json)["abort"];
+                if(!(abort_json.is_boolean() && abort_json.get<bool>() == false)){
+                    abort_requested = true;
+                }
             }
 
             if(json->find("set") != json->end()){
@@ -894,6 +969,11 @@ class kins: public base_node {
                     if(get_json.find("at_cmd_pos") != get_json.end()){
                         // return whether the robot is at the target position
                         (*json)["get"] = out_sigs.at_cmd_pos;
+                    }
+                    if(get_json.find("cmd_pos_limited") != get_json.end()){
+                        // return whether the last at-rest state was a joint-limit stop (move
+                        // truncated and target rebased) rather than arrival at the commanded pose
+                        (*json)["get"]["cmd_pos_limited"] = out_sigs.cmd_pos_limited;
                     }
                 }
                 else {
